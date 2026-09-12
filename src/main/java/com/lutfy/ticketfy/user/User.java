@@ -1,5 +1,6 @@
 package com.lutfy.ticketfy.user;
 
+import com.lutfy.ticketfy.infra.exception.InvalidRoleChangeException;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -7,6 +8,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.springframework.security.core.GrantedAuthority;
@@ -21,6 +23,7 @@ import java.util.UUID;
 @Table(name = "users")
 @Getter
 @NoArgsConstructor
+@EqualsAndHashCode(of = "id")
 public class User implements UserDetails {
 
     @Id
@@ -38,6 +41,13 @@ public class User implements UserDetails {
         this.name = data.name();
         this.email = data.email();
         this.password = encodedPassword;
+    }
+
+    public void promoteToOrganizer() {
+        if (this.getRole() == Role.ORGANIZER || this.getRole() == Role.ADMIN) {
+            throw new InvalidRoleChangeException("This account cannot be promoted to organizer");
+        }
+        this.role = Role.ORGANIZER;
     }
 
     @Override
