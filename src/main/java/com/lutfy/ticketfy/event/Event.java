@@ -6,7 +6,9 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -29,6 +31,9 @@ public class Event {
     private String venueName;
     private String address;
     private String city;
+
+    @JdbcTypeCode(SqlTypes.CHAR)
+    @Column(length = 2)
     private String state;
 
     @Column(name = "starts_at")
