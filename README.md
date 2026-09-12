@@ -1,151 +1,103 @@
 # Ticketfy
 
-API para um sistema de venda de ingressos para eventos, desenvolvida em Spring Boot. O projeto é construído como parte de um estudo pessoal/acadêmico, com foco em aplicar boas práticas de desenvolvimento backend.
+API para um sistema de venda de ingressos para eventos, em Spring Boot. Projeto de estudo pessoal, com foco em boas práticas de backend.
 
 ## Sobre o projeto
 
-O Ticketfy simula o backend de uma plataforma de venda de ingressos, no estilo de sistemas como Sympla ou Eventbrite. A proposta é permitir que qualquer pessoa se cadastre para comprar ingressos, que usuários interessados em produzir eventos se tornem organizadores e publiquem seus próprios eventos, e que os compradores naveguem pelo catálogo, escolham um tipo de ingresso e acompanhem seus pedidos.
+O Ticketfy simula o backend de uma plataforma de venda de ingressos, no estilo do Sympla ou Eventbrite: qualquer pessoa se cadastra para comprar, usuários interessados em produzir eventos viram organizadores, e compradores navegam pelo catálogo e acompanham seus pedidos.
 
-Por ser um projeto acadêmico, o foco não é só "fazer funcionar", mas também aplicar conceitos importantes de backend: separação de responsabilidades (Controller → Service → Repository), validação de dados, segurança (senhas criptografadas, autenticação via token, autorização por papel e por propriedade), tratamento centralizado de erros, versionamento de schema de banco de dados e documentação de API.
+O foco não é só fazer funcionar, mas aplicar separação de responsabilidades, validação, segurança, tratamento centralizado de erros, versionamento de schema e documentação de API.
 
-O projeto está em desenvolvimento ativo. Veja o [Roadmap](#roadmap) para saber o que já está pronto e o que ainda falta.
+Projeto em desenvolvimento ativo — veja o [Roadmap](#roadmap).
 
-## Papéis de usuário
+## Papéis e autorização
 
-O sistema trabalha com três papéis:
+| Papel | O que faz |
+|---|---|
+| **USER** | Compra ingressos e acompanha os próprios pedidos. Atribuído a todo mundo no cadastro |
+| **ORGANIZER** | Cria e gerencia os próprios eventos. Qualquer usuário autenticado se torna um, sem aprovação |
+| **ADMIN** | Administra a plataforma inteira |
 
-**USER** — o comprador. É o papel atribuído a todo mundo que se cadastra. Navega pelos eventos, compra ingressos e acompanha os próprios pedidos.
+O papel nunca é aceito no cadastro: é sempre definido pelo servidor.
 
-**ORGANIZER** — cria e gerencia os próprios eventos, e acompanha as vendas deles. Não tem acesso a eventos de outros organizadores. Seguindo o modelo do Sympla, qualquer usuário autenticado pode se tornar organizador, sem aprovação prévia.
+A autorização tem duas camadas: **por papel** ("você pode criar evento?"), resolvida com `@PreAuthorize`; e **por propriedade** ("esse evento é seu?"), que papel nenhum responde — dois organizadores têm o mesmo papel — e por isso vive na camada de serviço.
 
-**ADMIN** — administra a plataforma inteira: qualquer evento, qualquer usuário, qualquer pedido.
+## Tecnologias
 
-O papel nunca é aceito no cadastro: ele é sempre definido pelo servidor.
-
-## Tecnologias utilizadas
-
-- **Java 17**
-- **Spring Boot 4**
-- **Spring Data JPA / Hibernate**
-- **Spring Security**
-- **PostgreSQL**
-- **Flyway** — versionamento de banco de dados (migrations)
-- **JWT (java-jwt, da Auth0)** — autenticação baseada em token
-- **Bean Validation (Jakarta Validation)** — validação dos dados recebidos pela API
-- **Springdoc OpenAPI / Swagger UI** — documentação interativa da API
-- **Lombok**
-- **Maven**
+Java 17 · Spring Boot 4 · Spring Data JPA · Spring Security · PostgreSQL · Flyway · JWT (java-jwt) · Bean Validation · Springdoc OpenAPI · Lombok · Maven · Docker Compose
 
 ## Funcionalidades
 
-### Já implementado
+**Usuários e autenticação** — cadastro com validação, senha com BCrypt, id em UUID, login com JWT de expiração configurável, rotas protegidas por filtro stateless, auto-promoção a organizador com reemissão de token. A aplicação recusa iniciar com uma chave de assinatura fraca.
 
-**Usuários e autenticação**
+**Eventos** — CRUD completo com autorização nas duas camadas, listagem paginada e ordenada, busca por nome e filtro por cidade combináveis, atualização parcial, exclusão lógica (preservando a integridade dos pedidos futuros), validação de coerência entre início e fim, e timestamps de criação e alteração.
 
-- Cadastro de usuário com validação dos dados de entrada (`POST /users`)
-- Criptografia de senha com BCrypt, com limite de tamanho alinhado ao máximo que o algoritmo processa
-- Verificação de email duplicado no cadastro
-- Identificador de usuário como UUID gerado aleatoriamente, em vez de id sequencial
-- Papel do usuário definido sempre pelo servidor — nunca aceito do que o cliente envia
-- Login com emissão de token JWT (`POST /login`), com expiração configurável
-- Proteção de rotas via filtro de segurança, com autenticação stateless
-- Validação da força da chave de assinatura na inicialização: a aplicação não sobe com um segredo fraco
+**Erros** — respostas padronizadas em JSON, validação detalhada por campo, mensagem idêntica para credenciais inválidas (evitando enumeração de usuários) e erros inesperados logados sem expor detalhes internos.
 
-**Tratamento de erros**
+**Planejado** — tipos de ingresso e precificação, fluxo de pedidos e pagamento, emissão e validação de ingressos.
 
-- Respostas de erro padronizadas em JSON para toda a API
-- Erros de validação detalhados por campo
-- Mensagem genérica e idêntica para credenciais inválidas, evitando enumeração de usuários
-- Erros inesperados registrados no servidor e devolvidos sem expor detalhes internos
+## Como rodar
 
-### Em desenvolvimento
-
-- Domínio de eventos (CRUD, com autorização por papel e por propriedade)
-
-### Planejado
-
-- Auto-atribuição do papel de organizador
-- Tipos de ingresso e precificação
-- Fluxo de pedidos e pagamento
-- Emissão e validação de ingressos
-
-## Como rodar o projeto
-
-### Pré-requisitos
-
-- Java 17 ou superior
-- Maven (ou usar o `./mvnw` incluído no projeto)
-- PostgreSQL rodando localmente (ou acessível por string de conexão)
-
-### Passo a passo
-
-1. Clone o repositório
+Pré-requisitos: Java 17+, Maven (ou o `./mvnw` incluído) e Docker Compose.
 
 ```bash
-git clone https://github.com/rodrigolutfy/ticketfy.git
-cd ticketfy
+git clone https://github.com/rodrigolutfydev/Ticketfy-API.git
+cd Ticketfy-API
 ```
 
-2. Crie um banco de dados PostgreSQL (nome esperado por padrão: `ticketfy`)
+Crie um `.env` na raiz com a senha do banco (o arquivo não é versionado; o Compose o lê automaticamente):
 
-3. Configure as variáveis de ambiente. Nenhum segredo fica escrito no `application.yml`:
+```
+DB_PASSWORD=sua_senha
+```
+
+Suba o banco, exporte as variáveis e rode:
 
 ```bash
+docker compose up -d
+
 export DB_PASSWORD=sua_senha
 export JWT_SECRET=$(openssl rand -base64 32)
-```
 
-A `JWT_SECRET` é a chave usada para assinar os tokens, e precisa ter no mínimo 32 caracteres — a aplicação recusa iniciar com um valor mais curto. Ela não tem valor padrão de propósito: um segredo versionado no repositório permitiria que qualquer pessoa forjasse tokens válidos.
-
-4. Rode a aplicação
-
-```bash
 ./mvnw spring-boot:run
 ```
 
-O Flyway aplica as migrations do banco automaticamente ao iniciar.
+A `JWT_SECRET` assina os tokens e precisa de no mínimo 32 caracteres. Não tem valor padrão de propósito: um segredo versionado no repositório permitiria a qualquer pessoa forjar tokens válidos.
 
-A API estará disponível em `http://localhost:8080`, e a documentação interativa (Swagger UI) em `http://localhost:8080/swagger-ui/index.html`
+O Flyway aplica as migrations ao iniciar. A API sobe em `http://localhost:8080` e o Swagger UI em `/swagger-ui/index.html`.
 
-## Endpoints da API
+## Endpoints
 
-### Já implementados
+### Implementados
 
 | Método | Endpoint | Descrição | Acesso |
 |--------|----------|-----------|--------|
-| POST | `/users` | Cadastra um novo usuário | Público |
+| POST | `/users` | Cadastra um usuário | Público |
 | POST | `/login` | Autentica e retorna um token JWT | Público |
+| POST | `/users/me/organizer` | Torna o usuário autenticado um organizador | Autenticado |
+| POST | `/events` | Cadastra um evento | ORGANIZER ou ADMIN |
+| GET | `/events` | Lista os eventos ativos, paginado | Público |
+| GET | `/events/{id}` | Detalha um evento | Público |
+| PUT | `/events/{id}` | Atualiza um evento (parcial) | Dono ou ADMIN |
+| DELETE | `/events/{id}` | Desativa um evento | Dono ou ADMIN |
 
-As rotas protegidas esperam o token no header `Authorization`, no formato `Bearer <token>`.
+Rotas protegidas esperam o token no header `Authorization`, no formato `Bearer <token>`.
+
+A listagem aceita `q` (trecho do nome), `city` (exata), `page` (padrão `0`), `size` (padrão `20`) e `sort` (padrão `startsAt,asc`). Exemplo: `GET /events?q=rock&size=10`. A resposta traz `content` e um objeto `page` com `size`, `number`, `totalElements` e `totalPages`.
 
 ### Planejados
 
-| Método | Endpoint | Descrição | Acesso |
-|--------|----------|-----------|--------|
-| GET | `/users/me` | Retorna os dados do usuário autenticado | Autenticado |
-| POST | `/users/me/organizer` | Torna o usuário autenticado um organizador | Autenticado |
-| POST | `/events` | Cadastra um novo evento | ORGANIZER |
-| GET | `/events` | Lista os eventos publicados (paginado) | Público |
-| GET | `/events/{id}` | Detalha um evento específico | Público |
-| PUT | `/events/{id}` | Atualiza um evento | Dono ou ADMIN |
-| DELETE | `/events/{id}` | Cancela um evento | Dono ou ADMIN |
-| GET | `/events/{id}/ticket-types` | Lista os tipos de ingresso de um evento | Público |
-| POST | `/events/{id}/ticket-types` | Cadastra um tipo de ingresso | Dono ou ADMIN |
-| POST | `/orders` | Cria um novo pedido de compra | USER |
-| GET | `/orders/me` | Lista os pedidos do usuário autenticado | USER |
-| GET | `/orders/{id}` | Detalha um pedido específico | Dono ou ADMIN |
+`GET /users/me` · `GET` e `POST /events/{id}/ticket-types` · `POST /orders` · `GET /orders/me` · `GET /orders/{id}`
 
-## Formato das respostas de erro
+## Respostas de erro
 
-Toda resposta de erro da API é um objeto JSON com a mesma forma:
+Todo erro é um JSON com a mesma forma:
 
 ```json
-{
-  "message": "This email is already registered"
-}
+{ "message": "This email is already registered" }
 ```
 
-Erros de validação incluem a lista de campos que falharam:
+Erros de validação incluem os campos que falharam:
 
 ```json
 {
@@ -158,17 +110,14 @@ Erros de validação incluem a lista de campos que falharam:
 
 | Situação | Status |
 |----------|--------|
-| Dados inválidos na requisição | 400 |
-| Credenciais inválidas no login | 401 |
-| Requisição sem token em rota protegida | 401 |
-| Acesso a recurso de outro usuário | 403 |
+| Dados ou parâmetro de rota inválidos | 400 |
+| Credenciais inválidas, ou rota protegida sem token | 401 |
+| Papel insuficiente, ou recurso de outro usuário | 403 |
 | Recurso não encontrado | 404 |
 | Conflito (ex: email já cadastrado) | 409 |
 | Erro inesperado | 500 |
 
-## Estrutura do projeto
-
-### Estrutura atual
+## Estrutura
 
 ```
 src/main/java/com/lutfy/ticketfy/
@@ -177,31 +126,14 @@ src/main/java/com/lutfy/ticketfy/
 │   ├── security/    # login, token JWT, filtro de autenticação
 │   └── exception/   # tratamento centralizado de erros
 ├── user/            # cadastro, papéis
-└── ApiApplication   # ponto de entrada
-
-src/main/resources/
-└── db/migration/    # migrations do Flyway
-```
-
-### Estrutura final pretendida
-
-```
-src/main/java/com/lutfy/ticketfy/
-├── infra/
-│   ├── config/
-│   ├── security/
-│   └── exception/
-├── user/            # cadastro, papéis
 ├── event/           # eventos e seus endereços
-├── tickettype/      # tipos e preços de ingresso
-├── ticket/          # ingresso emitido
-├── order/           # pedidos de compra
-├── payment/         # pagamento dos pedidos
-└── ApiApplication   # ponto de entrada
+└── ApiApplication
 
 src/main/resources/
 └── db/migration/    # migrations do Flyway
 ```
+
+Ainda virão os pacotes `tickettype`, `ticket`, `order` e `payment`.
 
 O projeto é organizado por domínio, não por camada: cada pasta reúne entity, repository, service, controller e DTOs daquele conceito de negócio.
 
@@ -213,12 +145,14 @@ O endereço do evento não é uma entidade separada. Seguindo o modelo do Sympla
 - [x] Login + autenticação JWT
 - [x] Proteção de rotas via filtro de segurança
 - [x] Tratamento centralizado de erros
-- [ ] Domínio de eventos (CRUD)
-- [ ] Papel de organizador e autorização por propriedade
+- [x] Papel de organizador e auto-promoção
+- [x] Domínio de eventos (CRUD, paginação, busca, exclusão lógica)
+- [x] Autorização por propriedade
 - [ ] Domínio de tipos de ingresso
 - [ ] Fluxo de pedidos e pagamento
 - [ ] Emissão e validação de ingressos
+- [ ] Testes automatizados no fluxo de compra
 
 ## Licença
 
-Este projeto está licenciado sob a licença MIT — veja o arquivo [LICENSE](LICENSE) para mais detalhes.
+Licenciado sob a licença MIT — veja [LICENSE](LICENSE).
