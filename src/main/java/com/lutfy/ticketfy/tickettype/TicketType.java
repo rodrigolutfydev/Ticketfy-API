@@ -34,6 +34,17 @@ public class TicketType {
     @UpdateTimestamp
     private LocalDateTime updatedAt;
 
+    public TicketType(TicketTypeCreationDTO dto, Event event) {
+        this.event = event;
+        this.name = dto.name();
+        this.description = dto.description();
+        this.price = dto.price();
+        this.quantityTotal = dto.quantityTotal();
+        this.maxPerOrder = dto.maxPerOrder();
+        this.quantitySold = 0;
+        this.active = true;
+    }
+
     public Integer availableQuantity() {
         return quantityTotal - quantitySold;
     }
