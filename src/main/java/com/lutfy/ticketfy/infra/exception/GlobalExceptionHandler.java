@@ -81,4 +81,10 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest()
                 .body(new ErrorResponseDTO("Invalid value for parameter '" + ex.getName() + "'"));
     }
+
+    @ExceptionHandler(TicketTypeNotFoundException.class)
+    public ResponseEntity<ErrorResponseDTO> handleTypeNotFound(TicketTypeNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(new ErrorResponseDTO(ex.getMessage()));
+    }
 }
