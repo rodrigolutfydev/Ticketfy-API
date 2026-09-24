@@ -83,8 +83,14 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(TicketTypeNotFoundException.class)
-    public ResponseEntity<ErrorResponseDTO> handleTypeNotFound(TicketTypeNotFoundException ex) {
+    public ResponseEntity<ErrorResponseDTO> handleTicketTypeNotFound(TicketTypeNotFoundException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(new ErrorResponseDTO(ex.getMessage()));
+    }
+
+    @ExceptionHandler(InvalidOrderStateException.class)
+    public ResponseEntity<ErrorResponseDTO> handleInvalidOrderState(InvalidOrderStateException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(new ErrorResponseDTO(ex.getMessage()));
     }
 }
