@@ -1,14 +1,10 @@
 package com.lutfy.ticketfy.order;
 
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Positive;
-
-import java.util.UUID;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotEmpty;
+import java.util.List;
 
 public record OrderCreationDTO(
-        @NotNull
-        UUID ticketTypeId,
-        @NotNull @Positive
-        Integer quantity
-) {
-}
+        @NotEmpty @Valid
+        List<OrderItemRequestDTO> items
+) {}

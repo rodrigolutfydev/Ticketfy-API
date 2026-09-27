@@ -93,4 +93,28 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(new ErrorResponseDTO(ex.getMessage()));
     }
+
+    @ExceptionHandler(InsufficientStockException.class)
+    public ResponseEntity<ErrorResponseDTO> handleInsufficientStock(InsufficientStockException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new ErrorResponseDTO(ex.getMessage()));
+    }
+
+    @ExceptionHandler(MaxPerOrderExceededException.class)
+    public ResponseEntity<ErrorResponseDTO> handleMaxPorOrderExceeded(MaxPerOrderExceededException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(new ErrorResponseDTO(ex.getMessage()));
+    }
+
+    @ExceptionHandler(OrderNotFoundException.class)
+    public ResponseEntity<ErrorResponseDTO> handleOrderNotFound(OrderNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(new ErrorResponseDTO(ex.getMessage()));
+    }
+
+    @ExceptionHandler(OrderAccessDeniedException.class)
+    public ResponseEntity<ErrorResponseDTO> handleOrderAccesdenied(OrderAccessDeniedException ex) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(new ErrorResponseDTO(ex.getMessage()));
+    }
 }

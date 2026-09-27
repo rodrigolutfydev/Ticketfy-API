@@ -11,6 +11,7 @@ import org.hibernate.annotations.UpdateTimestamp;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -40,6 +41,15 @@ public class Order {
     @UpdateTimestamp
     private LocalDateTime updatedAt;
 
+    public Order(User user, LocalDateTime expiresAt, String idempotencyKey) {
+        this.user = user;
+        this.expiresAt = expiresAt;
+        this.idempotencyKey = idempotencyKey;
+        this.status = OrderStatus.PENDING;
+        this.items = new ArrayList<>();
+        this.totalAmount = BigDecimal.ZERO;
+    }
+
     public void markAsPaid() {
         if (status != OrderStatus.PENDING) {
             throw new InvalidOrderStateException("Only pending orders can be paid");
@@ -67,4 +77,10 @@ public class Order {
     public boolean isExpired() {
         return expiresAt.isBefore(LocalDateTime.now());
     }
+
+    public void addItem(OrderItem item) {
+        this.items.add(item);
+        this.totalAmount = this.totalAmount.add(item.subtotal());
+    }
+
 }
