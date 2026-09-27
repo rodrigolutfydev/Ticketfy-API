@@ -84,4 +84,16 @@ public class OrderService {
             throw new OrderAccessDeniedException("You do not own this order");
         }
     }
+
+    @Transactional
+    public int expireOverdueOrders() {
+        var overdueOrders = orderRepository.findByStatusAndExpiresAtBefore(OrderStatus.PENDING, LocalDateTime.now());
+        for (var order : overdueOrders) {
+            order.expire();
+            for (var item : order.getItems()) {
+                ticketTypeRepository.releaseStock(item.getTicketType().getId(), item.getQuantity());
+            }
+        }
+        return overdueOrders.size();
+    }
 }
