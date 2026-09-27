@@ -49,7 +49,7 @@ public class OrderService {
             var item = new OrderItem(order, ticketType, itemRequest.quantity());
             order.addItem(item);
         }
-        var saved = orderRepository.save(order);
+        var saved = orderRepository.saveAndFlush(order);
         return new OrderDetailsDTO(saved);
     }
 
