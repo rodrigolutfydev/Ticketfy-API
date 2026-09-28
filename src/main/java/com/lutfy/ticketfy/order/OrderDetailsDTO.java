@@ -14,7 +14,7 @@ public record OrderDetailsDTO(
        List<OrderItemDTO> items
 ) {
     public OrderDetailsDTO(Order order) {
-        this(   order.getId(),
+        this( order.getId(),
                 order.getStatus(),
                 order.getTotalAmount(),
                 order.getExpiresAt(),

@@ -6,5 +6,5 @@ import java.util.List;
 
 public record OrderCreationDTO(
         @NotEmpty @Valid
-        List<OrderItemRequestDTO> items
+        List<@Valid OrderItemRequestDTO> items
 ) {}
