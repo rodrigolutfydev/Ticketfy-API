@@ -26,14 +26,15 @@ public class OrderService {
 
     @Transactional
     public OrderDetailsDTO create(OrderCreationDTO dto, String idempotencyKey, User authenticated) {
-        var expiresAt = LocalDateTime.now().plusMinutes(15);
-        var order = new Order(authenticated, expiresAt, idempotencyKey);
         if (idempotencyKey != null) {
             var existing = orderRepository.findByIdempotencyKey(idempotencyKey);
             if (existing.isPresent()) {
+                checkOwnership(existing.get(), authenticated);
                 return new OrderDetailsDTO(existing.get());
             }
         }
+        var expiresAt = LocalDateTime.now().plusMinutes(15);
+        var order = new Order(authenticated, expiresAt, idempotencyKey);
         for (var itemRequest : dto.items()) {
             var ticketType = ticketTypeRepository.findByIdAndActiveTrue(itemRequest.ticketTypeId())
                     .orElseThrow(() -> new TicketTypeNotFoundException("Ticket type not found"));
