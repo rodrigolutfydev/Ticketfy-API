@@ -2,6 +2,7 @@ package com.lutfy.ticketfy.order;
 
 import com.lutfy.ticketfy.user.User;
 import jakarta.validation.Valid;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -26,8 +27,17 @@ public class OrderController {
             @RequestBody @Valid OrderCreationDTO dto,
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
             @AuthenticationPrincipal User authenticated) {
-        var create = service.create(dto, idempotencyKey, authenticated);
-        return ResponseEntity.status(HttpStatus.CREATED).body(create);
+        OrderDetailsDTO order;
+        try {
+            order = service.create(dto, idempotencyKey, authenticated);
+        } catch (DataIntegrityViolationException ex) {
+            if (idempotencyKey == null) {
+                throw ex;
+            }
+            order = service.findByIdempotencyKey(idempotencyKey, authenticated)
+                    .orElseThrow(() -> ex);
+        }
+        return ResponseEntity.status(HttpStatus.CREATED).body(order);
     }
 
     @GetMapping("/{id}")

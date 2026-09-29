@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -60,6 +61,15 @@ public class OrderService {
                 .orElseThrow(() -> new OrderNotFoundException("Order not found"));
         checkOwnership(order, authenticated);
         return new OrderDetailsDTO(order);
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<OrderDetailsDTO> findByIdempotencyKey(String idempotencyKey, User authenticated) {
+        return orderRepository.findByIdempotencyKey(idempotencyKey)
+                .map(order -> {
+                    checkOwnership(order, authenticated);
+                    return new OrderDetailsDTO(order);
+                });
     }
 
     public Page<OrderSummaryDTO> listMyOrders(User authenticated, Pageable pageable) {
