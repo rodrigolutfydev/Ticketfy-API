@@ -123,4 +123,16 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(new ErrorResponseDTO(ex.getMessage()));
     }
+
+    @ExceptionHandler(InvalidTicketStateException.class)
+    public ResponseEntity<ErrorResponseDTO> handleInvalidTicketState(InvalidTicketStateException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new ErrorResponseDTO(ex.getMessage()));
+    }
+
+    @ExceptionHandler(TicketNotFoundException.class)
+    public ResponseEntity<ErrorResponseDTO> handleTicketNotFound(TicketNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(new ErrorResponseDTO(ex.getMessage()));
+    }
 }

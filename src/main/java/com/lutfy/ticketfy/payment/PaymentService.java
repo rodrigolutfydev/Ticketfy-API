@@ -5,6 +5,7 @@ import com.lutfy.ticketfy.infra.exception.InvalidPaymentStateException;
 import com.lutfy.ticketfy.infra.exception.OrderAccessDeniedException;
 import com.lutfy.ticketfy.infra.exception.OrderNotFoundException;
 import com.lutfy.ticketfy.order.OrderRepository;
+import com.lutfy.ticketfy.ticket.TicketService;
 import com.lutfy.ticketfy.user.User;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,10 +17,14 @@ public class PaymentService {
 
     private final PaymentRepository paymentRepository;
     private final OrderRepository orderRepository;
+    private final TicketService ticketService;
 
-    public PaymentService(PaymentRepository paymentRepository, OrderRepository orderRepository) {
+    public PaymentService(PaymentRepository paymentRepository,
+                          OrderRepository orderRepository,
+                          TicketService ticketService) {
         this.paymentRepository = paymentRepository;
         this.orderRepository = orderRepository;
+        this.ticketService = ticketService;
     }
 
     @Transactional
@@ -40,6 +45,7 @@ public class PaymentService {
         var payment = new Payment(order, PaymentMethod.SIMULATED);
         payment.approve();
         order.markAsPaid();
+        ticketService.issueForOrder(order);
 
         var saved = paymentRepository.saveAndFlush(payment);
         return new PaymentDetailsDTO(saved);
