@@ -40,6 +40,8 @@ public class Order {
     private LocalDateTime createdAt;
     @UpdateTimestamp
     private LocalDateTime updatedAt;
+    @Version
+    private Long version;
 
     public Order(User user, LocalDateTime expiresAt, String idempotencyKey) {
         this.user = user;

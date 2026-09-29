@@ -7,6 +7,7 @@ CREATE TABLE orders (
                         idempotency_key  VARCHAR(100),
                         created_at       TIMESTAMP      NOT NULL DEFAULT NOW(),
                         updated_at       TIMESTAMP,
+                        version          BIGINT         NOT NULL DEFAULT 0,
 
                         CONSTRAINT fk_orders_user
                             FOREIGN KEY (user_id) REFERENCES users (id),
