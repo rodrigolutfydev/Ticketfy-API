@@ -76,6 +76,13 @@ public class Order {
         this.status = OrderStatus.CANCELLED;
     }
 
+    public void refund() {
+        if (status != OrderStatus.PAID) {
+            throw new InvalidOrderStateException("Only paid orders can be refunded");
+        }
+        this.status = OrderStatus.REFUNDED;
+    }
+
     public boolean isExpired() {
         return expiresAt.isBefore(LocalDateTime.now());
     }

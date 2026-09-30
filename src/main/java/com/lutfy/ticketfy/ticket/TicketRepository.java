@@ -30,4 +30,17 @@ public interface TicketRepository extends JpaRepository<Ticket, UUID> {
                 @Param("now") LocalDateTime now,
                 @Param("used") TicketStatus used,
                 @Param("valid") TicketStatus valid);
+
+    long countByOrderId(UUID orderId);
+
+    @Modifying(flushAutomatically = true)
+    @Query("""
+    UPDATE Ticket t
+    SET t.status = :cancelled, t.updatedAt = :now
+    WHERE t.order.id = :orderId AND t.status = :valid
+    """)
+    int cancelValidByOrderId(@Param("orderId") UUID orderId,
+                             @Param("now") LocalDateTime now,
+                             @Param("cancelled") TicketStatus cancelled,
+                             @Param("valid") TicketStatus valid);
 }
