@@ -60,4 +60,11 @@ public class OrderController {
             @AuthenticationPrincipal User authenticated) {
         return ResponseEntity.ok(service.cancel(id, authenticated));
     }
+
+    @PostMapping("/{id}/refund")
+    public ResponseEntity<OrderDetailsDTO> refund(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal User authenticated) {
+        return ResponseEntity.ok(service.refund(id, authenticated));
+    }
 }

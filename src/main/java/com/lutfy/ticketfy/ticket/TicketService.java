@@ -1,6 +1,7 @@
 package com.lutfy.ticketfy.ticket;
 
 import com.lutfy.ticketfy.infra.exception.EventAccessDeniedException;
+import com.lutfy.ticketfy.infra.exception.InvalidOrderStateException;
 import com.lutfy.ticketfy.infra.exception.InvalidTicketStateException;
 import com.lutfy.ticketfy.infra.exception.TicketNotFoundException;
 import com.lutfy.ticketfy.order.Order;
@@ -14,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.UUID;
 
 @Service
 public class TicketService {
@@ -71,5 +73,15 @@ public class TicketService {
             code.append(CODE_ALPHABET.charAt(random.nextInt(CODE_ALPHABET.length())));
         }
         return code.toString();
+    }
+
+    @Transactional
+    public void cancelForRefund(UUID orderId) {
+        long total = ticketRepository.countByOrderId(orderId);
+        int cancelled = ticketRepository.cancelValidByOrderId(
+                orderId, LocalDateTime.now(), TicketStatus.CANCELLED, TicketStatus.VALID);
+        if (cancelled != total) {
+            throw new InvalidOrderStateException("Order has tickets that were already used");
+        }
     }
 }

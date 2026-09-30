@@ -1,6 +1,7 @@
 package com.lutfy.ticketfy.order;
 
 import com.lutfy.ticketfy.infra.exception.*;
+import com.lutfy.ticketfy.ticket.TicketService;
 import com.lutfy.ticketfy.tickettype.TicketTypeRepository;
 import com.lutfy.ticketfy.user.Role;
 import com.lutfy.ticketfy.user.User;
@@ -20,16 +21,21 @@ public class OrderService {
 
     private final OrderRepository orderRepository;
     private final TicketTypeRepository ticketTypeRepository;
+    private final TicketService ticketService;
     private final long reservationMinutes;
+    private final long refundDeadlineHours;
 
     public OrderService(OrderRepository orderRepository,
                         TicketTypeRepository ticketTypeRepository,
-                        @Value("${ticketfy.order.reservation-minutes}") long reservationMinutes) {
+                        TicketService ticketService,
+                        @Value("${ticketfy.order.reservation-minutes}") long reservationMinutes,
+                        @Value("${ticketfy.refund.deadline-hours}") long refundDeadlineHours) {
         this.orderRepository = orderRepository;
         this.ticketTypeRepository = ticketTypeRepository;
+        this.ticketService = ticketService;
         this.reservationMinutes = reservationMinutes;
+        this.refundDeadlineHours = refundDeadlineHours;
     }
-
 
     @Transactional
     public OrderDetailsDTO create(OrderCreationDTO dto, String idempotencyKey, User authenticated) {
@@ -90,6 +96,27 @@ public class OrderService {
                 .orElseThrow(() -> new OrderNotFoundException("Order not found"));
         checkOwnership(order, authenticated);
         order.cancel();
+        for (var item : order.getItems()) {
+            ticketTypeRepository.releaseStock(item.getTicketType().getId(), item.getQuantity());
+        }
+        return new OrderDetailsDTO(order);
+    }
+
+    @Transactional
+    public OrderDetailsDTO refund(UUID id, User authenticated) {
+        var order = orderRepository.findById(id)
+                .orElseThrow(() -> new OrderNotFoundException("Order not found"));
+        checkOwnership(order, authenticated);
+
+        var deadline = LocalDateTime.now().plusHours(refundDeadlineHours);
+        for (var item : order.getItems()) {
+            if (item.getTicketType().getEvent().getStartsAt().isBefore(deadline)) {
+                throw new InvalidOrderStateException("The refund period for this event has ended");
+            }
+        }
+
+        order.refund();
+        ticketService.cancelForRefund(order.getId());
         for (var item : order.getItems()) {
             ticketTypeRepository.releaseStock(item.getTicketType().getId(), item.getQuantity());
         }
