@@ -5,9 +5,10 @@ import java.util.UUID;
 public record UserDetailsDTO(
         UUID id,
         String name,
-        String email
+        String email,
+        Role role
 ) {
     public UserDetailsDTO(User user) {
-        this(user.getId(), user.getName(), user.getEmail());
+        this(user.getId(), user.getName(), user.getEmail(), user.getRole());
     }
 }
