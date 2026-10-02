@@ -22,7 +22,7 @@ public record EventCreationDTO(
 
         @NotNull @Future
         LocalDateTime startsAt,
-        @NotNull @Future
+        @Future
         LocalDateTime endsAt
 ) {
 }
