@@ -53,6 +53,12 @@ public class EventController {
         return ResponseEntity.ok(event);
     }
 
+    @GetMapping("/mine")
+    public ResponseEntity<Page<EventSummaryDTO>> listMyEvents(@AuthenticationPrincipal User user, @PageableDefault(size = 20, sort = "startsAt") Pageable pageable) {
+        var events = service.listMyEvents(user.getId(), pageable);
+        return ResponseEntity.ok(events);
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable UUID id, @AuthenticationPrincipal User requester) {
         service.delete(id, requester);

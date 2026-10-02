@@ -7,7 +7,7 @@ CREATE TABLE events (
                         city         VARCHAR(100) NOT NULL,
                         state        CHAR(2)      NOT NULL,
                         starts_at    TIMESTAMP    NOT NULL,
-                        ends_at      TIMESTAMP    NOT NULL,
+                        ends_at      TIMESTAMP,
                         organizer_id UUID         NOT NULL REFERENCES users(id),
                         active       BOOLEAN      NOT NULL DEFAULT TRUE,
                         created_at   TIMESTAMP    NOT NULL DEFAULT now(),

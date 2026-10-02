@@ -22,7 +22,7 @@ public class EventService {
     }
 
     private void validateDates(LocalDateTime startsAt, LocalDateTime endsAt) {
-        if (!endsAt.isAfter(startsAt)) {
+        if (endsAt != null && !endsAt.isAfter(startsAt)) {
             throw new InvalidEventDatesException("Event end must be after its start");
         }
     }
@@ -79,9 +79,14 @@ public class EventService {
 
     private void checkOwnership(Event event, User requester) {
         if (requester.getRole() == Role.ADMIN) return;
-        if (!event.getOrganizer().equals(requester)) {
+        if (!event.getOrganizer().getId().equals(requester.getId())) {
             throw new EventAccessDeniedException("You do not own this event");
         }
+    }
+
+    @Transactional(readOnly = true)
+    public Page<EventSummaryDTO> listMyEvents(UUID organizerID, Pageable pageable) {
+        return repository.findByOrganizerIdAndActiveTrue(organizerID, pageable).map(EventSummaryDTO::new);
     }
 
     @Transactional

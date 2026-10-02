@@ -19,4 +19,6 @@ public interface EventRepository extends JpaRepository<Event, UUID> {
 
     Page<Event> findByActiveTrueAndNameContainingIgnoreCaseAndCityIgnoreCase(
             String name, String city, Pageable pageable);
+
+    Page<Event> findByOrganizerIdAndActiveTrue(UUID organizerId, Pageable pageable);
 }
