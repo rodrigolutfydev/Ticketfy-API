@@ -1,14 +1,12 @@
 # Ticketfy
 
-API para um sistema de venda de ingressos para eventos, em Spring Boot. Projeto de estudo pessoal, com foco em boas práticas de backend.
+API de venda de ingressos para eventos em Spring Boot. Projeto pessoal de estudo, com foco em boas práticas de backend.
 
 ## Sobre o projeto
 
-O Ticketfy simula o backend de uma plataforma de venda de ingressos, no estilo do Sympla ou Eventbrite: qualquer pessoa se cadastra para comprar, usuários interessados em produzir eventos viram organizadores, e compradores escolhem ingressos, pagam, recebem um código único por ingresso e entram no evento com check-in.
+Simula o backend de uma plataforma como Sympla ou Eventbrite: usuários compram ingressos, organizadores criam eventos e cada ingresso tem um código único validado no check-in.
 
-O foco não é só fazer funcionar, mas resolver os problemas de um sistema de ingressos real: duas pessoas comprando a última vaga ao mesmo tempo, clique duplo gerando pedido duplicado, reserva abandonada segurando estoque, pagamento chegando junto com a expiração do pedido e o mesmo ingresso lido por dois porteiros. Cada caso tem uma garantia no banco, não só um `if` no Java — veja [Decisões técnicas](#decisões-técnicas).
-
-Projeto em desenvolvimento ativo — veja o [Roadmap](#roadmap).
+O foco são os problemas reais de um sistema de ingressos: compra simultânea da última vaga, clique duplo, reserva abandonada, pagamento no instante da expiração e ingresso lido por dois porteiros. Cada caso é garantido no banco, não só no Java. Veja [Decisões técnicas](#decisões-técnicas).
 
 ## Fluxo de compra
 
@@ -21,48 +19,51 @@ Comprador cria pedido ──────────────┘  estoque res
         ├── cancela ───► estoque devolvido
         └── paga ──────► pedido PAID + um ingresso emitido por unidade
                                     │
-                         check-in na entrada ──► ingresso USED
+                                    ├── check-in na entrada ──► ingresso USED
+                                    └── reembolso (dentro do prazo) ──► pedido REFUNDED
 ```
 
 ## Papéis e autorização
 
 | Papel | O que faz |
 |---|---|
-| **USER** | Compra ingressos e acompanha os próprios pedidos e ingressos. Atribuído a todo mundo no cadastro |
-| **ORGANIZER** | Gerencia os próprios eventos e lotes e faz o check-in dos ingressos desses eventos. Qualquer usuário se torna um, sem aprovação |
+| **USER** | Compra ingressos e acompanha os próprios pedidos. Atribuído no cadastro |
+| **ORGANIZER** | Gerencia os próprios eventos e lotes e faz o check-in deles. Qualquer usuário pode virar organizador |
 | **ADMIN** | Administra a plataforma inteira |
 
-O papel nunca é aceito no cadastro: é sempre definido pelo servidor.
+O papel é sempre definido pelo servidor, nunca aceito no cadastro.
 
-A autorização tem duas camadas: **por papel** ("você pode criar evento?"), com `@PreAuthorize`; e **por propriedade** ("esse pedido é seu?"), que papel nenhum responde — dois compradores têm o mesmo papel — e por isso vive na camada de serviço.
+A autorização tem duas camadas: **por papel** ("pode criar evento?"), com `@PreAuthorize`, e **por propriedade** ("esse pedido é seu?"), que o papel não resolve e por isso fica no serviço, comparando o dono do recurso com o usuário autenticado.
 
 ## Tecnologias
 
-Java 17 · Spring Boot 4 · Spring Data JPA · Hibernate 7 · Spring Security · PostgreSQL 16 · Flyway · JWT (java-jwt) · Bean Validation · Spring Scheduling · Springdoc OpenAPI · Lombok · Maven · Docker Compose
+Java 17 · Spring Boot 4 · Spring Data JPA · Hibernate 7 · Spring Security · PostgreSQL 16 · Flyway · JWT (java-jwt) · Bean Validation · Spring Scheduling · Springdoc OpenAPI · Lombok · Maven · Docker · Docker Compose · JUnit 5 · Testcontainers
 
 ## Funcionalidades
 
-**Usuários e autenticação** — cadastro com validação, senha com BCrypt, id em UUID, login com JWT de expiração configurável, filtro stateless e auto-promoção a organizador com reemissão de token. A aplicação recusa iniciar com uma chave de assinatura fraca.
+**Usuários.** Cadastro validado, senha com BCrypt, login com JWT, auto-promoção a organizador e limite de 5 tentativas de login por minuto por IP. A aplicação não inicia com chave de assinatura fraca.
 
-**Eventos** — CRUD com autorização nas duas camadas, listagem paginada com busca por nome e filtro por cidade, atualização parcial, exclusão lógica, validação de início e fim, e timestamps de criação e alteração.
+**Eventos.** CRUD com busca, filtro por cidade, paginação, atualização parcial e exclusão lógica. Eventos com ingressos vendidos ou reservados não podem ser excluídos.
 
-**Lotes de ingresso** — cada evento tem um ou mais lotes (Pista, VIP, Camarote), com preço, quantidade total e limite opcional por pedido. O estoque é contado pela quantidade vendida, e o disponível é sempre calculado, nunca armazenado — assim ampliar um lote não gera divergência.
+**Lotes.** Cada evento tem lotes com preço, quantidade e limite opcional por pedido. O disponível é calculado a partir do vendido, nunca armazenado.
 
-**Pedidos** — vários itens por pedido, de lotes diferentes. O preço unitário é congelado no item no momento da compra. O pedido é uma máquina de estados (`PENDING`, `PAID`, `EXPIRED`, `CANCELLED`, `REFUNDED`), com prazo de reserva configurável, chave de idempotência opcional e cancelamento pelo dono enquanto pendente, devolvendo o estoque.
+**Pedidos.** Vários itens por pedido, preço congelado no momento da compra, chave de idempotência opcional e máquina de estados (`PENDING`, `PAID`, `EXPIRED`, `CANCELLED`, `REFUNDED`).
 
-**Expiração de reservas** — uma rotina agendada roda a cada minuto, marca como `EXPIRED` os pedidos pendentes vencidos e devolve o estoque. Cada pedido expira na própria transação: um conflito afeta só aquele pedido.
+**Expiração.** Uma rotina expira a cada minuto os pedidos pendentes vencidos e devolve o estoque, um pedido por transação.
 
-**Pagamento** — simulado, pensado para ser trocado por um gateway real sem mudar o resto. Aprovar o pagamento, marcar o pedido como pago e emitir os ingressos acontecem na mesma transação. Pedidos expirados, cancelados, já pagos ou de outro usuário são recusados.
+**Pagamento.** Simulado e isolado, para ser trocado por um gateway real. Aprovar, marcar como pago e emitir os ingressos acontecem na mesma transação.
 
-**Ingressos e check-in** — um ingresso por unidade comprada, com código de 16 caracteres gerado por `SecureRandom`, sem letras ambíguas e único no banco. O comprador lista os próprios ingressos, e o organizador do evento faz o check-in.
+**Ingressos.** Um por unidade comprada, com código único de 16 caracteres gerado por `SecureRandom`. O organizador do evento faz o check-in.
 
-**Erros** — respostas padronizadas em JSON, validação detalhada por campo, mensagem idêntica para credenciais inválidas (evitando enumeração de usuários) e erros inesperados logados sem expor detalhes internos.
+**Reembolso.** Permitido até um prazo configurável antes do evento. Cancela os ingressos e marca o pedido como `REFUNDED`. É recusado se algum ingresso já foi usado.
+
+**Erros.** JSON padronizado, validação por campo e mensagem única para credenciais inválidas, o que evita descobrir quais emails estão cadastrados.
 
 ## Decisões técnicas
 
 ### Venda concorrente do último ingresso
 
-Ler o estoque, conferir no Java e depois gravar deixa duas compras simultâneas passarem. A reserva é uma operação única no banco:
+Ler, conferir e gravar em passos separados deixa duas compras passarem. A reserva é uma operação única:
 
 ```sql
 UPDATE ticket_types
@@ -70,19 +71,19 @@ SET quantity_sold = quantity_sold + :quantidade
 WHERE id = :id AND quantity_sold + :quantidade <= quantity_total
 ```
 
-Se nenhuma linha for afetada, não havia estoque e a compra falha. Sem consulta prévia e sem lock explícito.
+Nenhuma linha afetada significa estoque insuficiente. Um teste com 10 threads disputando o último ingresso confirma que só uma compra passa.
 
-### Compra duplicada por clique duplo
+### Clique duplo
 
-O cliente pode enviar o header `Idempotency-Key`. Uma requisição repetida com a mesma chave devolve o pedido já criado, sem reservar estoque de novo. Se duas chegarem juntas, a segunda bate na constraint única da chave e recebe o pedido da primeira. A chave confere o dono, então ninguém recupera o pedido de outra pessoa reusando uma chave.
+Com o header `Idempotency-Key`, uma repetição devolve o pedido já criado. Se duas chegarem juntas, a constraint única barra a segunda, que recebe o pedido da primeira. A chave é vinculada ao dono.
 
-### Expiração e pagamento ao mesmo tempo
+### Expiração e pagamento simultâneos
 
-Sem proteção, um pedido poderia ser pago no mesmo instante em que expira, ficando pago com o estoque já devolvido — e a vaga seria vendida duas vezes. O pedido tem lock otimista (`@Version`): quem grava primeiro vence, e a outra operação é desfeita por inteiro. Se o pagamento perder, o cliente recebe `409`.
+Sem proteção, o pedido poderia ser pago com o estoque já devolvido. O lock otimista (`@Version`) faz a primeira gravação vencer e desfaz a outra. Se o pagamento perder, retorna `409`.
 
 ### Pagamento aprovado duas vezes
 
-Um pedido pode ter várias tentativas de pagamento, mas só uma aprovada, garantido por um índice único parcial:
+Um índice único parcial permite só um pagamento aprovado por pedido:
 
 ```sql
 CREATE UNIQUE INDEX uk_payments_order_approved
@@ -92,41 +93,76 @@ CREATE UNIQUE INDEX uk_payments_order_approved
 
 ### Check-in duplicado
 
-O check-in é um `UPDATE ... WHERE status = 'VALID'`. Se dois porteiros lerem o mesmo código ao mesmo tempo, um recebe sucesso e o outro recebe `409`.
+O check-in é um `UPDATE ... WHERE status = 'VALID'`. Com dois porteiros ao mesmo tempo, um recebe sucesso e o outro `409`.
+
+### Reembolso com ingresso usado
+
+Os ingressos são cancelados por um `UPDATE` que só atinge os `VALID`. Se o número de linhas afetadas for menor que o total do pedido, algum já foi usado, e tudo é desfeito com `409`.
+
+### Exclusão de evento com vendas
+
+Antes de desativar, o serviço verifica se algum lote tem vendas, incluindo reservas pendentes. A checagem vem depois da de dono, para que terceiros recebam `403` sem descobrir se há vendas.
+
+### Datas e fuso horário
+
+Datas são `Instant` no Java e `TIMESTAMPTZ` no banco. Assim o horário é um momento absoluto e não muda quando servidor e banco estão em fusos diferentes.
 
 ### Dinheiro
 
-Valores monetários usam `BigDecimal` no Java e `NUMERIC(10,2)` no banco, nunca `double`. O valor do pagamento vem do pedido, nunca do cliente.
+`BigDecimal` no Java e `NUMERIC(10,2)` no banco, nunca `double`. O valor cobrado vem do pedido, nunca do cliente.
+
+### Consultas N+1
+
+Detalhe do pedido e listagem de ingressos usam `@EntityGraph` para buscar tudo numa consulta com join.
 
 ## Como rodar
 
-Pré-requisitos: Java 17+, Maven (ou o `./mvnw` incluído) e Docker Compose.
+Pré-requisitos: Java 17+ e Docker. O `./mvnw` dispensa instalar o Maven.
 
 ```bash
 git clone https://github.com/rodrigolutfydev/Ticketfy-API.git
 cd Ticketfy-API
 ```
 
-Crie um `.env` na raiz com a senha do banco (o arquivo não é versionado; o Compose o lê automaticamente):
+Crie um `.env` na raiz (não versionado):
 
 ```
 DB_PASSWORD=sua_senha
+JWT_SECRET=gere_com_openssl_rand_base64_32
 ```
 
-Suba o banco, exporte as variáveis e rode:
+A `JWT_SECRET` precisa de 32+ caracteres e não tem padrão, para não existir segredo versionado. Gere com `openssl rand -base64 32`.
+
+**Opção 1: API pelo Maven**
 
 ```bash
 docker compose up -d
-
-export DB_PASSWORD=sua_senha
-export JWT_SECRET=$(openssl rand -base64 32)
-
+set -a; source .env; set +a
 ./mvnw spring-boot:run
 ```
 
-A `JWT_SECRET` precisa de no mínimo 32 caracteres e não tem valor padrão de propósito: um segredo versionado permitiria a qualquer pessoa forjar tokens válidos.
+**Opção 2: tudo pelo Docker** (perfil `prod`)
 
-O Flyway aplica as migrations ao iniciar. A API sobe em `http://localhost:8080` e o Swagger UI em `/swagger-ui/index.html`.
+```bash
+docker compose --profile app up -d --build
+```
+
+A API sobe em `http://localhost:8080`, com o Flyway aplicando as migrations. No perfil `dev`, o Swagger fica em `/swagger-ui/index.html`.
+
+### Testes
+
+```bash
+./mvnw test
+```
+
+Usam Testcontainers com um PostgreSQL descartável. O Docker precisa estar rodando.
+
+### Perfis
+
+| Perfil | Uso | Diferenças |
+|---|---|---|
+| `dev` (padrão) | Local | SQL no log, Swagger habilitado |
+| `prod` | Docker e deploy | Sem Swagger, sem stack trace nas respostas, suporte a proxy reverso |
 
 ### Configuração
 
@@ -135,14 +171,16 @@ O Flyway aplica as migrations ao iniciar. A API sobe em `http://localhost:8080` 
 | `DB_URL` | `jdbc:postgresql://localhost:5432/ticketfy` | URL do banco |
 | `DB_USERNAME` | `ticketfy_user` | Usuário do banco |
 | `DB_PASSWORD` | — | Senha do banco (obrigatória) |
-| `JWT_SECRET` | — | Chave de assinatura dos tokens (obrigatória) |
-| `ORDER_RESERVATION_MINUTES` | `15` | Tempo que um pedido pendente segura o estoque |
+| `JWT_SECRET` | — | Chave dos tokens (obrigatória) |
+| `SPRING_PROFILES_ACTIVE` | `dev` | Perfil da aplicação |
+| `CORS_ALLOWED_ORIGINS` | — | Endereço do frontend autorizado |
+| `ORDER_RESERVATION_MINUTES` | `15` | Duração da reserva de um pedido pendente |
 
-Para testar a expiração sem esperar, rode com `ORDER_RESERVATION_MINUTES=1`.
+O prazo de reembolso fica em `ticketfy.refund.deadline-hours`. Para testar a expiração rápido, use `ORDER_RESERVATION_MINUTES=1`.
 
 ## Endpoints
 
-Rotas protegidas esperam o token no header `Authorization`, no formato `Bearer <token>`.
+Rotas protegidas usam o header `Authorization: Bearer <token>`. Datas trafegam em ISO 8601 com fuso, em UTC: `"2026-12-10T23:00:00Z"` é 20h em Brasília.
 
 ### Usuários e autenticação
 
@@ -150,7 +188,8 @@ Rotas protegidas esperam o token no header `Authorization`, no formato `Bearer <
 |--------|----------|-----------|--------|
 | POST | `/users` | Cadastra um usuário | Público |
 | POST | `/login` | Autentica e retorna um token JWT | Público |
-| POST | `/users/me/organizer` | Torna o usuário autenticado um organizador | Autenticado |
+| GET | `/users/me` | Dados e papel do usuário autenticado | Autenticado |
+| POST | `/users/me/organizer` | Torna o usuário organizador e devolve um token novo | Autenticado |
 
 ### Eventos
 
@@ -158,20 +197,21 @@ Rotas protegidas esperam o token no header `Authorization`, no formato `Bearer <
 |--------|----------|-----------|--------|
 | POST | `/events` | Cadastra um evento | ORGANIZER ou ADMIN |
 | GET | `/events` | Lista os eventos ativos, paginado | Público |
-| GET | `/events/{id}` | Detalha um evento | Público |
+| GET | `/events/mine` | Lista os eventos do usuário, paginado | Autenticado |
+| GET | `/events/{id}` | Detalha um evento, com o organizador | Público |
 | PUT | `/events/{id}` | Atualiza um evento (parcial) | Dono ou ADMIN |
-| DELETE | `/events/{id}` | Desativa um evento | Dono ou ADMIN |
+| DELETE | `/events/{id}` | Desativa um evento sem vendas | Dono ou ADMIN |
 
-A listagem aceita `q` (trecho do nome), `city` (exata), `page` (padrão `0`), `size` (padrão `20`) e `sort` (padrão `startsAt,asc`). Exemplo: `GET /events?q=rock&size=10`. A resposta traz `content` e um objeto `page` com `size`, `number`, `totalElements` e `totalPages`.
+A listagem aceita `q` (nome), `city`, `page`, `size` (padrão `20`, máximo `100`) e `sort` (padrão `startsAt,asc`). Exemplo: `GET /events?q=rock&size=10`.
 
 ### Lotes de ingresso
 
 | Método | Endpoint | Descrição | Acesso |
 |--------|----------|-----------|--------|
 | POST | `/events/{eventId}/ticket-types` | Cria um lote no evento | Organizador do evento ou ADMIN |
-| GET | `/events/{eventId}/ticket-types` | Lista os lotes do evento, com o disponível | Público |
+| GET | `/events/{eventId}/ticket-types` | Lista os lotes, com o disponível | Público |
 
-### Pedidos e pagamento
+### Pedidos, pagamento e reembolso
 
 | Método | Endpoint | Descrição | Acesso |
 |--------|----------|-----------|--------|
@@ -179,7 +219,8 @@ A listagem aceita `q` (trecho do nome), `city` (exata), `page` (padrão `0`), `s
 | GET | `/orders` | Lista os pedidos do usuário, paginado | Autenticado |
 | GET | `/orders/{id}` | Detalha um pedido | Dono ou ADMIN |
 | DELETE | `/orders/{id}` | Cancela um pedido pendente | Dono ou ADMIN |
-| POST | `/orders/{orderId}/payment` | Paga o pedido (simulado) e emite os ingressos | Dono |
+| POST | `/orders/{orderId}/payment` | Paga (simulado) e emite os ingressos | Dono |
+| POST | `/orders/{id}/refund` | Reembolsa um pedido pago, dentro do prazo | Dono |
 
 `POST /orders` aceita o header opcional `Idempotency-Key`. Corpo:
 
@@ -198,19 +239,15 @@ A listagem aceita `q` (trecho do nome), `city` (exata), `page` (padrão `0`), `s
 | GET | `/tickets/me` | Lista os ingressos do usuário, paginado | Autenticado |
 | POST | `/tickets/{code}/check-in` | Valida o ingresso na entrada | Organizador do evento ou ADMIN |
 
-### Planejados
-
-`POST /orders/{id}/refund` · `GET /users/me`
-
 ## Respostas de erro
 
-Todo erro é um JSON com a mesma forma:
+Todo erro segue o mesmo formato:
 
 ```json
 { "message": "Not enough tickets available for this ticket type" }
 ```
 
-Erros de validação incluem os campos que falharam:
+Erros de validação listam os campos:
 
 ```json
 {
@@ -223,11 +260,13 @@ Erros de validação incluem os campos que falharam:
 
 | Situação | Status |
 |----------|--------|
-| Dados inválidos, ou quantidade acima do limite por pedido | 400 |
-| Credenciais inválidas, ou rota protegida sem token | 401 |
-| Papel insuficiente, ou recurso de outro usuário | 403 |
-| Recurso não encontrado | 404 |
-| Conflito: email já cadastrado, estoque insuficiente, estado inválido do pedido, ingresso já usado, alteração concorrente | 409 |
+| Dados inválidos ou quantidade acima do limite | 400 |
+| Credenciais inválidas ou sem token | 401 |
+| Papel insuficiente ou recurso de outro usuário | 403 |
+| Recurso ou rota inexistente | 404 |
+| Método HTTP não suportado | 405 |
+| Conflito: email em uso, estoque insuficiente, estado inválido do pedido, ingresso já usado, reembolso negado, evento com vendas, alteração concorrente | 409 |
+| Excesso de tentativas de login | 429 |
 | Erro inesperado | 500 |
 
 ## Estrutura
@@ -235,54 +274,51 @@ Erros de validação incluem os campos que falharam:
 ```
 src/main/java/com/lutfy/ticketfy/
 ├── infra/
-│   ├── config/      # segurança e agendamento
-│   ├── security/    # login, token JWT, filtro de autenticação
+│   ├── config/      # segurança, CORS e agendamento
+│   ├── security/    # login, token JWT e filtro de autenticação
 │   └── exception/   # tratamento centralizado de erros
-├── user/            # cadastro, papéis
-├── event/           # eventos e seus endereços
-├── tickettype/      # lotes, reserva e devolução de estoque
-├── order/           # pedidos, máquina de estados, expiração
+├── user/            # cadastro e papéis
+├── event/           # eventos e endereços
+├── tickettype/      # lotes e estoque
+├── order/           # pedidos, expiração e reembolso
 ├── payment/         # pagamento simulado
 ├── ticket/          # emissão e check-in
 └── ApiApplication
 
 src/main/resources/
-└── db/migration/
-    ├── V1  users
-    ├── V2  events
-    ├── V3  ticket_types
-    ├── V4  orders e order_items
-    ├── V5  payments
-    └── V6  tickets
+├── application.properties        # configuração comum
+├── application-dev.properties
+├── application-prod.properties
+└── db/migration/                 # V1 a V6: users, events, ticket_types,
+                                  # orders/order_items, payments, tickets
+
+src/test/java/com/lutfy/ticketfy/
+├── IntegrationTestBase                 # container PostgreSQL compartilhado
+└── OrderConcurrencyIntegrationTest     # disputa pelo último ingresso
 ```
 
-O projeto é organizado por domínio, não por camada: cada pasta reúne entity, repository, service, controller e DTOs daquele conceito de negócio.
-
-O endereço do evento não é uma entidade separada. Seguindo o modelo do Sympla, o organizador informa local, endereço e cidade no próprio evento.
-
-Pedidos e pagamentos não têm setter de status: o estado só muda pelos métodos de transição (`markAsPaid()`, `cancel()`, `expire()`, `approve()`), que concentram as regras de cada mudança.
+O código é organizado por domínio, não por camada. O endereço fica no próprio evento, como no Sympla. Pedidos e pagamentos não têm setter de status: o estado só muda por métodos de transição como `markAsPaid()`, `cancel()` e `expire()`.
 
 ## Roadmap
 
-- [x] Cadastro de usuário + criptografia de senha
-- [x] Login + autenticação JWT
-- [x] Proteção de rotas via filtro de segurança
+- [x] Cadastro, login e autenticação JWT
 - [x] Tratamento centralizado de erros
-- [x] Papel de organizador e auto-promoção
-- [x] Domínio de eventos (CRUD, paginação, busca, exclusão lógica)
-- [x] Autorização por propriedade
-- [x] Lotes de ingresso com reserva de estoque atômica
-- [x] Pedidos com preço congelado e idempotência
-- [x] Expiração automática de reservas
-- [x] Pagamento simulado
-- [x] Emissão de ingressos e check-in
-- [x] Proteção contra condições de corrida
-- [ ] Reembolso
-- [ ] Testes automatizados no fluxo de compra, incluindo concorrência
-- [ ] Perfis de desenvolvimento e produção
-- [ ] Integração com gateway de pagamento real
-- [ ] Containerização da API e deploy
+- [x] Papel de organizador e autorização por propriedade
+- [x] Eventos e lotes com reserva de estoque atômica
+- [x] Pedidos com preço congelado, idempotência e expiração
+- [x] Pagamento simulado, ingressos e check-in
+- [x] Reembolso
+- [x] Proteção contra condições de corrida, com teste de concorrência
+- [x] Perfis dev e prod e containerização
+- [x] Limite de tentativas de login
+- [x] Datas com fuso horário
+- [x] Bloqueio de exclusão de eventos com vendas
+- [ ] Health check e graceful shutdown
+- [ ] Integração contínua (CI)
+- [ ] Deploy
+- [ ] Mais testes automatizados
+- [ ] Gateway de pagamento real
 
 ## Licença
 
-Licenciado sob a licença MIT — veja [LICENSE](LICENSE).
+MIT. Veja [LICENSE](LICENSE).
