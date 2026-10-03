@@ -12,7 +12,7 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.UUID;
 
 @Entity
@@ -40,11 +40,11 @@ public class Ticket {
     private User owner;
     @Enumerated(EnumType.STRING)
     private TicketStatus status;
-    private LocalDateTime usedAt;
+    private Instant usedAt;
     @CreationTimestamp
-    private LocalDateTime createdAt;
+    private Instant createdAt;
     @UpdateTimestamp
-    private LocalDateTime updatedAt;
+    private Instant updatedAt;
 
     public Ticket(Order order, OrderItem orderItem, String code) {
         this.order = order;

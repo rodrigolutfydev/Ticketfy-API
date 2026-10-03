@@ -1,6 +1,6 @@
 package com.lutfy.ticketfy.ticket;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.UUID;
 
 public record TicketDetailsDTO(
@@ -8,10 +8,10 @@ public record TicketDetailsDTO(
         String code,
         TicketStatus status,
         String eventName,
-        LocalDateTime eventStartsAt,
+        Instant eventStartsAt,
         String ticketTypeName,
-        LocalDateTime usedAt,
-        LocalDateTime createdAt
+        Instant usedAt,
+        Instant createdAt
 ) {
     public TicketDetailsDTO(Ticket ticket) {
         this(ticket.getId(),

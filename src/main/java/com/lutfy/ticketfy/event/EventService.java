@@ -1,27 +1,31 @@
 package com.lutfy.ticketfy.event;
 
 import com.lutfy.ticketfy.infra.exception.EventAccessDeniedException;
+import com.lutfy.ticketfy.infra.exception.EventHasSalesException;
 import com.lutfy.ticketfy.infra.exception.EventNotFoundException;
 import com.lutfy.ticketfy.infra.exception.InvalidEventDatesException;
+import com.lutfy.ticketfy.tickettype.TicketTypeRepository;
 import com.lutfy.ticketfy.user.Role;
 import com.lutfy.ticketfy.user.User;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.UUID;
 
 @Service
 public class EventService {
 
     private final EventRepository repository;
+    private final TicketTypeRepository ticketTypeRepository;
 
-    public EventService(EventRepository repository) {
+    public EventService(EventRepository repository, TicketTypeRepository ticketTypeRepository) {
         this.repository = repository;
+        this.ticketTypeRepository = ticketTypeRepository;
     }
 
-    private void validateDates(LocalDateTime startsAt, LocalDateTime endsAt) {
+    private void validateDates(Instant startsAt, Instant endsAt) {
         if (endsAt != null && !endsAt.isAfter(startsAt)) {
             throw new InvalidEventDatesException("Event end must be after its start");
         }
@@ -94,6 +98,9 @@ public class EventService {
         var event = repository.findByIdAndActiveTrue(id)
                 .orElseThrow(() -> new EventNotFoundException("Event not found"));
         checkOwnership(event, requester);
+        if (ticketTypeRepository.existsByEventIdAndQuantitySoldGreaterThan(id, 0)) {
+            throw new EventHasSalesException("Event has sold or reserved tickets");
+        }
         event.deactivate();
     }
 }

@@ -6,9 +6,9 @@ CREATE TABLE tickets (
                          ticket_type_id  UUID         NOT NULL,
                          owner_id        UUID         NOT NULL,
                          status          VARCHAR(20)  NOT NULL DEFAULT 'VALID',
-                         used_at         TIMESTAMP,
-                         created_at      TIMESTAMP    NOT NULL DEFAULT NOW(),
-                         updated_at      TIMESTAMP,
+                         used_at         TIMESTAMPTZ,
+                         created_at      TIMESTAMPTZ    NOT NULL DEFAULT NOW(),
+                         updated_at      TIMESTAMPTZ,
 
                          CONSTRAINT uk_tickets_code
                              UNIQUE (code),

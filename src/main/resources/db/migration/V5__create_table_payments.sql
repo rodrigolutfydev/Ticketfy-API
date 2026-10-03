@@ -5,9 +5,9 @@ CREATE TABLE payments (
                           method              VARCHAR(20)    NOT NULL,
                           amount              NUMERIC(10, 2) NOT NULL,
                           provider_reference  VARCHAR(100),
-                          approved_at         TIMESTAMP,
-                          created_at          TIMESTAMP      NOT NULL DEFAULT NOW(),
-                          updated_at          TIMESTAMP,
+                          approved_at         TIMESTAMPTZ,
+                          created_at          TIMESTAMPTZ      NOT NULL DEFAULT NOW(),
+                          updated_at          TIMESTAMPTZ,
 
                           CONSTRAINT fk_payments_order
                               FOREIGN KEY (order_id) REFERENCES orders (id),

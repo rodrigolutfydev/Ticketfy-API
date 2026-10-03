@@ -10,7 +10,7 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.type.SqlTypes;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.UUID;
 
 @Entity
@@ -37,20 +37,20 @@ public class Event {
     private String state;
 
     @Column(name = "starts_at")
-    private LocalDateTime startsAt;
+    private Instant startsAt;
 
     @Column(name = "ends_at")
-    private LocalDateTime endsAt;
+    private Instant endsAt;
 
     @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name = "organizer_id")
     private User organizer;
     private boolean active;
 
     @CreationTimestamp @Column(name = "created_at", updatable = false)
-    private LocalDateTime createdAt;
+    private Instant createdAt;
 
     @UpdateTimestamp @Column(name = "updated_at")
-    private LocalDateTime updatedAt;
+    private Instant updatedAt;
 
     public Event(EventCreationDTO dto, User organizer) {
         this.name = dto.name();

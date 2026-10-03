@@ -3,10 +3,10 @@ CREATE TABLE orders (
                         user_id          UUID           NOT NULL,
                         status           VARCHAR(20)    NOT NULL DEFAULT 'PENDING',
                         total_amount     NUMERIC(10, 2) NOT NULL,
-                        expires_at       TIMESTAMP      NOT NULL,
+                        expires_at       TIMESTAMPTZ      NOT NULL,
                         idempotency_key  VARCHAR(100),
-                        created_at       TIMESTAMP      NOT NULL DEFAULT NOW(),
-                        updated_at       TIMESTAMP,
+                        created_at       TIMESTAMPTZ      NOT NULL DEFAULT NOW(),
+                        updated_at       TIMESTAMPTZ,
                         version          BIGINT         NOT NULL DEFAULT 0,
 
                         CONSTRAINT fk_orders_user
@@ -33,7 +33,7 @@ CREATE TABLE order_items (
                              ticket_type_id  UUID           NOT NULL,
                              unit_price      NUMERIC(10, 2) NOT NULL,
                              quantity        INTEGER        NOT NULL,
-                             created_at      TIMESTAMP      NOT NULL DEFAULT NOW(),
+                             created_at      TIMESTAMPTZ      NOT NULL DEFAULT NOW(),
 
                              CONSTRAINT fk_order_items_order
                                  FOREIGN KEY (order_id) REFERENCES orders (id),

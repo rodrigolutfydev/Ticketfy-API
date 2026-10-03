@@ -3,7 +3,7 @@ package com.lutfy.ticketfy.event;
 import jakarta.validation.constraints.Future;
 import jakarta.validation.constraints.Size;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 public record EventUpdateDTO(
         @Size(max = 150)
@@ -19,8 +19,8 @@ public record EventUpdateDTO(
         String state,
 
         @Future
-        LocalDateTime startsAt,
+        Instant startsAt,
         @Future
-        LocalDateTime endsAt
+        Instant endsAt
     ) {
 }

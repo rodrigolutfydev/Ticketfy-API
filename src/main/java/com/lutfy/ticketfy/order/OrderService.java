@@ -11,7 +11,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -46,7 +47,7 @@ public class OrderService {
                 return new OrderDetailsDTO(existing.get());
             }
         }
-        var expiresAt = LocalDateTime.now().plusMinutes(reservationMinutes);
+        var expiresAt = Instant.now().plus(Duration.ofMinutes(reservationMinutes));
         var order = new Order(authenticated, expiresAt, idempotencyKey);
         for (var itemRequest : dto.items()) {
             var ticketType = ticketTypeRepository.findByIdAndActiveTrue(itemRequest.ticketTypeId())
@@ -69,7 +70,7 @@ public class OrderService {
 
     @Transactional(readOnly = true)
     public OrderDetailsDTO findById(UUID id, User authenticated) {
-        var order = orderRepository.findById(id)
+        var order = orderRepository.findWithItemsById(id)
                 .orElseThrow(() -> new OrderNotFoundException("Order not found"));
         checkOwnership(order, authenticated);
         return new OrderDetailsDTO(order);
@@ -107,8 +108,7 @@ public class OrderService {
         var order = orderRepository.findById(id)
                 .orElseThrow(() -> new OrderNotFoundException("Order not found"));
         checkOwnership(order, authenticated);
-
-        var deadline = LocalDateTime.now().plusHours(refundDeadlineHours);
+        var deadline = Instant.now().plus(Duration.ofHours(refundDeadlineHours));
         for (var item : order.getItems()) {
             if (item.getTicketType().getEvent().getStartsAt().isBefore(deadline)) {
                 throw new InvalidOrderStateException("The refund period for this event has ended");
@@ -132,7 +132,7 @@ public class OrderService {
 
     @Transactional(readOnly = true)
     public List<UUID> findOverdueOrderIds() {
-        return orderRepository.findByStatusAndExpiresAtBefore(OrderStatus.PENDING, LocalDateTime.now())
+        return orderRepository.findByStatusAndExpiresAtBefore(OrderStatus.PENDING, Instant.now())
                 .stream()
                 .map(Order::getId)
                 .toList();
