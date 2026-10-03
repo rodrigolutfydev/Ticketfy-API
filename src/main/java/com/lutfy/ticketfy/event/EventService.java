@@ -35,7 +35,7 @@ public class EventService {
     public EventDetailsDTO create(EventCreationDTO dto, User organizer) {
         validateDates(dto.startsAt(), dto.endsAt());
         var event = new Event(dto, organizer);
-        var saved = repository.save(event);
+        var saved = repository.saveAndFlush(event);
         return new EventDetailsDTO(saved);
     }
 

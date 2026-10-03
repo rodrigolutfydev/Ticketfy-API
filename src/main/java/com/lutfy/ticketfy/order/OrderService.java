@@ -50,7 +50,7 @@ public class OrderService {
         var expiresAt = Instant.now().plus(Duration.ofMinutes(reservationMinutes));
         var order = new Order(authenticated, expiresAt, idempotencyKey);
         for (var itemRequest : dto.items()) {
-            var ticketType = ticketTypeRepository.findByIdAndActiveTrue(itemRequest.ticketTypeId())
+            var ticketType = ticketTypeRepository.findByIdAndActiveTrueAndEventActiveTrue(itemRequest.ticketTypeId())
                     .orElseThrow(() -> new TicketTypeNotFoundException("Ticket type not found"));
             if (ticketType.getMaxPerOrder() != null
                     && itemRequest.quantity() > ticketType.getMaxPerOrder()) {
