@@ -149,4 +149,10 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED)
                 .body(new ErrorResponseDTO("Method not allowed"));
     }
+
+    @ExceptionHandler(EventHasSalesException.class)
+    public ResponseEntity<ErrorResponseDTO> handleEventHasSales(EventHasSalesException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new ErrorResponseDTO(ex.getMessage()));
+    }
 }

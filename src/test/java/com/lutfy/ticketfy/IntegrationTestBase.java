@@ -9,7 +9,8 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import java.math.BigDecimal;
 import java.sql.Timestamp;
-import java.time.LocalDateTime;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.UUID;
 
 @SpringBootTest
@@ -41,14 +42,14 @@ public abstract class IntegrationTestBase {
 
     protected UUID insertEvent(UUID organizerId) {
         var id = UUID.randomUUID();
-        var startsAt = LocalDateTime.now().plusDays(30);
+        var startsAt = Instant.now().plus(Duration.ofDays(30));
         jdbc.update("""
                 INSERT INTO events (id, name, description, venue_name, address, city, state,
                                     starts_at, ends_at, organizer_id, active, created_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, true, NOW())
                 """,
                 id, "Test Event", "Event for tests", "Test Arena", "Rua A, 100", "Rio de Janeiro", "RJ",
-                Timestamp.valueOf(startsAt), Timestamp.valueOf(startsAt.plusHours(3)), organizerId);
+                Timestamp.from(startsAt), Timestamp.from(startsAt.plus(Duration.ofHours(3))), organizerId);
         return id;
     }
 

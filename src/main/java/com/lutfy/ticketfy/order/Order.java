@@ -10,7 +10,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -32,18 +32,18 @@ public class Order {
     @Enumerated(EnumType.STRING)
     private OrderStatus status;
     private BigDecimal totalAmount;
-    private LocalDateTime expiresAt;
+    private Instant expiresAt;
     private String idempotencyKey;
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<OrderItem> items;
     @CreationTimestamp
-    private LocalDateTime createdAt;
+    private Instant createdAt;
     @UpdateTimestamp
-    private LocalDateTime updatedAt;
+    private Instant updatedAt;
     @Version
     private Long version;
 
-    public Order(User user, LocalDateTime expiresAt, String idempotencyKey) {
+    public Order(User user, Instant expiresAt, String idempotencyKey) {
         this.user = user;
         this.expiresAt = expiresAt;
         this.idempotencyKey = idempotencyKey;
@@ -84,7 +84,7 @@ public class Order {
     }
 
     public boolean isExpired() {
-        return expiresAt.isBefore(LocalDateTime.now());
+        return expiresAt.isBefore(Instant.now());
     }
 
     public void addItem(OrderItem item) {

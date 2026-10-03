@@ -8,8 +8,8 @@ CREATE TABLE ticket_types (
                             quantity_sold   INTEGER         NOT NULL DEFAULT 0,
                             max_per_order   INTEGER,
                             active          BOOLEAN         NOT NULL DEFAULT TRUE,
-                            created_at      TIMESTAMP       NOT NULL DEFAULT now(),
-                            updated_at      TIMESTAMP,
+                            created_at      TIMESTAMPTZ       NOT NULL DEFAULT now(),
+                            updated_at      TIMESTAMPTZ,
 
                             CONSTRAINT fk_ticket_types_event FOREIGN KEY (event_id) REFERENCES events(id),
                             CONSTRAINT uq_ticket_types_event_name UNIQUE (event_id, name),

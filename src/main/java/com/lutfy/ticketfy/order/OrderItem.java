@@ -8,7 +8,7 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.UUID;
 
 @Entity
@@ -30,7 +30,7 @@ public class OrderItem {
     private BigDecimal unitPrice;
     private Integer quantity;
     @CreationTimestamp
-    private LocalDateTime createdAt;
+    private Instant createdAt;
 
     public OrderItem(Order order, TicketType ticketType, Integer quantity) {
         this.order = order;

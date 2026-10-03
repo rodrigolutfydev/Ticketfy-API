@@ -10,7 +10,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.UUID;
 
 @Entity
@@ -32,11 +32,11 @@ public class Payment {
     private PaymentMethod method;
     private BigDecimal amount;
     private String providerReference;
-    private LocalDateTime approvedAt;
+    private Instant approvedAt;
     @CreationTimestamp
-    private LocalDateTime createdAt;
+    private Instant createdAt;
     @UpdateTimestamp
-    private LocalDateTime updatedAt;
+    private Instant updatedAt;
 
     public Payment(Order order, PaymentMethod method) {
         this.order = order;
@@ -50,7 +50,7 @@ public class Payment {
             throw new InvalidPaymentStateException("Only pending payments can be approved");
         }
         this.status = PaymentStatus.APPROVED;
-        this.approvedAt = LocalDateTime.now();
+        this.approvedAt = Instant.now();
     }
 
     public void reject() {

@@ -6,12 +6,12 @@ CREATE TABLE events (
                         address      VARCHAR(255) NOT NULL,
                         city         VARCHAR(100) NOT NULL,
                         state        CHAR(2)      NOT NULL,
-                        starts_at    TIMESTAMP    NOT NULL,
-                        ends_at      TIMESTAMP,
+                        starts_at    TIMESTAMPTZ    NOT NULL,
+                        ends_at      TIMESTAMPTZ,
                         organizer_id UUID         NOT NULL REFERENCES users(id),
                         active       BOOLEAN      NOT NULL DEFAULT TRUE,
-                        created_at   TIMESTAMP    NOT NULL DEFAULT now(),
-                        updated_at   TIMESTAMP
+                        created_at   TIMESTAMPTZ    NOT NULL DEFAULT now(),
+                        updated_at   TIMESTAMPTZ
 );
 
 CREATE INDEX idx_events_city ON events (city);

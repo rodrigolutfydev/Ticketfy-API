@@ -13,7 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.UUID;
 
@@ -57,7 +57,7 @@ public class TicketService {
             throw new EventAccessDeniedException("You are not the organizer of this event");
         }
 
-        int updated = ticketRepository.checkIn(code, LocalDateTime.now(), TicketStatus.USED, TicketStatus.VALID);
+        int updated = ticketRepository.checkIn(code, Instant.now(), TicketStatus.USED, TicketStatus.VALID);
         if (updated == 0) {
             throw new InvalidTicketStateException("Ticket is not valid for check-in");
         }
@@ -79,7 +79,7 @@ public class TicketService {
     public void cancelForRefund(UUID orderId) {
         long total = ticketRepository.countByOrderId(orderId);
         int cancelled = ticketRepository.cancelValidByOrderId(
-                orderId, LocalDateTime.now(), TicketStatus.CANCELLED, TicketStatus.VALID);
+                orderId, Instant.now(), TicketStatus.CANCELLED, TicketStatus.VALID);
         if (cancelled != total) {
             throw new InvalidOrderStateException("Order has tickets that were already used");
         }

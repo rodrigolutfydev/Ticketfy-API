@@ -1,7 +1,7 @@
 package com.lutfy.ticketfy.payment;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.UUID;
 
 public record PaymentDetailsDTO(
@@ -10,8 +10,8 @@ public record PaymentDetailsDTO(
         PaymentStatus status,
         PaymentMethod method,
         BigDecimal amount,
-        LocalDateTime approvedAt,
-        LocalDateTime createdAt
+        Instant approvedAt,
+        Instant createdAt
 ) {
     public PaymentDetailsDTO(Payment payment) {
         this( payment.getId(),

@@ -1,6 +1,6 @@
 package com.lutfy.ticketfy.event;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.UUID;
 
 public record EventDetailsDTO(
@@ -11,11 +11,11 @@ public record EventDetailsDTO(
         String address,
         String city,
         String state,
-        LocalDateTime startsAt,
-        LocalDateTime endsAt,
+        Instant startsAt,
+        Instant endsAt,
         String organizerName,
         UUID organizerId,
-        LocalDateTime createdAt
+        Instant createdAt
 ) {
     public EventDetailsDTO(Event event) {
         this(event.getId(), event.getName(), event.getDescription(), event.getVenueName(),

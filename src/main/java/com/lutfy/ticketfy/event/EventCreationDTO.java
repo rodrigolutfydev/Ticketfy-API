@@ -5,7 +5,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 public record EventCreationDTO(
         @NotBlank @Size(max = 150)
@@ -21,8 +21,8 @@ public record EventCreationDTO(
         String state,
 
         @NotNull @Future
-        LocalDateTime startsAt,
+        Instant startsAt,
         @Future
-        LocalDateTime endsAt
+        Instant endsAt
 ) {
 }
