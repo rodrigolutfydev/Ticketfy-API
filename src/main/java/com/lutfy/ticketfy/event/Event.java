@@ -27,6 +27,9 @@ public class Event {
     @Column(columnDefinition = "TEXT")
     private String description;
 
+    @Column(name = "image_url", length = 500)
+    private String imageUrl;
+
     @Column(name = "venue_name")
     private String venueName;
     private String address;
@@ -55,6 +58,7 @@ public class Event {
     public Event(EventCreationDTO dto, User organizer) {
         this.name = dto.name();
         this.description = dto.description();
+        this.imageUrl = dto.imageUrl();
         this.venueName = dto.venueName();
         this.address = dto.address();
         this.city = dto.city();
@@ -68,6 +72,7 @@ public class Event {
     public void updateFrom(EventUpdateDTO dto) {
         if (dto.name() != null) this.name = dto.name();
         if (dto.description() != null) this.description = dto.description();
+        this.imageUrl = dto.imageUrl();
         if (dto.venueName() != null) this.venueName = dto.venueName();
         if (dto.address() != null) this.address = dto.address();
         if (dto.city() != null) this.city = dto.city();

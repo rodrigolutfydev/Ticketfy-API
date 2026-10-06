@@ -2,6 +2,7 @@ package com.lutfy.ticketfy.event;
 
 import jakarta.validation.constraints.Future;
 import jakarta.validation.constraints.Size;
+import org.hibernate.validator.constraints.URL;
 
 import java.time.Instant;
 
@@ -9,6 +10,8 @@ public record EventUpdateDTO(
         @Size(max = 150)
         String name,
         String description,
+        @Size(max = 500) @URL(protocol = "https")
+        String imageUrl,
         @Size(max = 150)
         String venueName,
         @Size(max = 255)

@@ -6,11 +6,12 @@ import java.util.UUID;
 public record EventSummaryDTO(
         UUID id,
         String name,
+        String imageUrl,
         String venueName,
         String city,
         Instant startsAt
 ) {
     public EventSummaryDTO(Event event) {
-        this(event.getId(), event.getName(), event.getVenueName(), event.getCity(), event.getStartsAt());
+        this(event.getId(), event.getName(), event.getImageUrl(), event.getVenueName(), event.getCity(), event.getStartsAt());
     }
 }

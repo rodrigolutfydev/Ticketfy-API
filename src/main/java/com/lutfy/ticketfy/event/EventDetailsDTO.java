@@ -7,6 +7,7 @@ public record EventDetailsDTO(
         UUID id,
         String name,
         String description,
+        String imageUrl,
         String venueName,
         String address,
         String city,
@@ -18,7 +19,7 @@ public record EventDetailsDTO(
         Instant createdAt
 ) {
     public EventDetailsDTO(Event event) {
-        this(event.getId(), event.getName(), event.getDescription(), event.getVenueName(),
+        this(event.getId(), event.getName(), event.getDescription(), event.getImageUrl(), event.getVenueName(),
                 event.getAddress(), event.getCity(), event.getState(), event.getStartsAt(),
                 event.getEndsAt(), event.getOrganizer().getName(), event.getOrganizer().getId(), event.getCreatedAt());
     }
