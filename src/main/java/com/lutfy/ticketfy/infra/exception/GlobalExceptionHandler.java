@@ -112,6 +112,12 @@ public class GlobalExceptionHandler {
                 .body(new ErrorResponseDTO(ex.getMessage()));
     }
 
+    @ExceptionHandler(TicketTypeNameAlreadyExistsException.class)
+    public ResponseEntity<ErrorResponseDTO> handleTicketTypeNameAlreadyExists(TicketTypeNameAlreadyExistsException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new ErrorResponseDTO(ex.getMessage()));
+    }
+
     @ExceptionHandler(InvalidOrderStateException.class)
     public ResponseEntity<ErrorResponseDTO> handleInvalidOrderState(InvalidOrderStateException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT)

@@ -3,6 +3,19 @@
 Registro das mudanças que exigem ajuste no frontend, da mais recente para a mais antiga.
 O contrato completo do dashboard do organizador está em [CONTRATO-DASHBOARD.md](CONTRATO-DASHBOARD.md).
 
+## Lotes: nome duplicado responde 409
+
+`POST /events/{id}/ticket-types`. Antes, esse caso respondia **500**.
+
+Não podem existir dois lotes com o mesmo nome no mesmo evento. A comparação diferencia maiúsculas de minúsculas, como a constraint do banco. Tentar criar um nome repetido responde:
+
+```http
+409 Conflict
+{ "message": "A ticket type with this name already exists for this event" }
+```
+
+O mesmo nome em eventos diferentes continua permitido.
+
 ## Eventos em destaque (Tarefa 9)
 
 **Novo campo `featured` (boolean)** em:
