@@ -10,7 +10,7 @@ import java.math.BigDecimal;
 public record TicketTypeCreationDTO(
         @NotBlank @Size(max = 150)
         String name,
-        @Size(max = 445)
+        @Size(max = 500)
         String description,
         @NotNull @Positive
         BigDecimal price,

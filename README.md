@@ -110,7 +110,7 @@ Rotas protegidas exigem o header `Authorization: Bearer <token>`. Datas trafegam
 
 | Método | Endpoint | Descrição | Acesso |
 |---|---|---|---|
-| GET | `/events/{eventId}/ticket-types` | Lista os lotes, com o disponível | Público |
+| GET | `/events/{eventId}/ticket-types` | Lista os lotes ativos (esgotado/restante, sem revelar volume de vendas) | Público |
 | POST | `/events/{eventId}/ticket-types` | Cria um lote | Dono do evento ou ADMIN |
 
 ### Pedidos — `/orders`
@@ -253,6 +253,24 @@ POST /events/{eventId}/ticket-types
   "maxPerOrder": 4
 }
 ```
+
+**Listar lotes (público)**
+```json
+GET /events/{eventId}/ticket-types
+
+[
+  {
+    "id": "ffe5dc69-f145-484a-8b47-51700a8b5414",
+    "name": "Pista",
+    "description": "Primeiro lote",
+    "price": 80.00,
+    "maxPerOrder": 4,
+    "soldOut": false,
+    "remaining": 7
+  }
+]
+```
+`remaining` só é preenchido quando restam 10 ingressos ou menos; nos demais casos (inclusive esgotado) vem `null`. A quantidade total e a vendida não são expostas nesta rota.
 
 **Comprar**
 ```json
