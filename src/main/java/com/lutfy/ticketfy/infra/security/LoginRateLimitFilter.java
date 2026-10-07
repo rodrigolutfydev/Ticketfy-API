@@ -1,13 +1,13 @@
 package com.lutfy.ticketfy.infra.security;
 
+import com.lutfy.ticketfy.infra.exception.ProblemDetailResponseWriter;
+import com.lutfy.ticketfy.infra.exception.ProblemType;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpMethod;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
@@ -27,9 +27,12 @@ public class LoginRateLimitFilter extends OncePerRequestFilter {
     private final int maxAttempts;
     private final long windowMillis;
     private final Map<String, Window> attempts = new ConcurrentHashMap<>();
+    private final ProblemDetailResponseWriter writer;
 
     public LoginRateLimitFilter(@Value("${ticketfy.login.max-attempts}") int maxAttempts,
-                                @Value("${ticketfy.login.window-seconds}") long windowSeconds) {
+                                @Value("${ticketfy.login.window-seconds}") long windowSeconds,
+                                ProblemDetailResponseWriter writer) {
+        this.writer = writer;
         this.maxAttempts = maxAttempts;
         this.windowMillis = windowSeconds * 1000;
     }
@@ -51,10 +54,8 @@ public class LoginRateLimitFilter extends OncePerRequestFilter {
 
         if (window.count().incrementAndGet() > maxAttempts) {
             long retryAfterSeconds = Math.max(1, (window.start() + windowMillis - now) / 1000);
-            response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
             response.setHeader("Retry-After", String.valueOf(retryAfterSeconds));
-            response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-            response.getWriter().write("{\"message\":\"Too many login attempts. Try again later.\"}");
+            writer.write(request, response, ProblemType.TOO_MANY_LOGIN_ATTEMPTS, "Too many login attempts. Try again later.");
             return;
         }
         chain.doFilter(request, response);

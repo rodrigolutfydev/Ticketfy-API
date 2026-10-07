@@ -1,7 +1,9 @@
 package com.lutfy.ticketfy.infra.config;
 
+import com.lutfy.ticketfy.infra.security.JsonAccessDeniedHandler;
 import com.lutfy.ticketfy.infra.security.JsonAuthenticationEntryPoint;
 import com.lutfy.ticketfy.infra.security.SecurityFilter;
+import jakarta.servlet.DispatcherType;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -28,11 +30,14 @@ public class SecurityConfig {
 
     private final SecurityFilter securityFilter;
     private final JsonAuthenticationEntryPoint authenticationEntryPoint;
+    private final JsonAccessDeniedHandler accessDeniedHandler;
 
     public SecurityConfig(SecurityFilter securityFilter,
-                          JsonAuthenticationEntryPoint authenticationEntryPoint) {
+                          JsonAuthenticationEntryPoint authenticationEntryPoint,
+                          JsonAccessDeniedHandler accessDeniedHandler) {
         this.securityFilter = securityFilter;
         this.authenticationEntryPoint = authenticationEntryPoint;
+        this.accessDeniedHandler = accessDeniedHandler;
     }
 
     @Bean
@@ -41,8 +46,11 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .cors(Customizer.withDefaults())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .exceptionHandling(ex -> ex.authenticationEntryPoint(authenticationEntryPoint))
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint(authenticationEntryPoint)
+                        .accessDeniedHandler(accessDeniedHandler))
                 .authorizeHttpRequests(auth -> auth
+                        .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
                         .requestMatchers(HttpMethod.POST, "/users").permitAll()
                         .requestMatchers(HttpMethod.GET, "/events/mine").authenticated()
                         .requestMatchers(HttpMethod.GET, "/events", "/events/*").permitAll()

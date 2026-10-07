@@ -40,7 +40,7 @@ class OrderMixedEventsIntegrationTest extends IntegrationTestBase {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(items(firstTicketType, secondTicketType)))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("All items of an order must belong to the same event"));
+                .andExpect(jsonPath("$.detail").value("All items of an order must belong to the same event"));
 
         assertThat(sold(firstTicketType)).isZero();
         assertThat(sold(secondTicketType)).isZero();

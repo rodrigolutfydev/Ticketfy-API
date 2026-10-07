@@ -11,6 +11,7 @@ import org.springframework.test.web.servlet.ResultActions;
 import java.net.URI;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -32,7 +33,12 @@ class LoginRateLimitIntegrationTest extends IntegrationTestBase {
         login("/login", "10.0.9.1")
                 .andExpect(status().isTooManyRequests())
                 .andExpect(header().exists("Retry-After"))
-                .andExpect(jsonPath("$.message").value("Too many login attempts. Try again later."));
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.type").value("https://ticketfy-api.onrender.com/problems/too-many-login-attempts"))
+                .andExpect(jsonPath("$.title").value("Too many login attempts"))
+                .andExpect(jsonPath("$.status").value(429))
+                .andExpect(jsonPath("$.detail").value("Too many login attempts. Try again later."))
+                .andExpect(jsonPath("$.instance").value("/login"));
 
         login("/login", "10.0.9.2").andExpect(status().isUnauthorized());
     }

@@ -88,7 +88,52 @@ Records que definem o formato de entrada e saída da API. Separam o contrato pú
 
 Tratamento centralizado de erros com `@RestControllerAdvice`, convertendo exceções em respostas HTTP padronizadas.
 
-*No projeto:* **planejado.** Hoje, o e-mail duplicado lança `IllegalArgumentException`, que chega ao cliente como erro 500. Com o pacote `exception`, esse caso deve virar uma resposta 409 ou 400 com mensagem clara.
+*No projeto:* **implementado.** Toda resposta de erro segue a RFC 7807 (`ProblemDetail` do Spring), com `Content-Type: application/problem+json` e os campos:
+
+| Campo | Conteúdo |
+| --- | --- |
+| `type` | URI estável do tipo de erro: `https://ticketfy-api.onrender.com/problems/<slug>` (propriedade `ticketfy.problems.base-uri`). |
+| `title` | Resumo fixo do tipo de erro. |
+| `status` | Código HTTP. |
+| `detail` | Mensagem legível para o cliente, específica da ocorrência. |
+| `instance` | Caminho da requisição que falhou. |
+
+Erros de Bean Validation trazem também `errors`, com um item `{ field, message }` por campo inválido:
+
+```json
+{
+  "type": "https://ticketfy-api.onrender.com/problems/validation-failed",
+  "title": "Validation failed",
+  "status": 400,
+  "detail": "Validation failed",
+  "instance": "/users",
+  "errors": [
+    { "field": "password", "message": "Password must be at least 8 characters long" }
+  ]
+}
+```
+
+Quem gera cada resposta:
+
+- `GlobalExceptionHandler` (`@RestControllerAdvice`): exceções de negócio e do Spring MVC. O enum `ProblemType` concentra slug, título e status de cada tipo, e o `ProblemDetailFactory` monta a resposta.
+- `JsonAuthenticationEntryPoint`: 401 `authentication-required` quando a rota exige token e ele falta ou é inválido.
+- `JsonAccessDeniedHandler`: 403 `access-denied` negado pelo Spring Security. O 403 de `@PreAuthorize` também usa `access-denied`, só que pelo handler global.
+- `LoginRateLimitFilter`: 429 `too-many-login-attempts`, com o cabeçalho `Retry-After`.
+- `ProblemDetailErrorController`: substitui o `/error` do Spring Boot. Erros que escapam do MVC (por exemplo, exceção num filtro) viram um problem genérico por status, sem mensagem interna.
+
+| Status | Tipos (`slug`) |
+| --- | --- |
+| 400 | `validation-failed`, `malformed-request-body`, `missing-parameter`, `missing-header`, `invalid-parameter`, `invalid-event-dates`, `invalid-ticket-type-quantity`, `mixed-events-order`, `max-per-order-exceeded`, `bad-request` |
+| 401 | `invalid-credentials`, `authentication-required` |
+| 403 | `access-denied`, `event-access-denied`, `order-access-denied` |
+| 404 | `user-not-found`, `event-not-found`, `ticket-type-not-found`, `order-not-found`, `ticket-not-found`, `resource-not-found` |
+| 405 | `method-not-allowed` (com o cabeçalho `Allow`) |
+| 409 | `email-already-exists`, `invalid-role-change`, `ticket-type-name-already-exists`, `invalid-order-state`, `insufficient-stock`, `invalid-payment-state`, `invalid-ticket-state`, `invalid-event-state`, `event-has-sales` |
+| 415 | `unsupported-media-type` |
+| 429 | `too-many-login-attempts` |
+| 500 | `internal-error` |
+
+O 500 genérico responde sempre `detail: "Internal server error"`. A exceção vai apenas para o log, e a resposta nunca expõe mensagem, stack trace ou nome de classe. Um status de erro sem tipo próprio que chegue ao `/error` responde com `type: about:blank` e o nome padrão do status.
 
 ### Security
 
@@ -162,7 +207,7 @@ Linhas cheias são chamadas; linhas tracejadas são retornos.
 | 6 | `UserRepository` | Salva o usuário; o Hibernate gera o `INSERT` na tabela `users`. |
 | 7 | `UserController` | Converte o usuário salvo em `UserDetailsDTO`, sem a senha, e responde 201. |
 
-Se o e-mail já existir, o service lança `IllegalArgumentException`. Sem o exception handler, essa exceção chega ao cliente como erro 500 (limitação L02).
+Se o e-mail já existir, o service lança `EmailAlreadyExistsException`, que o `GlobalExceptionHandler` converte em 409 no formato RFC 7807 (`type` terminado em `email-already-exists`). Dados inválidos respondem 400 `validation-failed`, com a lista `errors` por campo (veja a seção Exception).
 
 ```plantuml
 @startuml user-registration
@@ -378,7 +423,7 @@ A arquitetura atende ao escopo acadêmico, mas tem limitações conhecidas.
 | ID | Limitação | Impacto |
 | --- | --- | --- |
 | L01 | A autenticação por JWT ainda não está concluída: hoje, nenhuma rota protegida pode ser acessada. | Os domínios planejados dependem do login para serem testados com perfis diferentes. |
-| L02 | Não há tratamento centralizado de erros; exceções de negócio chegam ao cliente como erro 500. | O cliente da API não consegue distinguir erro de validação de falha do servidor. |
+| L02 | Resolvida: os erros seguem a RFC 7807 com `type` estável por tipo de erro (seção Exception). Os textos de `detail` são em inglês e não são traduzidos pela API. | O frontend precisa usar o `type`, o status ou `errors` para mostrar mensagens próprias em português. |
 | L03 | O enum `Role` não tem o perfil de organizador exigido pelos requisitos. | A autorização por perfil não pode ser implementada como especificada. |
 | L04 | Os services dependem diretamente dos repositories JPA. | Testar regras de negócio exige simular os repositórios; o domínio não é totalmente independente da persistência. Para o porte do projeto, é uma troca aceitável. |
 | L05 | Por ser um monólito, todos os domínios escalam juntos e uma falha grave afeta o sistema inteiro. | Aceitável para o volume de um projeto acadêmico. |

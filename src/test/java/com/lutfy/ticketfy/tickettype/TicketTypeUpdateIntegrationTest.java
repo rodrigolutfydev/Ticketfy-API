@@ -150,7 +150,7 @@ class TicketTypeUpdateIntegrationTest extends IntegrationTestBase {
 
         update(organizerId, "{\"name\":\"Renomeado\",\"quantityTotal\":36}")
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("quantityTotal cannot be lower than the 37 tickets already sold or reserved"));
+                .andExpect(jsonPath("$.detail").value("quantityTotal cannot be lower than the 37 tickets already sold or reserved"));
 
         var row = stored();
         assertThat(row.get("quantity_total")).isEqualTo(100);
@@ -171,7 +171,7 @@ class TicketTypeUpdateIntegrationTest extends IntegrationTestBase {
     void onlyOwnerOrAdminCanEdit() throws Exception {
         update(insertUser("ORGANIZER"), "{\"price\":1.00}")
                 .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.message").value("You do not own this event"));
+                .andExpect(jsonPath("$.detail").value("You do not own this event"));
         update(insertUser("USER"), "{\"price\":1.00}").andExpect(status().isForbidden());
         mockMvc.perform(patch("/events/{e}/ticket-types/{t}", eventId, ticketTypeId)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -185,7 +185,7 @@ class TicketTypeUpdateIntegrationTest extends IntegrationTestBase {
     void returnsNotFoundForUnknownLotOrEventMismatchOrInactiveEvent() throws Exception {
         perform(organizerId, eventId, UUID.randomUUID(), "{\"price\":1.00}")
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.message").value("Ticket type not found"));
+                .andExpect(jsonPath("$.detail").value("Ticket type not found"));
 
         var otherEvent = insertEvent(organizerId);
         perform(organizerId, otherEvent, ticketTypeId, "{\"price\":1.00}")
@@ -194,7 +194,7 @@ class TicketTypeUpdateIntegrationTest extends IntegrationTestBase {
         jdbc.update("UPDATE events SET active = false WHERE id = ?", eventId);
         update(organizerId, "{\"price\":1.00}")
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.message").value("Event not found"));
+                .andExpect(jsonPath("$.detail").value("Event not found"));
 
         assertThat(stored().get("price")).isEqualTo(new BigDecimal("80.00"));
     }

@@ -124,7 +124,7 @@ class EventFeaturedIntegrationTest extends IntegrationTestBase {
     void rejectsInvalidFeaturedFilter() throws Exception {
         mockMvc.perform(get("/events").param("featured", "abc"))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("Invalid value for parameter 'featured'"));
+                .andExpect(jsonPath("$.detail").value("Invalid value for parameter 'featured'"));
     }
 
     private UUID taggedEvent(String tag, String city, boolean featured) {

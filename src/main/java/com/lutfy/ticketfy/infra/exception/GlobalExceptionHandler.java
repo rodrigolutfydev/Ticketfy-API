@@ -2,7 +2,9 @@ package com.lutfy.ticketfy.infra.exception;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
+import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -10,6 +12,8 @@ import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingRequestHeaderException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
@@ -22,182 +26,179 @@ public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
+    private final ProblemDetailFactory problems;
+
+    public GlobalExceptionHandler(ProblemDetailFactory problems) {
+        this.problems = problems;
+    }
+
     @ExceptionHandler(EmailAlreadyExistsException.class)
-    public ResponseEntity<ErrorResponseDTO> handleEmailAlreadyExists(EmailAlreadyExistsException ex) {
-        return ResponseEntity.status(HttpStatus.CONFLICT)
-                .body(new ErrorResponseDTO(ex.getMessage()));
+    public ResponseEntity<ProblemDetail> handleEmailAlreadyExists(EmailAlreadyExistsException ex) {
+        return problems.response(ProblemType.EMAIL_ALREADY_EXISTS, ex.getMessage());
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ValidationErrorResponseDTO> handleValidation(MethodArgumentNotValidException ex) {
+    public ResponseEntity<ProblemDetail> handleValidation(MethodArgumentNotValidException ex) {
         List<ValidationErrorDTO> errors = ex.getBindingResult().getFieldErrors().stream()
                 .map(error -> new ValidationErrorDTO(error.getField(), error.getDefaultMessage()))
                 .toList();
-        return ResponseEntity.badRequest()
-                .body(new ValidationErrorResponseDTO("Validation failed", errors));
+        var problem = problems.create(ProblemType.VALIDATION_FAILED, "Validation failed");
+        problem.setProperty("errors", errors);
+        return problems.response(problem);
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
-    public ResponseEntity<ErrorResponseDTO> handleNotReadable(HttpMessageNotReadableException ex) {
+    public ResponseEntity<ProblemDetail> handleNotReadable(HttpMessageNotReadableException ex) {
         log.debug("Unreadable request body", ex);
-        return ResponseEntity.badRequest()
-                .body(new ErrorResponseDTO("Malformed request body"));
+        return problems.response(ProblemType.MALFORMED_REQUEST_BODY, "Malformed request body");
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ProblemDetail> handleMissingParameter(MissingServletRequestParameterException ex) {
+        return problems.response(ProblemType.MISSING_PARAMETER,
+                "Required parameter '" + ex.getParameterName() + "' is missing");
+    }
+
+    @ExceptionHandler(MissingRequestHeaderException.class)
+    public ResponseEntity<ProblemDetail> handleMissingHeader(MissingRequestHeaderException ex) {
+        return problems.response(ProblemType.MISSING_HEADER,
+                "Required header '" + ex.getHeaderName() + "' is missing");
     }
 
     @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
-    public ResponseEntity<ErrorResponseDTO> handleMediaTypeNotSupported(HttpMediaTypeNotSupportedException ex) {
-        return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
-                .body(new ErrorResponseDTO("Unsupported media type"));
+    public ResponseEntity<ProblemDetail> handleMediaTypeNotSupported(HttpMediaTypeNotSupportedException ex) {
+        return problems.response(ProblemType.UNSUPPORTED_MEDIA_TYPE, "Unsupported media type");
     }
 
     @ExceptionHandler(BadCredentialsException.class)
-    public ResponseEntity<ErrorResponseDTO> handleBadCredentials(BadCredentialsException ex) {
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(new ErrorResponseDTO("Invalid credentials"));
+    public ResponseEntity<ProblemDetail> handleBadCredentials(BadCredentialsException ex) {
+        return problems.response(ProblemType.INVALID_CREDENTIALS, "Invalid credentials");
     }
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ErrorResponseDTO> handleUnexpected(Exception ex) {
+    public ResponseEntity<ProblemDetail> handleUnexpected(Exception ex) {
         log.error("Unexpected error", ex);
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(new ErrorResponseDTO("Internal server error"));
+        return problems.response(ProblemType.INTERNAL_ERROR, "Internal server error");
     }
 
     @ExceptionHandler(InvalidRoleChangeException.class)
-    public ResponseEntity<ErrorResponseDTO> handleInvalidRoleChange(InvalidRoleChangeException ex) {
-        return ResponseEntity.status(HttpStatus.CONFLICT)
-                .body(new ErrorResponseDTO(ex.getMessage()));
+    public ResponseEntity<ProblemDetail> handleInvalidRoleChange(InvalidRoleChangeException ex) {
+        return problems.response(ProblemType.INVALID_ROLE_CHANGE, ex.getMessage());
     }
 
     @ExceptionHandler(UserNotFoundException.class)
-    public ResponseEntity<ErrorResponseDTO> handleUserNotFound(UserNotFoundException ex) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(new ErrorResponseDTO(ex.getMessage()));
+    public ResponseEntity<ProblemDetail> handleUserNotFound(UserNotFoundException ex) {
+        return problems.response(ProblemType.USER_NOT_FOUND, ex.getMessage());
     }
 
     @ExceptionHandler(EventNotFoundException.class)
-    public ResponseEntity<ErrorResponseDTO> handleEventNotFound(EventNotFoundException ex) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(new ErrorResponseDTO(ex.getMessage()));
+    public ResponseEntity<ProblemDetail> handleEventNotFound(EventNotFoundException ex) {
+        return problems.response(ProblemType.EVENT_NOT_FOUND, ex.getMessage());
     }
 
     @ExceptionHandler(EventAccessDeniedException.class)
-    public ResponseEntity<ErrorResponseDTO> handleAccessDenied(EventAccessDeniedException ex) {
-        return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                .body(new ErrorResponseDTO(ex.getMessage()));
+    public ResponseEntity<ProblemDetail> handleAccessDenied(EventAccessDeniedException ex) {
+        return problems.response(ProblemType.EVENT_ACCESS_DENIED, ex.getMessage());
     }
 
     @ExceptionHandler(InvalidEventDatesException.class)
-    public ResponseEntity<ErrorResponseDTO> handleInvalidEventDates(InvalidEventDatesException ex) {
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(new ErrorResponseDTO(ex.getMessage()));
+    public ResponseEntity<ProblemDetail> handleInvalidEventDates(InvalidEventDatesException ex) {
+        return problems.response(ProblemType.INVALID_EVENT_DATES, ex.getMessage());
     }
 
     @ExceptionHandler(AuthorizationDeniedException.class)
-    public ResponseEntity<ErrorResponseDTO> handleAuthorizationDenied(AuthorizationDeniedException ex) {
-        return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                .body(new ErrorResponseDTO("Access denied"));
+    public ResponseEntity<ProblemDetail> handleAuthorizationDenied(AuthorizationDeniedException ex) {
+        return problems.response(ProblemType.ACCESS_DENIED, "Access denied");
     }
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
-    public ResponseEntity<ErrorResponseDTO> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
-        return ResponseEntity.badRequest()
-                .body(new ErrorResponseDTO("Invalid value for parameter '" + ex.getName() + "'"));
+    public ResponseEntity<ProblemDetail> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
+        return problems.response(ProblemType.INVALID_PARAMETER,
+                "Invalid value for parameter '" + ex.getName() + "'");
     }
 
     @ExceptionHandler(TicketTypeNotFoundException.class)
-    public ResponseEntity<ErrorResponseDTO> handleTicketTypeNotFound(TicketTypeNotFoundException ex) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(new ErrorResponseDTO(ex.getMessage()));
+    public ResponseEntity<ProblemDetail> handleTicketTypeNotFound(TicketTypeNotFoundException ex) {
+        return problems.response(ProblemType.TICKET_TYPE_NOT_FOUND, ex.getMessage());
     }
 
     @ExceptionHandler(InvalidTicketTypeQuantityException.class)
-    public ResponseEntity<ErrorResponseDTO> handleInvalidTicketTypeQuantity(InvalidTicketTypeQuantityException ex) {
-        return ResponseEntity.badRequest()
-                .body(new ErrorResponseDTO(ex.getMessage()));
+    public ResponseEntity<ProblemDetail> handleInvalidTicketTypeQuantity(InvalidTicketTypeQuantityException ex) {
+        return problems.response(ProblemType.INVALID_TICKET_TYPE_QUANTITY, ex.getMessage());
     }
 
     @ExceptionHandler(TicketTypeNameAlreadyExistsException.class)
-    public ResponseEntity<ErrorResponseDTO> handleTicketTypeNameAlreadyExists(TicketTypeNameAlreadyExistsException ex) {
-        return ResponseEntity.status(HttpStatus.CONFLICT)
-                .body(new ErrorResponseDTO(ex.getMessage()));
+    public ResponseEntity<ProblemDetail> handleTicketTypeNameAlreadyExists(TicketTypeNameAlreadyExistsException ex) {
+        return problems.response(ProblemType.TICKET_TYPE_NAME_ALREADY_EXISTS, ex.getMessage());
     }
 
     @ExceptionHandler(InvalidOrderStateException.class)
-    public ResponseEntity<ErrorResponseDTO> handleInvalidOrderState(InvalidOrderStateException ex) {
-        return ResponseEntity.status(HttpStatus.CONFLICT)
-                .body(new ErrorResponseDTO(ex.getMessage()));
+    public ResponseEntity<ProblemDetail> handleInvalidOrderState(InvalidOrderStateException ex) {
+        return problems.response(ProblemType.INVALID_ORDER_STATE, ex.getMessage());
     }
 
     @ExceptionHandler(InsufficientStockException.class)
-    public ResponseEntity<ErrorResponseDTO> handleInsufficientStock(InsufficientStockException ex) {
-        return ResponseEntity.status(HttpStatus.CONFLICT)
-                .body(new ErrorResponseDTO(ex.getMessage()));
+    public ResponseEntity<ProblemDetail> handleInsufficientStock(InsufficientStockException ex) {
+        return problems.response(ProblemType.INSUFFICIENT_STOCK, ex.getMessage());
     }
 
     @ExceptionHandler(MixedEventsOrderException.class)
-    public ResponseEntity<ErrorResponseDTO> handleMixedEventsOrder(MixedEventsOrderException ex) {
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(new ErrorResponseDTO(ex.getMessage()));
+    public ResponseEntity<ProblemDetail> handleMixedEventsOrder(MixedEventsOrderException ex) {
+        return problems.response(ProblemType.MIXED_EVENTS_ORDER, ex.getMessage());
     }
 
     @ExceptionHandler(MaxPerOrderExceededException.class)
-    public ResponseEntity<ErrorResponseDTO> handleMaxPorOrderExceeded(MaxPerOrderExceededException ex) {
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(new ErrorResponseDTO(ex.getMessage()));
+    public ResponseEntity<ProblemDetail> handleMaxPorOrderExceeded(MaxPerOrderExceededException ex) {
+        return problems.response(ProblemType.MAX_PER_ORDER_EXCEEDED, ex.getMessage());
     }
 
     @ExceptionHandler(OrderNotFoundException.class)
-    public ResponseEntity<ErrorResponseDTO> handleOrderNotFound(OrderNotFoundException ex) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(new ErrorResponseDTO(ex.getMessage()));
+    public ResponseEntity<ProblemDetail> handleOrderNotFound(OrderNotFoundException ex) {
+        return problems.response(ProblemType.ORDER_NOT_FOUND, ex.getMessage());
     }
 
     @ExceptionHandler(OrderAccessDeniedException.class)
-    public ResponseEntity<ErrorResponseDTO> handleOrderAccesdenied(OrderAccessDeniedException ex) {
-        return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                .body(new ErrorResponseDTO(ex.getMessage()));
+    public ResponseEntity<ProblemDetail> handleOrderAccesdenied(OrderAccessDeniedException ex) {
+        return problems.response(ProblemType.ORDER_ACCESS_DENIED, ex.getMessage());
     }
 
     @ExceptionHandler(InvalidPaymentStateException.class)
-    public ResponseEntity<ErrorResponseDTO> handleInvalidPaymentState(InvalidPaymentStateException ex) {
-        return ResponseEntity.status(HttpStatus.CONFLICT)
-                .body(new ErrorResponseDTO(ex.getMessage()));
+    public ResponseEntity<ProblemDetail> handleInvalidPaymentState(InvalidPaymentStateException ex) {
+        return problems.response(ProblemType.INVALID_PAYMENT_STATE, ex.getMessage());
     }
 
     @ExceptionHandler(InvalidTicketStateException.class)
-    public ResponseEntity<ErrorResponseDTO> handleInvalidTicketState(InvalidTicketStateException ex) {
-        return ResponseEntity.status(HttpStatus.CONFLICT)
-                .body(new ErrorResponseDTO(ex.getMessage()));
+    public ResponseEntity<ProblemDetail> handleInvalidTicketState(InvalidTicketStateException ex) {
+        return problems.response(ProblemType.INVALID_TICKET_STATE, ex.getMessage());
     }
 
     @ExceptionHandler(TicketNotFoundException.class)
-    public ResponseEntity<ErrorResponseDTO> handleTicketNotFound(TicketNotFoundException ex) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(new ErrorResponseDTO(ex.getMessage()));
+    public ResponseEntity<ProblemDetail> handleTicketNotFound(TicketNotFoundException ex) {
+        return problems.response(ProblemType.TICKET_NOT_FOUND, ex.getMessage());
     }
 
     @ExceptionHandler(NoResourceFoundException.class)
-    public ResponseEntity<ErrorResponseDTO> handleNoResource(NoResourceFoundException ex) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(new ErrorResponseDTO("Resource not found"));
+    public ResponseEntity<ProblemDetail> handleNoResource(NoResourceFoundException ex) {
+        return problems.response(ProblemType.RESOURCE_NOT_FOUND, "Resource not found");
     }
 
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
-    public ResponseEntity<ErrorResponseDTO> handleMethodNotSupported(HttpRequestMethodNotSupportedException ex) {
-        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED)
-                .body(new ErrorResponseDTO("Method not allowed"));
+    public ResponseEntity<ProblemDetail> handleMethodNotSupported(HttpRequestMethodNotSupportedException ex) {
+        var problem = problems.create(ProblemType.METHOD_NOT_ALLOWED, "Method not allowed");
+        var allowed = ex.getSupportedHttpMethods();
+        return ResponseEntity.status(problem.getStatus())
+                .contentType(MediaType.APPLICATION_PROBLEM_JSON)
+                .allow(allowed == null ? new HttpMethod[0] : allowed.toArray(HttpMethod[]::new))
+                .body(problem);
     }
 
     @ExceptionHandler(InvalidEventStateException.class)
-    public ResponseEntity<ErrorResponseDTO> handleInvalidEventState(InvalidEventStateException ex) {
-        return ResponseEntity.status(HttpStatus.CONFLICT)
-                .body(new ErrorResponseDTO(ex.getMessage()));
+    public ResponseEntity<ProblemDetail> handleInvalidEventState(InvalidEventStateException ex) {
+        return problems.response(ProblemType.INVALID_EVENT_STATE, ex.getMessage());
     }
 
     @ExceptionHandler(EventHasSalesException.class)
-    public ResponseEntity<ErrorResponseDTO> handleEventHasSales(EventHasSalesException ex) {
-        return ResponseEntity.status(HttpStatus.CONFLICT)
-                .body(new ErrorResponseDTO(ex.getMessage()));
+    public ResponseEntity<ProblemDetail> handleEventHasSales(EventHasSalesException ex) {
+        return problems.response(ProblemType.EVENT_HAS_SALES, ex.getMessage());
     }
 }

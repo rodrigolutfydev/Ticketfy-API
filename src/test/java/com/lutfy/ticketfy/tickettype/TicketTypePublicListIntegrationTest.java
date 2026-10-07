@@ -101,7 +101,7 @@ class TicketTypePublicListIntegrationTest extends IntegrationTestBase {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"items\":[{\"ticketTypeId\":\"" + ticketTypeId + "\",\"quantity\":5}]}"))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("Maximum 4 tickets per order for this ticket type"));
+                .andExpect(jsonPath("$.detail").value("Maximum 4 tickets per order for this ticket type"));
 
         var sold = jdbc.queryForObject(
                 "SELECT quantity_sold FROM ticket_types WHERE id = ?", Integer.class, ticketTypeId);

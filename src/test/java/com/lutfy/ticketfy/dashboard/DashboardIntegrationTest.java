@@ -115,7 +115,7 @@ class DashboardIntegrationTest extends IntegrationTestBase {
             mockMvc.perform(get(path).header("Authorization", tokenFor(insertUser("ADMIN")))).andExpect(status().isOk());
             mockMvc.perform(get(path).header("Authorization", tokenFor(insertUser("ORGANIZER"))))
                     .andExpect(status().isForbidden())
-                    .andExpect(jsonPath("$.message").value("You do not own this event"));
+                    .andExpect(jsonPath("$.detail").value("You do not own this event"));
             mockMvc.perform(get(path).header("Authorization", tokenFor(maria))).andExpect(status().isForbidden());
             mockMvc.perform(get(path)).andExpect(status().isUnauthorized());
             mockMvc.perform(get(route.formatted(UUID.randomUUID())).header("Authorization", tokenFor(organizerId)))

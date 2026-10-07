@@ -47,7 +47,7 @@ class TicketTypeNameConflictIntegrationTest extends IntegrationTestBase {
 
         create(eventId, "Pista")
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.message").value("A ticket type with this name already exists for this event"));
+                .andExpect(jsonPath("$.detail").value("A ticket type with this name already exists for this event"));
 
         var count = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM ticket_types WHERE event_id = ? AND name = 'Pista'", Integer.class, eventId);
@@ -64,7 +64,7 @@ class TicketTypeNameConflictIntegrationTest extends IntegrationTestBase {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"name\":\"Pista\",\"price\":99.00}"))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.message").value("A ticket type with this name already exists for this event"));
+                .andExpect(jsonPath("$.detail").value("A ticket type with this name already exists for this event"));
 
         var row = jdbc.queryForMap("SELECT name, price FROM ticket_types WHERE id = ?", vip);
         assertThat(row.get("name")).isEqualTo("VIP");

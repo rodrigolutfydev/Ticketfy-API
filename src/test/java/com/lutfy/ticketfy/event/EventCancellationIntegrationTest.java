@@ -170,7 +170,7 @@ class EventCancellationIntegrationTest extends IntegrationTestBase {
 
         mockMvc.perform(post("/orders/{id}/payment", orderId).header("Authorization", bearer(buyer)))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.message").value("The event for this order was cancelled"));
+                .andExpect(jsonPath("$.detail").value("The event for this order was cancelled"));
 
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM payments WHERE order_id = ?", Long.class, orderId)).isZero();
         assertThat(ticketStatuses(orderId)).isEmpty();
@@ -263,7 +263,7 @@ class EventCancellationIntegrationTest extends IntegrationTestBase {
 
         mockMvc.perform(post("/tickets/{code}/check-in", code).header("Authorization", bearer(organizer)))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.message").value("Event was cancelled"));
+                .andExpect(jsonPath("$.detail").value("Event was cancelled"));
         assertThat(ticketStatuses(orderId)).containsOnly("VALID");
     }
 
@@ -296,7 +296,7 @@ class EventCancellationIntegrationTest extends IntegrationTestBase {
 
         cancel(organizer, null)
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.message").value("Event is already cancelled"));
+                .andExpect(jsonPath("$.detail").value("Event is already cancelled"));
     }
 
     @Test
@@ -308,7 +308,7 @@ class EventCancellationIntegrationTest extends IntegrationTestBase {
         for (var id : List.of(ended, startedWithoutEnd)) {
             mockMvc.perform(post("/events/{id}/cancel", id).header("Authorization", bearer(organizer)))
                     .andExpect(status().isConflict())
-                    .andExpect(jsonPath("$.message").value("Event has already ended"));
+                    .andExpect(jsonPath("$.detail").value("Event has already ended"));
         }
     }
 
