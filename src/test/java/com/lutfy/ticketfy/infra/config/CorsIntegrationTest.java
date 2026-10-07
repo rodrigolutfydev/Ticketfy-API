@@ -56,7 +56,6 @@ class CorsIntegrationTest extends IntegrationTestBase {
                 .andExpect(header().doesNotExist("Access-Control-Allow-Origin"));
     }
 
-    // MockMvc leaves the servlet path empty; the rate limit filter matches it like Tomcat does ("/login")
     @Test
     void rateLimitedLoginExposesRetryAfterToTheBrowser() throws Exception {
         var address = "10.0.8." + (UUID.randomUUID().hashCode() & 0xff);
@@ -64,7 +63,6 @@ class CorsIntegrationTest extends IntegrationTestBase {
             mockMvc.perform(post("/login")
                             .with(request -> {
                                 request.setRemoteAddr(address);
-                                request.setServletPath("/login");
                                 return request;
                             })
                             .header("Origin", FRONTEND)
@@ -76,7 +74,6 @@ class CorsIntegrationTest extends IntegrationTestBase {
         mockMvc.perform(post("/login")
                         .with(request -> {
                             request.setRemoteAddr(address);
-                            request.setServletPath("/login");
                             return request;
                         })
                         .header("Origin", FRONTEND)
