@@ -3,6 +3,37 @@
 Registro das mudanças que exigem ajuste no frontend, da mais recente para a mais antiga.
 O contrato completo do dashboard do organizador está em [CONTRATO-DASHBOARD.md](CONTRATO-DASHBOARD.md).
 
+## Eventos em destaque (Tarefa 9)
+
+**Novo campo `featured` (boolean)** em:
+- `GET /events` e `GET /events/mine`, no resumo de cada evento;
+- `GET /events/{id}`, no detalhe.
+
+Eventos novos começam com `false`.
+
+**Novo filtro em `GET /events`:** `featured`, opcional.
+
+| `featured` | Resultado |
+|---|---|
+| ausente | todos os eventos ativos (como antes) |
+| `true` | só os eventos em destaque |
+| `false` | só os eventos que não estão em destaque |
+| outro valor | 400 `{ "message": "Invalid value for parameter 'featured'" }` |
+
+O filtro combina com `q` e `city`.
+
+**Novo endpoint `PATCH /events/{id}/featured`:**
+- **Acesso:** somente ADMIN. O organizador, mesmo sendo dono do evento, recebe 403.
+- **Corpo:** `{ "featured": true }` ou `{ "featured": false }`. O campo é obrigatório.
+- **Respostas:**
+  - 200 com o mesmo corpo de `GET /events/{id}`, já com o novo valor de `featured`;
+  - 400 sem `featured`;
+  - 401 sem token;
+  - 403 para quem não é ADMIN;
+  - 404 para evento inexistente ou desativado.
+
+O `PUT /events/{id}` não altera `featured`.
+
 ## CORS: PATCH liberado e `Retry-After` exposto (Tarefa 8)
 
 **Origens permitidas:** vêm de `CORS_ALLOWED_ORIGINS`, uma lista separada por vírgula. O padrão é `http://localhost:3000,http://localhost:5173`.

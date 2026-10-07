@@ -9,9 +9,11 @@ public record EventSummaryDTO(
         String imageUrl,
         String venueName,
         String city,
-        Instant startsAt
+        Instant startsAt,
+        boolean featured
 ) {
     public EventSummaryDTO(Event event) {
-        this(event.getId(), event.getName(), event.getImageUrl(), event.getVenueName(), event.getCity(), event.getStartsAt());
+        this(event.getId(), event.getName(), event.getImageUrl(), event.getVenueName(), event.getCity(), event.getStartsAt(),
+                event.isFeatured());
     }
 }

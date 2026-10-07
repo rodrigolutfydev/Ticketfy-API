@@ -47,21 +47,14 @@ public class EventService {
     }
 
     @Transactional(readOnly = true)
-    public Page<EventSummaryDTO> search(String q, String city, Pageable pageable) {
+    public Page<EventSummaryDTO> search(String q, String city, Boolean featured, Pageable pageable) {
+        var spec = EventSpecifications.isActive();
         var name = normalize(q);
+        if (name != null) spec = spec.and(EventSpecifications.nameContains(name));
         var cityFilter = normalize(city);
-
-        Page<Event> page;
-        if (name != null && cityFilter != null) {
-            page = repository.findByActiveTrueAndNameContainingIgnoreCaseAndCityIgnoreCase(name, cityFilter, pageable);
-        } else if (name != null) {
-            page = repository.findByActiveTrueAndNameContainingIgnoreCase(name, pageable);
-        } else if (cityFilter != null) {
-            page = repository.findByActiveTrueAndCityIgnoreCase(cityFilter, pageable);
-        } else {
-            page = repository.findByActiveTrue(pageable);
-        }
-        return page.map(EventSummaryDTO::new);
+        if (cityFilter != null) spec = spec.and(EventSpecifications.cityEquals(cityFilter));
+        if (featured != null) spec = spec.and(EventSpecifications.isFeatured(featured));
+        return repository.findAll(spec, pageable).map(EventSummaryDTO::new);
     }
 
     private String normalize(String value) {
@@ -86,6 +79,14 @@ public class EventService {
         if (!event.getOrganizer().getId().equals(requester.getId())) {
             throw new EventAccessDeniedException("You do not own this event");
         }
+    }
+
+    @Transactional
+    public EventDetailsDTO changeFeatured(UUID id, boolean featured) {
+        var event = repository.findByIdAndActiveTrue(id)
+                .orElseThrow(() -> new EventNotFoundException("Event not found"));
+        event.changeFeatured(featured);
+        return new EventDetailsDTO(event);
     }
 
     @Transactional(readOnly = true)

@@ -34,8 +34,9 @@ public class EventController {
     public ResponseEntity<Page<EventSummaryDTO>> search(
             @RequestParam(required = false) String q,
             @RequestParam(required = false) String city,
+            @RequestParam(required = false) Boolean featured,
             @PageableDefault(size = 20, sort = "startsAt") Pageable pageable) {
-        var page = service.search(q, city, pageable);
+        var page = service.search(q, city, featured, pageable);
         return ResponseEntity.ok(page);
     }
 
@@ -51,6 +52,13 @@ public class EventController {
                                                   @AuthenticationPrincipal User requester) {
         var event = service.update(id, dto, requester);
         return ResponseEntity.ok(event);
+    }
+
+    @PatchMapping("/{id}/featured")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<EventDetailsDTO> changeFeatured(@PathVariable UUID id,
+                                                          @RequestBody @Valid EventFeaturedUpdateDTO dto) {
+        return ResponseEntity.ok(service.changeFeatured(id, dto.featured()));
     }
 
     @GetMapping("/mine")

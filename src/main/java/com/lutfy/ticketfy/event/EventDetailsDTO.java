@@ -16,11 +16,13 @@ public record EventDetailsDTO(
         Instant endsAt,
         String organizerName,
         UUID organizerId,
-        Instant createdAt
+        Instant createdAt,
+        boolean featured
 ) {
     public EventDetailsDTO(Event event) {
         this(event.getId(), event.getName(), event.getDescription(), event.getImageUrl(), event.getVenueName(),
                 event.getAddress(), event.getCity(), event.getState(), event.getStartsAt(),
-                event.getEndsAt(), event.getOrganizer().getName(), event.getOrganizer().getId(), event.getCreatedAt());
+                event.getEndsAt(), event.getOrganizer().getName(), event.getOrganizer().getId(), event.getCreatedAt(),
+                event.isFeatured());
     }
 }

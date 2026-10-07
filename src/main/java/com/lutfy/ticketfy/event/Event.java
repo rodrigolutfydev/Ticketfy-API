@@ -48,6 +48,7 @@ public class Event {
     @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name = "organizer_id")
     private User organizer;
     private boolean active;
+    private boolean featured;
 
     @CreationTimestamp @Column(name = "created_at", updatable = false)
     private Instant createdAt;
@@ -83,6 +84,10 @@ public class Event {
 
     public void deactivate() {
         this.active = false;
+    }
+
+    public void changeFeatured(boolean featured) {
+        this.featured = featured;
     }
 
     private static String blankToNull(String value) {
