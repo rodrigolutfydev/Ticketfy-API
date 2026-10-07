@@ -28,6 +28,12 @@ public class UserController {
         return ResponseEntity.ok(new UserDetailsDTO(user));
     }
 
+    @PatchMapping("/me/avatar")
+    public ResponseEntity<UserDetailsDTO> updateAvatar(@AuthenticationPrincipal User user,
+                                                       @RequestBody @Valid UserAvatarUpdateDTO dto) {
+        return ResponseEntity.ok(service.updateAvatar(user.getId(), dto));
+    }
+
     @PostMapping("/me/organizer")
     public ResponseEntity<LoginResponseDTO> becomeOrganizer(@AuthenticationPrincipal User user) {
         var response = service.becomeOrganizer(user);

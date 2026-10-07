@@ -39,6 +39,9 @@ public class User implements UserDetails {
     private String email;
     private String password;
 
+    @Column(name = "avatar_url", length = 500)
+    private String avatarUrl;
+
     @CreationTimestamp
     @Column(updatable = false)
     private Instant createdAt;
@@ -58,6 +61,10 @@ public class User implements UserDetails {
             throw new InvalidRoleChangeException("This account cannot be promoted to organizer");
         }
         this.role = Role.ORGANIZER;
+    }
+
+    public void changeAvatar(String url) {
+        this.avatarUrl = (url == null || url.isBlank()) ? null : url;
     }
 
     @Override

@@ -1,11 +1,14 @@
 package com.lutfy.ticketfy.user;
 
 import com.lutfy.ticketfy.infra.exception.EmailAlreadyExistsException;
+import com.lutfy.ticketfy.infra.exception.UserNotFoundException;
 import com.lutfy.ticketfy.infra.security.LoginResponseDTO;
 import com.lutfy.ticketfy.infra.security.TokenService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.UUID;
 
 @Service
 public class UserService {
@@ -35,5 +38,13 @@ public class UserService {
         user.promoteToOrganizer();
         User saved = repository.save(user);
         return new LoginResponseDTO(tokenService.generateToken(saved));
+    }
+
+    @Transactional
+    public UserDetailsDTO updateAvatar(UUID userId, UserAvatarUpdateDTO dto) {
+        var user = repository.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException("User not found"));
+        user.changeAvatar(dto.avatarUrl());
+        return new UserDetailsDTO(user);
     }
 }

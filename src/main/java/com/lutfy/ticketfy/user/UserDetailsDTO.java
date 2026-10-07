@@ -6,9 +6,10 @@ public record UserDetailsDTO(
         UUID id,
         String name,
         String email,
-        Role role
+        Role role,
+        String avatarUrl
 ) {
     public UserDetailsDTO(User user) {
-        this(user.getId(), user.getName(), user.getEmail(), user.getRole());
+        this(user.getId(), user.getName(), user.getEmail(), user.getRole(), user.getAvatarUrl());
     }
 }
