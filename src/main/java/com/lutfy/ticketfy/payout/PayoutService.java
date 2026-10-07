@@ -1,0 +1,61 @@
+package com.lutfy.ticketfy.payout;
+
+import com.lutfy.ticketfy.infra.exception.InvalidDateRangeException;
+import com.lutfy.ticketfy.user.User;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.UUID;
+
+@Service
+public class PayoutService {
+
+    private final PayoutQueryRepository queries;
+    private final PayoutSettings settings;
+    private final Clock clock;
+    private final ZoneId zone;
+
+    public PayoutService(PayoutQueryRepository queries, PayoutSettings settings, Clock clock,
+                         @Value("${ticketfy.dashboard.time-zone}") String timeZone) {
+        this.queries = queries;
+        this.settings = settings;
+        this.clock = clock;
+        this.zone = ZoneId.of(timeZone);
+    }
+
+    @Transactional(readOnly = true)
+    public BalanceDTO balance(User organizer) {
+        var releasedUntil = clock.instant().minus(settings.releaseDelay());
+        var balance = queries.findBalance(organizer.getId(), releasedUntil);
+        return new BalanceDTO(money(balance.pending()), money(balance.available()), money(balance.held()),
+                money(balance.total()), settings.releaseDelayDays());
+    }
+
+    @Transactional(readOnly = true)
+    public Page<LedgerEntryDTO> ledger(User organizer, UUID eventId, LocalDate from, LocalDate to,
+                                       Pageable pageable) {
+        if (from != null && to != null && from.isAfter(to)) {
+            throw new InvalidDateRangeException("'from' must not be after 'to'");
+        }
+        Instant start = from == null ? null : from.atStartOfDay(zone).toInstant();
+        Instant until = to == null ? null : to.plusDays(1).atStartOfDay(zone).toInstant();
+        return queries.findEntries(organizer.getId(), eventId, start, until,
+                        PageRequest.of(pageable.getPageNumber(), pageable.getPageSize()))
+                .map(entry -> new LedgerEntryDTO(entry.id(), entry.type(), money(entry.amount()), entry.eventId(),
+                        entry.eventName(), entry.orderId(), entry.createdAt()));
+    }
+
+    private static BigDecimal money(BigDecimal value) {
+        return (value == null ? BigDecimal.ZERO : value).setScale(2, RoundingMode.HALF_UP);
+    }
+}

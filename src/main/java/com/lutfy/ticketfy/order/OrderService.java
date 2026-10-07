@@ -3,6 +3,8 @@ package com.lutfy.ticketfy.order;
 import com.lutfy.ticketfy.event.EventRepository;
 import com.lutfy.ticketfy.infra.exception.*;
 import com.lutfy.ticketfy.payment.PaymentService;
+import com.lutfy.ticketfy.payout.LedgerService;
+import com.lutfy.ticketfy.payout.PayoutSettings;
 import com.lutfy.ticketfy.ticket.TicketService;
 import com.lutfy.ticketfy.tickettype.TicketTypeRepository;
 import com.lutfy.ticketfy.user.Role;
@@ -27,6 +29,8 @@ public class OrderService {
     private final TicketService ticketService;
     private final PaymentService paymentService;
     private final EventRepository eventRepository;
+    private final LedgerService ledgerService;
+    private final PayoutSettings payoutSettings;
     private final long reservationMinutes;
     private final long refundDeadlineHours;
 
@@ -35,6 +39,8 @@ public class OrderService {
                         TicketService ticketService,
                         PaymentService paymentService,
                         EventRepository eventRepository,
+                        LedgerService ledgerService,
+                        PayoutSettings payoutSettings,
                         @Value("${ticketfy.order.reservation-minutes}") long reservationMinutes,
                         @Value("${ticketfy.refund.deadline-hours}") long refundDeadlineHours) {
         this.orderRepository = orderRepository;
@@ -42,6 +48,8 @@ public class OrderService {
         this.ticketService = ticketService;
         this.paymentService = paymentService;
         this.eventRepository = eventRepository;
+        this.ledgerService = ledgerService;
+        this.payoutSettings = payoutSettings;
         this.reservationMinutes = reservationMinutes;
         this.refundDeadlineHours = refundDeadlineHours;
     }
@@ -82,6 +90,7 @@ public class OrderService {
             var item = new OrderItem(order, ticketType, itemRequest.quantity());
             order.addItem(item);
         }
+        order.applyPlatformFee(payoutSettings.platformFeePercent());
         var saved = orderRepository.saveAndFlush(order);
         return new OrderDetailsDTO(saved);
     }
@@ -146,6 +155,7 @@ public class OrderService {
         ticketService.cancelForRefund(order.getId());
         releaseStock(order);
         paymentService.refundApproved(order);
+        ledgerService.recordRefund(order);
     }
 
     private void releaseStock(Order order) {

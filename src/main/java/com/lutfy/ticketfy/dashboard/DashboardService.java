@@ -71,8 +71,12 @@ public class DashboardService {
 
         var paid = statusCounts.get(OrderStatus.PAID);
         long paidOrders = paid == null ? 0 : paid.orders();
+        var fees = queries.findFeesByEvent(List.of(eventId)).stream().findFirst();
         var totals = new EventDashboardDTO.Totals(
-                sold, reserved, capacity, remaining, percent(sold, capacity), money(revenue), paidOrders,
+                sold, reserved, capacity, remaining, percent(sold, capacity), money(revenue),
+                money(fees.map(DashboardQueryRepository.EventFees::platformFee).orElse(null)),
+                money(fees.map(DashboardQueryRepository.EventFees::netAmount).orElse(null)),
+                paidOrders,
                 average(revenue, paidOrders), paidOrders == 0 ? null : average(revenue, sold));
 
         var ordersByStatus = STATUS_ORDER.stream()
@@ -125,7 +129,9 @@ public class DashboardService {
                                 money(item.unitPrice()),
                                 money(item.unitPrice().multiply(BigDecimal.valueOf(item.quantity())))))
                         .toList(),
-                money(order.total())));
+                money(order.total()),
+                money(order.platformFee()),
+                money(order.netAmount())));
     }
 
     @Transactional(readOnly = true)
@@ -135,18 +141,25 @@ public class DashboardService {
         var eventIds = events.getContent().stream().map(Event::getId).toList();
         var salesByEvent = queries.findSalesByEvent(eventIds).stream()
                 .collect(Collectors.toMap(DashboardQueryRepository.EventSales::eventId, Function.identity()));
+        var feesByEvent = queries.findFeesByEvent(eventIds).stream()
+                .collect(Collectors.toMap(DashboardQueryRepository.EventFees::eventId, Function.identity()));
 
         var page = events.map(event -> {
             var sales = salesByEvent.get(event.getId());
             long sold = sales == null ? 0 : sales.sold();
             long capacity = sales == null ? 0 : sales.capacity();
+            var fees = feesByEvent.get(event.getId());
             return new OrganizerDashboardDTO.EventSales(event.getId(), event.getName(), event.getStartsAt(),
                     event.getImageUrl(), sold, capacity, percent(sold, capacity),
-                    money(sales == null ? null : sales.revenue()));
+                    money(sales == null ? null : sales.revenue()),
+                    money(fees == null ? null : fees.platformFee()),
+                    money(fees == null ? null : fees.netAmount()));
         });
 
         var overall = queries.findOrganizerSales(requester.getId());
-        var totals = new OrganizerDashboardDTO.Totals(events.getTotalElements(), overall.sold(), money(overall.revenue()));
+        var overallFees = queries.findOrganizerFees(requester.getId());
+        var totals = new OrganizerDashboardDTO.Totals(events.getTotalElements(), overall.sold(), money(overall.revenue()),
+                money(overallFees.platformFee()), money(overallFees.netAmount()));
         return new OrganizerDashboardDTO(totals, page);
     }
 

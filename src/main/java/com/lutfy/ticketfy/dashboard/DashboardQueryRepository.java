@@ -42,6 +42,14 @@ public class DashboardQueryRepository {
               JOIN ticket_types tt ON tt.id = oi.ticket_type_id
             """;
 
+    private static final String PAID_ORDER_EVENTS = """
+            SELECT DISTINCT o.id, o.platform_fee, o.net_amount, tt.event_id
+              FROM orders o
+              JOIN order_items oi ON oi.order_id = o.id
+              JOIN ticket_types tt ON tt.id = oi.ticket_type_id
+             WHERE o.status = 'PAID'
+            """;
+
     private final NamedParameterJdbcTemplate jdbc;
 
     public DashboardQueryRepository(NamedParameterJdbcTemplate jdbc) {
@@ -125,7 +133,7 @@ public class DashboardQueryRepository {
                 "SELECT COUNT(DISTINCT o.id)" + EVENT_ORDERS_FROM + where, params, Long.class);
 
         var sql = """
-                SELECT o.id, o.status, o.created_at, u.name, u.email,
+                SELECT o.id, o.status, o.created_at, u.name, u.email, o.platform_fee, o.net_amount,
                        SUM(oi.unit_price * oi.quantity) AS total,
                        (SELECT p.approved_at FROM payments p
                          WHERE p.order_id = o.id AND p.status = 'APPROVED') AS paid_at
@@ -142,7 +150,9 @@ public class DashboardQueryRepository {
                 toInstant(rs, "paid_at"),
                 rs.getString("name"),
                 rs.getString("email"),
-                rs.getBigDecimal("total")));
+                rs.getBigDecimal("total"),
+                rs.getBigDecimal("platform_fee"),
+                rs.getBigDecimal("net_amount")));
         return new PageImpl<>(content, pageable, total == null ? 0 : total);
     }
 
@@ -180,6 +190,30 @@ public class DashboardQueryRepository {
                 rs.getBigDecimal("revenue")));
     }
 
+    public List<EventFees> findFeesByEvent(Collection<UUID> eventIds) {
+        if (eventIds.isEmpty()) return List.of();
+        var sql = "WITH paid AS (" + PAID_ORDER_EVENTS + ") " + """
+                SELECT event_id, SUM(platform_fee) AS platform_fee, SUM(net_amount) AS net_amount
+                  FROM paid
+                 WHERE event_id IN (:eventIds)
+                 GROUP BY event_id
+                """;
+        return jdbc.query(sql, new MapSqlParameterSource("eventIds", eventIds), (rs, i) -> new EventFees(
+                rs.getObject("event_id", UUID.class),
+                rs.getBigDecimal("platform_fee"),
+                rs.getBigDecimal("net_amount")));
+    }
+
+    public Fees findOrganizerFees(UUID organizerId) {
+        var sql = "WITH paid AS (" + PAID_ORDER_EVENTS + ") " + """
+                SELECT COALESCE(SUM(platform_fee), 0) AS platform_fee, COALESCE(SUM(net_amount), 0) AS net_amount
+                  FROM paid
+                 WHERE event_id IN (SELECT e.id FROM events e WHERE e.organizer_id = :organizerId AND e.active)
+                """;
+        return jdbc.queryForObject(sql, new MapSqlParameterSource("organizerId", organizerId), (rs, i) ->
+                new Fees(rs.getBigDecimal("platform_fee"), rs.getBigDecimal("net_amount")));
+    }
+
     public OrganizerSales findOrganizerSales(UUID organizerId) {
         var sql = "WITH lots AS (" + LOT_SALES.formatted(
                 "tt.event_id IN (SELECT e.id FROM events e WHERE e.organizer_id = :organizerId AND e.active)") + """
@@ -210,11 +244,16 @@ public class DashboardQueryRepository {
     record DailySales(LocalDate date, long tickets, BigDecimal revenue) {}
 
     record EventOrder(UUID id, OrderStatus status, Instant createdAt, Instant paidAt,
-                      String buyerName, String buyerEmail, BigDecimal total) {}
+                      String buyerName, String buyerEmail, BigDecimal total,
+                      BigDecimal platformFee, BigDecimal netAmount) {}
 
     record EventOrderItem(UUID orderId, UUID ticketTypeId, String ticketTypeName, int quantity, BigDecimal unitPrice) {}
 
     record EventSales(UUID eventId, long capacity, long sold, BigDecimal revenue) {}
 
     record OrganizerSales(long sold, BigDecimal revenue) {}
+
+    record EventFees(UUID eventId, BigDecimal platformFee, BigDecimal netAmount) {}
+
+    record Fees(BigDecimal platformFee, BigDecimal netAmount) {}
 }

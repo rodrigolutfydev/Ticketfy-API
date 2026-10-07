@@ -7,6 +7,7 @@ import com.lutfy.ticketfy.infra.exception.OrderAccessDeniedException;
 import com.lutfy.ticketfy.infra.exception.OrderNotFoundException;
 import com.lutfy.ticketfy.order.Order;
 import com.lutfy.ticketfy.order.OrderRepository;
+import com.lutfy.ticketfy.payout.LedgerService;
 import com.lutfy.ticketfy.ticket.TicketService;
 import com.lutfy.ticketfy.user.User;
 import org.springframework.stereotype.Service;
@@ -21,15 +22,18 @@ public class PaymentService {
     private final OrderRepository orderRepository;
     private final TicketService ticketService;
     private final PaymentGateway paymentGateway;
+    private final LedgerService ledgerService;
 
     public PaymentService(PaymentRepository paymentRepository,
                           OrderRepository orderRepository,
                           TicketService ticketService,
-                          PaymentGateway paymentGateway) {
+                          PaymentGateway paymentGateway,
+                          LedgerService ledgerService) {
         this.paymentRepository = paymentRepository;
         this.orderRepository = orderRepository;
         this.ticketService = ticketService;
         this.paymentGateway = paymentGateway;
+        this.ledgerService = ledgerService;
     }
 
     @Transactional
@@ -53,6 +57,7 @@ public class PaymentService {
         var payment = new Payment(order, PaymentMethod.SIMULATED);
         payment.approve();
         order.markAsPaid();
+        ledgerService.recordSale(order);
         ticketService.issueForOrder(order);
 
         var saved = paymentRepository.saveAndFlush(payment);

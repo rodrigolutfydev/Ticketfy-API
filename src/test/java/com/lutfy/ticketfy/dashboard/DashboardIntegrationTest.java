@@ -273,7 +273,8 @@ class DashboardIntegrationTest extends IntegrationTestBase {
         var order = objectMapper.readTree(body).get("content").get(0);
 
         assertThat(order.propertyNames()).containsExactlyInAnyOrder(
-                "orderId", "status", "createdAt", "paidAt", "buyer", "items", "total");
+                "orderId", "status", "createdAt", "paidAt", "buyer", "items", "total",
+                "platformFee", "netAmount");
         assertThat(order.get("buyer").propertyNames()).containsExactlyInAnyOrder("name", "email");
         assertThat(body).doesNotContain(maria.toString(), joao.toString(), "not-used");
     }
@@ -418,9 +419,10 @@ class DashboardIntegrationTest extends IntegrationTestBase {
         var id = UUID.randomUUID();
         var created = Instant.parse(createdAt);
         jdbc.update("""
-                INSERT INTO orders (id, user_id, status, total_amount, expires_at, created_at)
-                VALUES (?, ?, ?, ?, ?, ?)
-                """, id, userId, status, new BigDecimal(total),
+                INSERT INTO orders (id, user_id, status, total_amount, platform_fee_percent, platform_fee,
+                                    net_amount, expires_at, created_at)
+                VALUES (?, ?, ?, ?, 0, 0, ?, ?, ?)
+                """, id, userId, status, new BigDecimal(total), new BigDecimal(total),
                 Timestamp.from(created.plus(Duration.ofMinutes(15))), Timestamp.from(created));
         return id;
     }

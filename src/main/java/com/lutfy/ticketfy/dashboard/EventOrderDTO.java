@@ -14,7 +14,9 @@ public record EventOrderDTO(
         Instant paidAt,
         Buyer buyer,
         List<Item> items,
-        BigDecimal total
+        BigDecimal total,
+        BigDecimal platformFee,
+        BigDecimal netAmount
 ) {
     public record Buyer(String name, String email) {}
 

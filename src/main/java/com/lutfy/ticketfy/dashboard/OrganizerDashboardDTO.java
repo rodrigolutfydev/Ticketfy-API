@@ -10,7 +10,8 @@ public record OrganizerDashboardDTO(
         Totals totals,
         Page<EventSales> events
 ) {
-    public record Totals(long events, long ticketsSold, BigDecimal revenue) {}
+    public record Totals(long events, long ticketsSold, BigDecimal revenue, BigDecimal platformFee,
+                         BigDecimal netRevenue) {}
 
     public record EventSales(
             UUID eventId,
@@ -20,6 +21,8 @@ public record OrganizerDashboardDTO(
             long ticketsSold,
             long capacity,
             BigDecimal percentSold,
-            BigDecimal revenue
+            BigDecimal revenue,
+            BigDecimal platformFee,
+            BigDecimal netRevenue
     ) {}
 }

@@ -27,6 +27,8 @@ public record EventDashboardDTO(
             long remaining,
             BigDecimal percentSold,
             BigDecimal revenue,
+            BigDecimal platformFee,
+            BigDecimal netRevenue,
             long paidOrders,
             BigDecimal averageOrderValue,
             BigDecimal averageTicketPrice

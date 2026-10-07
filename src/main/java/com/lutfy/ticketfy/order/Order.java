@@ -1,5 +1,6 @@
 package com.lutfy.ticketfy.order;
 
+import com.lutfy.ticketfy.event.Event;
 import com.lutfy.ticketfy.infra.exception.InvalidOrderStateException;
 import com.lutfy.ticketfy.user.User;
 import jakarta.persistence.*;
@@ -10,6 +11,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -32,6 +34,9 @@ public class Order {
     @Enumerated(EnumType.STRING)
     private OrderStatus status;
     private BigDecimal totalAmount;
+    private BigDecimal platformFeePercent;
+    private BigDecimal platformFee;
+    private BigDecimal netAmount;
     private Instant expiresAt;
     private String idempotencyKey;
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
@@ -50,6 +55,20 @@ public class Order {
         this.status = OrderStatus.PENDING;
         this.items = new ArrayList<>();
         this.totalAmount = BigDecimal.ZERO;
+        this.platformFeePercent = BigDecimal.ZERO;
+        this.platformFee = BigDecimal.ZERO;
+        this.netAmount = BigDecimal.ZERO;
+    }
+
+    public void applyPlatformFee(BigDecimal percent) {
+        this.platformFeePercent = percent;
+        this.platformFee = totalAmount.multiply(percent)
+                .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+        this.netAmount = totalAmount.subtract(platformFee);
+    }
+
+    public Event event() {
+        return items.get(0).getTicketType().getEvent();
     }
 
     public void markAsPaid() {

@@ -201,4 +201,9 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ProblemDetail> handleEventHasSales(EventHasSalesException ex) {
         return problems.response(ProblemType.EVENT_HAS_SALES, ex.getMessage());
     }
+
+    @ExceptionHandler(InvalidDateRangeException.class)
+    public ResponseEntity<ProblemDetail> handleInvalidDateRange(InvalidDateRangeException ex) {
+        return problems.response(ProblemType.INVALID_PARAMETER, ex.getMessage());
+    }
 }
