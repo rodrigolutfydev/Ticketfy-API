@@ -49,8 +49,6 @@ class EventImageUrlIntegrationTest extends IntegrationTestBase {
         token = "Bearer " + tokenService.generateToken(userRepository.findById(organizerId).orElseThrow());
     }
 
-    // --- creation -----------------------------------------------------------------------------------------------
-
     @Test
     void createsWithoutImageWhenImageUrlIsBlankOrAbsent() throws Exception {
         for (var imageField : new String[]{"\"imageUrl\":\"\",", "\"imageUrl\":\"   \",", "\"imageUrl\":null,", ""}) {
@@ -77,8 +75,6 @@ class EventImageUrlIntegrationTest extends IntegrationTestBase {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errors[0].field").value("imageUrl"));
     }
-
-    // --- update -------------------------------------------------------------------------------------------------
 
     @Test
     void keepsImageWhenImageUrlIsAbsentOrNull() throws Exception {
@@ -129,8 +125,6 @@ class EventImageUrlIntegrationTest extends IntegrationTestBase {
 
         assertThat(storedImage(eventId)).isEqualTo(CURRENT_IMAGE);
     }
-
-    // --- helpers ------------------------------------------------------------------------------------------------
 
     private ResultActions createEvent(String imageField) throws Exception {
         var startsAt = Instant.now().plus(Duration.ofDays(30));

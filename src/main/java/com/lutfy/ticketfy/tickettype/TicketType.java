@@ -25,7 +25,6 @@ public class TicketType {
     private String name;
     private String description;
     private BigDecimal price;
-    // Stock columns only change through conditional UPDATE queries, never by flushing a stale entity
     @Column(updatable = false)
     private Integer quantityTotal;
     @Column(updatable = false)

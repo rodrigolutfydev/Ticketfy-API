@@ -34,7 +34,6 @@ class LoginRateLimitIntegrationTest extends IntegrationTestBase {
                 .andExpect(header().exists("Retry-After"))
                 .andExpect(jsonPath("$.message").value("Too many login attempts. Try again later."));
 
-        // other addresses keep their own window
         login("/login", "10.0.9.2").andExpect(status().isUnauthorized());
     }
 

@@ -12,7 +12,6 @@ public record TicketTypeSummaryDTO(
         boolean soldOut,
         Integer remaining
 ) {
-    // Exact stock is only shown when it is running low, so the public route does not reveal sales volume
     static final int LOW_STOCK_THRESHOLD = 10;
 
     public TicketTypeSummaryDTO(TicketType ticketType) {

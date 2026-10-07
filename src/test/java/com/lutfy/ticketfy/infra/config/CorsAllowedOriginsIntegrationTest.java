@@ -11,7 +11,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-// Same property that CORS_ALLOWED_ORIGINS feeds in each environment
 @AutoConfigureMockMvc
 @TestPropertySource(properties = "ticketfy.cors.allowed-origins=https://ticketfy.vercel.app")
 class CorsAllowedOriginsIntegrationTest extends IntegrationTestBase {
@@ -32,7 +31,6 @@ class CorsAllowedOriginsIntegrationTest extends IntegrationTestBase {
                         .header("Access-Control-Request-Method", "GET"))
                 .andExpect(status().isForbidden());
 
-        // exact match only: preview deployments are not accepted
         mockMvc.perform(options("/events")
                         .header("Origin", "https://ticketfy-git-feature-user.vercel.app")
                         .header("Access-Control-Request-Method", "GET"))

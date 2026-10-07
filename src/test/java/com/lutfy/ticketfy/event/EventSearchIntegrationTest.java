@@ -25,7 +25,6 @@ class EventSearchIntegrationTest extends IntegrationTestBase {
     @Autowired
     private MockMvc mockMvc;
 
-    // Unique tag per test so events from other tests never match the filters
     private String tag;
     private UUID rockRio;
     private UUID rockSaoPaulo;
@@ -44,11 +43,9 @@ class EventSearchIntegrationTest extends IntegrationTestBase {
         percent = insertEvent(organizer, "Desconto " + tag + " 100% off", "Recife " + tag, true);
         underscore = insertEvent(organizer, "Festa " + tag + " a_b", "Recife " + tag, true);
         insertEvent(organizer, "Rock cancelado " + tag, "Rio de Janeiro " + tag, false);
-        // would match "a_b" if "_" were a wildcard
         lookalike = insertEvent(organizer, "Festa " + tag + " ayb", "Recife " + tag, true);
     }
 
-    // Pairs of parameter name and raw value, so "%" and "_" reach the API unencoded by the test
     private ResultActions search(String... params) throws Exception {
         var request = get("/events");
         for (int i = 0; i < params.length; i += 2) {

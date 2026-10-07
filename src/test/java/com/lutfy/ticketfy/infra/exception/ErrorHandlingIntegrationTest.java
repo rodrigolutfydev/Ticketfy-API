@@ -102,7 +102,6 @@ class ErrorHandlingIntegrationTest extends IntegrationTestBase {
                 .andExpect(jsonPath("$.token").isNotEmpty());
     }
 
-    // Each login test uses its own address so the per-IP rate limit is not shared with other tests
     private static RequestPostProcessor remoteAddr(String address) {
         return request -> {
             request.setRemoteAddr(address);

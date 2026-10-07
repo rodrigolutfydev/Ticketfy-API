@@ -26,7 +26,6 @@ public record EventUpdateDTO(
         @Future
         Instant endsAt
     ) {
-    // null keeps the current image and blank removes it, so blank is kept as "" to tell both apart
     public EventUpdateDTO {
         if (imageUrl != null && imageUrl.isBlank()) imageUrl = "";
     }

@@ -22,7 +22,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 @Component
 public class LoginRateLimitFilter extends OncePerRequestFilter {
 
-    // Matches the decoded request path like Spring MVC does, independent of how the servlet is mapped
     private static final RequestMatcher LOGIN = PathPatternRequestMatcher.withDefaults().matcher(HttpMethod.POST, "/login");
 
     private final int maxAttempts;

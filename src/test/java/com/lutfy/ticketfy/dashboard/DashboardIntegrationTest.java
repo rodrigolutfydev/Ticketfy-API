@@ -25,18 +25,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * Fixture (event 1 belongs to the organizer and has two ticket types):
- * <pre>
- * O1 PAID      Maria  Pista 2 x 80 + VIP 1 x 200   paid 2026-09-01T02:30Z (2026-08-31 in Sao Paulo), 1 check-in
- * O2 PAID      Joao   Pista 1 x 70 (frozen, current price is 80) + Arquibancada 2 x 50 from event 2
- * O3 PENDING   Joao   VIP 2 x 200
- * O4 CANCELLED Maria  Pista 1 x 80
- * O5 EXPIRED   Joao   Pista 3 x 80
- * O6 REFUNDED  Maria  VIP 1 x 200   payment approved, tickets cancelled
- * O7 PAID      Joao   inactive event 4
- * </pre>
- */
 @AutoConfigureMockMvc
 class DashboardIntegrationTest extends IntegrationTestBase {
 
@@ -118,8 +106,6 @@ class DashboardIntegrationTest extends IntegrationTestBase {
         insertTickets(o7, o7Item, inactiveLot, joao, "VALID", 1);
     }
 
-    // --- access -------------------------------------------------------------------------------------------------
-
     @Test
     void ownerAndAdminCanSeeTheDashboardButNotOthers() throws Exception {
         var routes = new String[]{"/events/%s/dashboard", "/events/%s/orders", "/events/%s/ticket-types/manage"};
@@ -142,8 +128,6 @@ class DashboardIntegrationTest extends IntegrationTestBase {
         mockMvc.perform(get("/organizer/dashboard")).andExpect(status().isUnauthorized());
     }
 
-    // --- 3.1 ----------------------------------------------------------------------------------------------------
-
     @Test
     void summarizesOnlyPaidOrdersAndOnlyItemsOfTheEvent() throws Exception {
         dashboard(event1)
@@ -157,7 +141,6 @@ class DashboardIntegrationTest extends IntegrationTestBase {
                 .andExpect(jsonPath("$.totals.capacity").value(120))
                 .andExpect(jsonPath("$.totals.remaining").value(114))
                 .andExpect(jsonPath("$.totals.percentSold").value(3.33))
-                // 2x80 + 200 (O1) + 70 frozen (O2); cancelled, expired, refunded and event 2 items stay out
                 .andExpect(jsonPath("$.totals.revenue").value(430.00))
                 .andExpect(jsonPath("$.totals.paidOrders").value(2))
                 .andExpect(jsonPath("$.totals.averageOrderValue").value(215.00))
@@ -209,10 +192,8 @@ class DashboardIntegrationTest extends IntegrationTestBase {
     void buildsContinuousDailySeriesInConfiguredTimeZone() throws Exception {
         dashboard(event1)
                 .andExpect(jsonPath("$.dailySales", hasSize(3)))
-                // 2026-09-01T02:30Z is still 2026-08-31 in Sao Paulo
                 .andExpect(jsonPath("$.dailySales[*].date").value(contains("2026-08-31", "2026-09-01", "2026-09-02")))
                 .andExpect(jsonPath("$.dailySales[*].tickets").value(contains(3, 0, 1)))
-                // the refunded order approved on 2026-09-01 does not count
                 .andExpect(jsonPath("$.dailySales[*].revenue").value(contains(360.00, 0.00, 70.00)));
     }
 
@@ -255,8 +236,6 @@ class DashboardIntegrationTest extends IntegrationTestBase {
         assertThat(body).contains("\"revenue\":430.00", "\"price\":80.00", "\"averageTicketPrice\":107.50",
                 "\"percentSold\":3.33");
     }
-
-    // --- 3.2 ----------------------------------------------------------------------------------------------------
 
     @Test
     void listsEventOrdersNewestFirstWithOnlyTheEventItems() throws Exception {
@@ -335,8 +314,6 @@ class DashboardIntegrationTest extends IntegrationTestBase {
         assertThat(orders.get("page").propertyNames()).containsExactlyInAnyOrderElementsOf(events.get("page").propertyNames());
     }
 
-    // --- 3.3 ----------------------------------------------------------------------------------------------------
-
     @Test
     void listsTicketTypesWithInternalNumbersForManagement() throws Exception {
         mockMvc.perform(get("/events/{id}/ticket-types/manage", event1).header("Authorization", tokenFor(organizerId)))
@@ -354,13 +331,10 @@ class DashboardIntegrationTest extends IntegrationTestBase {
                 .andExpect(jsonPath("$[1].name").value("VIP"));
     }
 
-    // --- 3.4 ----------------------------------------------------------------------------------------------------
-
     @Test
     void summarizesAllActiveEventsOfTheOrganizer() throws Exception {
         mockMvc.perform(get("/organizer/dashboard").header("Authorization", tokenFor(organizerId)))
                 .andExpect(status().isOk())
-                // event 4 is inactive, so its paid order stays out
                 .andExpect(jsonPath("$.totals.events").value(2))
                 .andExpect(jsonPath("$.totals.ticketsSold").value(6))
                 .andExpect(jsonPath("$.totals.revenue").value(530.00))
@@ -399,8 +373,6 @@ class DashboardIntegrationTest extends IntegrationTestBase {
                 .andExpect(jsonPath("$.totals.events").value(0))
                 .andExpect(jsonPath("$.events.content", hasSize(0)));
     }
-
-    // --- helpers ------------------------------------------------------------------------------------------------
 
     private ResultActions dashboard(UUID eventId) throws Exception {
         return mockMvc.perform(get("/events/{id}/dashboard", eventId).header("Authorization", tokenFor(organizerId)));

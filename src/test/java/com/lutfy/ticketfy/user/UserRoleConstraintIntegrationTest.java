@@ -12,7 +12,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class UserRoleConstraintIntegrationTest extends IntegrationTestBase {
 
-    // Fails if a new Role is added to the enum without updating ck_users_role
     @ParameterizedTest
     @EnumSource(Role.class)
     void acceptsEveryRoleOfTheEnum(Role role) {

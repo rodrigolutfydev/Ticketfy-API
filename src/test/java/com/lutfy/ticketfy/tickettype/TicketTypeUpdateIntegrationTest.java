@@ -51,15 +51,12 @@ class TicketTypeUpdateIntegrationTest extends IntegrationTestBase {
     private UUID eventId;
     private UUID ticketTypeId;
 
-    // insertTicketType creates "VIP": price 80.00, quantityTotal 100, quantitySold 0, maxPerOrder 4
     @BeforeEach
     void setUp() {
         organizerId = insertUser("ORGANIZER");
         eventId = insertEvent(organizerId);
         ticketTypeId = insertTicketType(eventId, 100);
     }
-
-    // --- editing ------------------------------------------------------------------------------------------------
 
     @Test
     void ownerEditsEveryField() throws Exception {
@@ -138,7 +135,6 @@ class TicketTypeUpdateIntegrationTest extends IntegrationTestBase {
 
     @Test
     void responseReflectsStockChangedOutsideTheRequest() throws Exception {
-        // the lot was loaded before; a sale recorded in the database must show up in the response
         setSold(12);
 
         update(organizerId, "{\"name\":\"Pista\"}")
@@ -148,8 +144,6 @@ class TicketTypeUpdateIntegrationTest extends IntegrationTestBase {
                 .andExpect(jsonPath("$.available").value(88));
     }
 
-    // --- quantityTotal ------------------------------------------------------------------------------------------
-
     @Test
     void rejectsQuantityTotalBelowSoldAndReserved() throws Exception {
         setSold(37);
@@ -158,7 +152,6 @@ class TicketTypeUpdateIntegrationTest extends IntegrationTestBase {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("quantityTotal cannot be lower than the 37 tickets already sold or reserved"));
 
-        // the whole update is rolled back, including the name
         var row = stored();
         assertThat(row.get("quantity_total")).isEqualTo(100);
         assertThat(row.get("name")).isEqualTo("VIP");
@@ -173,8 +166,6 @@ class TicketTypeUpdateIntegrationTest extends IntegrationTestBase {
                 .andExpect(jsonPath("$.quantityTotal").value(37))
                 .andExpect(jsonPath("$.available").value(0));
     }
-
-    // --- access and validation ----------------------------------------------------------------------------------
 
     @Test
     void onlyOwnerOrAdminCanEdit() throws Exception {
@@ -223,8 +214,6 @@ class TicketTypeUpdateIntegrationTest extends IntegrationTestBase {
         }
     }
 
-    // --- frozen prices and stock consistency --------------------------------------------------------------------
-
     @Test
     void priceChangeDoesNotAffectExistingOrders() throws Exception {
         var buyer = insertUser("USER");
@@ -258,7 +247,6 @@ class TicketTypeUpdateIntegrationTest extends IntegrationTestBase {
             var ticketType = ticketTypeRepository.findById(ticketTypeId).orElseThrow();
             assertThat(ticketType.getQuantitySold()).isZero();
 
-            // a sale and a capacity change commit while the lot is loaded with the old stock
             concurrent.executeWithoutResult(inner -> {
                 ticketTypeRepository.reserveStock(ticketTypeId, 5);
                 ticketTypeRepository.changeQuantityTotal(ticketTypeId, 150);
@@ -272,8 +260,6 @@ class TicketTypeUpdateIntegrationTest extends IntegrationTestBase {
         assertThat(row.get("quantity_sold")).isEqualTo(5);
         assertThat(row.get("quantity_total")).isEqualTo(150);
     }
-
-    // --- helpers ------------------------------------------------------------------------------------------------
 
     private UUID createOrder(UUID buyer, int quantity) throws Exception {
         var body = mockMvc.perform(post("/orders")

@@ -64,7 +64,6 @@ public class TicketTypeService {
             throw translateNameConflict(ex);
         }
 
-        // Conditional UPDATE so a concurrent reservation can never leave quantity_sold above the new total
         if (dto.quantityTotal() != null
                 && ticketTypeRepository.changeQuantityTotal(ticketTypeId, dto.quantityTotal()) == 0) {
             entityManager.refresh(ticketType);
@@ -72,7 +71,6 @@ public class TicketTypeService {
                     + ticketType.getQuantitySold() + " tickets already sold or reserved");
         }
 
-        // The stock columns were changed in the database, so the response is built from fresh values
         entityManager.refresh(ticketType);
         return new TicketTypeDetailsDTO(ticketType);
     }
@@ -98,7 +96,6 @@ public class TicketTypeService {
                 .toList();
     }
 
-    // Only the (event_id, name) unique constraint becomes a 409; any other violation is rethrown as is
     private RuntimeException translateNameConflict(DataIntegrityViolationException ex) {
         for (Throwable cause = ex; cause != null; cause = cause.getCause()) {
             if (cause instanceof ConstraintViolationException violation

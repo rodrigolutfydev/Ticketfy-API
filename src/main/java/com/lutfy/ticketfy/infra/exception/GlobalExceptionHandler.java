@@ -37,7 +37,6 @@ public class GlobalExceptionHandler {
                 .body(new ValidationErrorResponseDTO("Validation failed", errors));
     }
 
-    // Malformed JSON, missing body or wrong field types; the parser message is not exposed
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ErrorResponseDTO> handleNotReadable(HttpMessageNotReadableException ex) {
         log.debug("Unreadable request body", ex);
