@@ -11,6 +11,7 @@ import java.util.UUID;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.containsStringIgnoringCase;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -83,5 +84,13 @@ class CorsIntegrationTest extends IntegrationTestBase {
                 .andExpect(header().exists("Retry-After"))
                 .andExpect(header().string("Access-Control-Allow-Origin", FRONTEND))
                 .andExpect(header().string("Access-Control-Expose-Headers", containsString("Retry-After")));
+    }
+
+    @Test
+    void requestIdHeaderIsExposedToTheBrowser() throws Exception {
+        mockMvc.perform(get("/events").header("Origin", FRONTEND))
+                .andExpect(status().isOk())
+                .andExpect(header().exists("X-Request-Id"))
+                .andExpect(header().string("Access-Control-Expose-Headers", containsString("X-Request-Id")));
     }
 }

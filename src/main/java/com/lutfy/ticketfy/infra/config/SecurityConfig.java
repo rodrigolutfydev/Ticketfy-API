@@ -1,5 +1,6 @@
 package com.lutfy.ticketfy.infra.config;
 
+import com.lutfy.ticketfy.infra.logging.RequestIdFilter;
 import com.lutfy.ticketfy.infra.security.JsonAccessDeniedHandler;
 import com.lutfy.ticketfy.infra.security.JsonAuthenticationEntryPoint;
 import com.lutfy.ticketfy.infra.security.SecurityFilter;
@@ -70,7 +71,7 @@ public class SecurityConfig {
         config.setAllowedOrigins(allowedOrigins);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("Authorization", "Content-Type", "Idempotency-Key"));
-        config.setExposedHeaders(List.of("Retry-After"));
+        config.setExposedHeaders(List.of("Retry-After", RequestIdFilter.HEADER));
         config.setMaxAge(3600L);
 
         var source = new UrlBasedCorsConfigurationSource();

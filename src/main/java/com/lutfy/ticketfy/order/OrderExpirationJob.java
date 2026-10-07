@@ -1,5 +1,6 @@
 package com.lutfy.ticketfy.order;
 
+import com.lutfy.ticketfy.infra.logging.JobRun;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
@@ -19,6 +20,10 @@ public class OrderExpirationJob {
 
     @Scheduled(fixedDelay = 60000)
     public void expireOverdueOrders() {
+        JobRun.run(this::expire);
+    }
+
+    private void expire() {
         int expired = 0;
         for (var id : orderService.findOverdueOrderIds()) {
             try {

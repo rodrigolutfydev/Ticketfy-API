@@ -1,5 +1,7 @@
 package com.lutfy.ticketfy.infra.exception;
 
+import com.lutfy.ticketfy.infra.logging.RequestIdFilter;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -24,6 +26,7 @@ public class ProblemDetailFactory {
         var problem = ProblemDetail.forStatusAndDetail(type.status(), detail);
         problem.setType(URI.create(baseUri + type.slug()));
         problem.setTitle(type.title());
+        addRequestId(problem);
         return problem;
     }
 
@@ -37,6 +40,7 @@ public class ProblemDetailFactory {
         var problem = ProblemDetail.forStatusAndDetail(status, status.getReasonPhrase());
         problem.setTitle(status.getReasonPhrase());
         problem.setInstance(instanceOf(path));
+        addRequestId(problem);
         return problem;
     }
 
@@ -48,6 +52,13 @@ public class ProblemDetailFactory {
         return ResponseEntity.status(problem.getStatus())
                 .contentType(MediaType.APPLICATION_PROBLEM_JSON)
                 .body(problem);
+    }
+
+    private static void addRequestId(ProblemDetail problem) {
+        var requestId = MDC.get(RequestIdFilter.MDC_KEY);
+        if (problem.getStatus() >= 500 && requestId != null) {
+            problem.setProperty("requestId", requestId);
+        }
     }
 
     private static URI instanceOf(String path) {
