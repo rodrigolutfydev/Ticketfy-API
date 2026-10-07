@@ -9,12 +9,13 @@ public record TicketTypeDetailsDTO(
         String description,
         BigDecimal price,
         Integer quantityTotal,
+        Integer quantitySold,
         Integer available,
         Integer maxPerOrder,
         Boolean active
 ) {
     public TicketTypeDetailsDTO(TicketType ticketType) {
         this(ticketType.getId(), ticketType.getName(), ticketType.getDescription(), ticketType.getPrice(),
-        ticketType.getQuantityTotal(), ticketType.availableQuantity(), ticketType.getMaxPerOrder(), ticketType.getActive());
+        ticketType.getQuantityTotal(), ticketType.getQuantitySold(), ticketType.availableQuantity(), ticketType.getMaxPerOrder(), ticketType.getActive());
     }
 }

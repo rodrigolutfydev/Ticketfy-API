@@ -26,6 +26,12 @@ public class TicketTypeController {
         return ResponseEntity.ok(service.listByEvent(eventId));
     }
 
+    @GetMapping("/manage")
+    @PreAuthorize("hasAnyRole('ORGANIZER','ADMIN')")
+    public ResponseEntity<List<TicketTypeDetailsDTO>> listForManagement(@PathVariable UUID eventId, @AuthenticationPrincipal User authenticated) {
+        return ResponseEntity.ok(service.listForManagement(eventId, authenticated));
+    }
+
     @PostMapping
     @PreAuthorize("hasAnyRole('ORGANIZER','ADMIN')")
     public ResponseEntity<TicketTypeDetailsDTO> create(@PathVariable UUID eventId, @RequestBody @Valid TicketTypeCreationDTO dto, @AuthenticationPrincipal User authenticated) {

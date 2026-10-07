@@ -112,6 +112,17 @@ Rotas protegidas exigem o header `Authorization: Bearer <token>`. Datas trafegam
 |---|---|---|---|
 | GET | `/events/{eventId}/ticket-types` | Lista os lotes ativos (esgotado/restante, sem revelar volume de vendas) | Público |
 | POST | `/events/{eventId}/ticket-types` | Cria um lote | Dono do evento ou ADMIN |
+| GET | `/events/{eventId}/ticket-types/manage` | Lotes com dados internos (total, vendido, reservado) | Dono do evento ou ADMIN |
+
+### Dashboard do organizador
+
+| Método | Endpoint | Descrição | Acesso |
+|---|---|---|---|
+| GET | `/events/{id}/dashboard` | Resumo de vendas do evento: totais, pedidos por status, check-in, lotes e vendas por dia | Dono do evento ou ADMIN |
+| GET | `/events/{id}/orders` | Pedidos do evento, paginado, com filtros `status` e `q` (nome ou e-mail) | Dono do evento ou ADMIN |
+| GET | `/organizer/dashboard` | Vendas de todos os eventos ativos do organizador logado, paginado | ORGANIZER ou ADMIN |
+
+Receita considera só pedidos `PAID`, pelo preço congelado nos itens. Como um pedido pode ter lotes de eventos diferentes, os números de cada evento usam apenas os itens daquele evento. Vendas por dia agrupam pela data de aprovação do pagamento no fuso `ticketfy.dashboard.time-zone` (padrão `America/Sao_Paulo`).
 
 ### Pedidos — `/orders`
 
@@ -195,6 +206,7 @@ Os testes de integração sobem um PostgreSQL descartável com Testcontainers, e
 | `JWT_SECRET` | — | Chave de assinatura dos tokens (obrigatória) |
 | `SPRING_PROFILES_ACTIVE` | `dev` | Perfil (`dev` ou `prod`) |
 | `CORS_ALLOWED_ORIGINS` | `http://localhost:3000,http://localhost:5173` | Origens autorizadas, separadas por vírgula |
+| `DASHBOARD_TIME_ZONE` | `America/Sao_Paulo` | Fuso usado para agrupar as vendas por dia no dashboard |
 | `ORDER_RESERVATION_MINUTES` | `15` | Duração da reserva de um pedido |
 | `REFUND_DEADLINE_HOURS` | `48` | Antecedência mínima para reembolso |
 | `LOGIN_MAX_ATTEMPTS` | `5` | Tentativas de login por janela |

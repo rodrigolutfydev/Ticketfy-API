@@ -11,6 +11,7 @@ import java.util.UUID;
 
 public interface TicketTypeRepository extends JpaRepository<TicketType, UUID> {
     List<TicketType> findByEventIdAndActiveTrue(UUID eventId);
+    List<TicketType> findByEventIdOrderByCreatedAtAscNameAsc(UUID eventId);
     Optional<TicketType> findByIdAndActiveTrue(UUID id);
     boolean existsByEventIdAndQuantitySoldGreaterThan(UUID eventId, int quantity);
     Optional<TicketType> findByIdAndActiveTrueAndEventActiveTrue(UUID id);

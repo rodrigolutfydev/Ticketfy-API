@@ -43,6 +43,17 @@ public class TicketTypeService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public List<TicketTypeDetailsDTO> listForManagement(UUID eventId, User authenticated) {
+        var event = eventRepository.findByIdAndActiveTrue(eventId)
+                .orElseThrow(() -> new EventNotFoundException("Event not found"));
+        checkEventOwnership(event, authenticated);
+        return ticketTypeRepository.findByEventIdOrderByCreatedAtAscNameAsc(eventId)
+                .stream()
+                .map(TicketTypeDetailsDTO::new)
+                .toList();
+    }
+
     private void checkEventOwnership(Event event, User authenticated) {
         if (authenticated.getRole() == Role.ADMIN) return;
         if (!event.getOrganizer().getId().equals(authenticated.getId())) {
