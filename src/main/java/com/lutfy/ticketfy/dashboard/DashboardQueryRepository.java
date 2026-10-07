@@ -19,14 +19,10 @@ import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * Aggregation queries for the organizer dashboard. Everything is summed in the database,
- * always per order item, because one order can contain items from different events.
- */
+
 @Repository
 public class DashboardQueryRepository {
 
-    // Sales of each ticket type: paid and pending quantities come from the frozen order items
     private static final String LOT_SALES = """
             SELECT tt.id, tt.event_id, tt.name, tt.price, tt.quantity_total, tt.quantity_sold,
                    COALESCE(SUM(oi.quantity) FILTER (WHERE o.status = 'PAID'), 0)                  AS sold,

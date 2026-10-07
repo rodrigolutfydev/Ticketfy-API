@@ -91,7 +91,6 @@ public class DashboardService {
                 totals, ordersByStatus, checkIn, ticketTypes, continuousDailySales(eventId));
     }
 
-    // From the first to the last day with a paid sale, filling the days in between with zero
     private List<EventDashboardDTO.DailySales> continuousDailySales(UUID eventId) {
         var rows = queries.findDailySales(eventId, zone);
         if (rows.isEmpty()) return List.of();

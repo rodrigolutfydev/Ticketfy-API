@@ -25,6 +25,15 @@ public interface TicketTypeRepository extends JpaRepository<TicketType, UUID> {
         """)
     int reserveStock(@Param("id") UUID id, @Param("quantity") int quantity);
 
+    @Modifying(flushAutomatically = true)
+    @Query("""
+        UPDATE TicketType t
+           SET t.quantityTotal = :quantityTotal
+         WHERE t.id = :id
+           AND t.quantitySold <= :quantityTotal
+        """)
+    int changeQuantityTotal(@Param("id") UUID id, @Param("quantityTotal") int quantityTotal);
+
     @Modifying
     @Query("""
         UPDATE TicketType t

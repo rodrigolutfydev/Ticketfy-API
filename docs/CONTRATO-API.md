@@ -3,9 +3,46 @@
 Registro das mudanças que exigem ajuste no frontend, da mais recente para a mais antiga.
 O contrato completo do dashboard do organizador está em [CONTRATO-DASHBOARD.md](CONTRATO-DASHBOARD.md).
 
+## Lotes: edição (Tarefa 11)
+
+**Novo endpoint `PATCH /events/{eventId}/ticket-types/{ticketTypeId}`.** A edição é parcial: só mudam os campos enviados, e `null` ou ausente mantém o valor atual.
+
+- **Acesso:** dono do evento ou ADMIN.
+
+| Campo | Regras |
+|---|---|
+| `name` | Até 150 caracteres, não pode ser só espaços. Não pode repetir o nome de outro lote do evento (409) |
+| `description` | Até 500 caracteres. `""` ou só espaços remove a descrição |
+| `price` | Maior que zero. **Não afeta pedidos já feitos**, que mantêm o `unitPrice` da compra. Vale para os pedidos novos |
+| `quantityTotal` | Maior que zero e **não pode ficar abaixo do vendido + reservado** (`quantitySold`) |
+| `maxPerOrder` | Maior que zero. **Não dá para remover o limite** por esta rota: `null` mantém o valor atual |
+
+Exemplo de corpo:
+
+```json
+{ "name": "Pista Premium", "price": 120.50, "quantityTotal": 150 }
+```
+
+**Respostas:**
+
+| Código | Quando | Corpo |
+|---|---|---|
+| 200 | Lote atualizado | Mesmo formato de `GET /events/{id}/ticket-types/manage`, com os valores atuais do banco (`quantityTotal`, `quantitySold`, `available`) |
+| 400 | `quantityTotal` abaixo do vendido + reservado | `{ "message": "quantityTotal cannot be lower than the 37 tickets already sold or reserved" }` |
+| 400 | Validação de campo | `{ "message": "Validation failed", "errors": [ { "field", "message" } ] }` |
+| 401 | Sem token | `{ "message": "Authentication required" }` |
+| 403 | Não é dono do evento nem ADMIN | `{ "message": "You do not own this event" }` ou `{ "message": "Access denied" }` |
+| 404 | Evento inexistente ou desativado | `{ "message": "Event not found" }` |
+| 404 | Lote inexistente ou de outro evento | `{ "message": "Ticket type not found" }` |
+| 409 | Nome já usado por outro lote do evento | `{ "message": "A ticket type with this name already exists for this event" }` |
+
+**Outras regras:**
+- Se qualquer regra falhar, nada é alterado, nem os campos válidos enviados junto.
+- Lotes de eventos desativados não podem ser editados.
+
 ## Lotes: nome duplicado responde 409
 
-`POST /events/{id}/ticket-types`. Antes, esse caso respondia **500**.
+`POST /events/{id}/ticket-types` e, desde a Tarefa 11, também a edição. Antes, esse caso respondia **500**.
 
 Não podem existir dois lotes com o mesmo nome no mesmo evento. A comparação diferencia maiúsculas de minúsculas, como a constraint do banco. Tentar criar um nome repetido responde:
 

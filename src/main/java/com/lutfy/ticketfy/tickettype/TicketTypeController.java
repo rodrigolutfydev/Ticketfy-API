@@ -32,6 +32,14 @@ public class TicketTypeController {
         return ResponseEntity.ok(service.listForManagement(eventId, authenticated));
     }
 
+    @PatchMapping("/{ticketTypeId}")
+    @PreAuthorize("hasAnyRole('ORGANIZER','ADMIN')")
+    public ResponseEntity<TicketTypeDetailsDTO> update(@PathVariable UUID eventId, @PathVariable UUID ticketTypeId,
+                                                       @RequestBody @Valid TicketTypeUpdateDTO dto,
+                                                       @AuthenticationPrincipal User authenticated) {
+        return ResponseEntity.ok(service.update(eventId, ticketTypeId, dto, authenticated));
+    }
+
     @PostMapping
     @PreAuthorize("hasAnyRole('ORGANIZER','ADMIN')")
     public ResponseEntity<TicketTypeDetailsDTO> create(@PathVariable UUID eventId, @RequestBody @Valid TicketTypeCreationDTO dto, @AuthenticationPrincipal User authenticated) {

@@ -14,6 +14,7 @@ import org.springframework.test.web.servlet.ResultActions;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -51,6 +52,23 @@ class TicketTypeNameConflictIntegrationTest extends IntegrationTestBase {
         var count = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM ticket_types WHERE event_id = ? AND name = 'Pista'", Integer.class, eventId);
         assertThat(count).isEqualTo(1);
+    }
+
+    @Test
+    void renamingTicketTypeToExistingNameReturnsConflict() throws Exception {
+        create(eventId, "Pista").andExpect(status().isCreated());
+        var vip = insertTicketType(eventId, 50);
+
+        mockMvc.perform(patch("/events/{e}/ticket-types/{t}", eventId, vip)
+                        .header("Authorization", token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Pista\",\"price\":99.00}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("A ticket type with this name already exists for this event"));
+
+        var row = jdbc.queryForMap("SELECT name, price FROM ticket_types WHERE id = ?", vip);
+        assertThat(row.get("name")).isEqualTo("VIP");
+        assertThat(row.get("price")).isEqualTo(new java.math.BigDecimal("80.00"));
     }
 
     @Test

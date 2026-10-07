@@ -10,12 +10,10 @@ final class DashboardMath {
     private DashboardMath() {
     }
 
-    // Same scale as NUMERIC(10,2), so sums and empty results serialize like prices do
     static BigDecimal money(BigDecimal value) {
         return (value == null ? BigDecimal.ZERO : value).setScale(2, RoundingMode.HALF_UP);
     }
 
-    // 0-100 with two decimals; null when there is nothing to compare against
     static BigDecimal percent(long part, long whole) {
         if (whole == 0) return null;
         return BigDecimal.valueOf(part).multiply(HUNDRED).divide(BigDecimal.valueOf(whole), 2, RoundingMode.HALF_UP);

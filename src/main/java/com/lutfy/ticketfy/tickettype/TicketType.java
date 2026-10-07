@@ -25,7 +25,10 @@ public class TicketType {
     private String name;
     private String description;
     private BigDecimal price;
+    // Stock columns only change through conditional UPDATE queries, never by flushing a stale entity
+    @Column(updatable = false)
     private Integer quantityTotal;
+    @Column(updatable = false)
     private Integer quantitySold;
     private Integer maxPerOrder;
     private Boolean active;
@@ -43,6 +46,13 @@ public class TicketType {
         this.maxPerOrder = dto.maxPerOrder();
         this.quantitySold = 0;
         this.active = true;
+    }
+
+    public void updateFrom(TicketTypeUpdateDTO dto) {
+        if (dto.name() != null) this.name = dto.name();
+        if (dto.description() != null) this.description = dto.description().isBlank() ? null : dto.description();
+        if (dto.price() != null) this.price = dto.price();
+        if (dto.maxPerOrder() != null) this.maxPerOrder = dto.maxPerOrder();
     }
 
     public Integer availableQuantity() {
