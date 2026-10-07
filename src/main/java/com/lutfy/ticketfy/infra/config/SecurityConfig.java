@@ -60,8 +60,10 @@ public class SecurityConfig {
             @Value("${ticketfy.cors.allowed-origins}") List<String> allowedOrigins) {
         var config = new CorsConfiguration();
         config.setAllowedOrigins(allowedOrigins);
-        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("Authorization", "Content-Type", "Idempotency-Key"));
+        // Lets the frontend read how long to wait after the login rate limit (429)
+        config.setExposedHeaders(List.of("Retry-After"));
         config.setMaxAge(3600L);
 
         var source = new UrlBasedCorsConfigurationSource();

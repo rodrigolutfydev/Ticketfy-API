@@ -3,6 +3,34 @@
 Registro das mudanças que exigem ajuste no frontend, da mais recente para a mais antiga.
 O contrato completo do dashboard do organizador está em [CONTRATO-DASHBOARD.md](CONTRATO-DASHBOARD.md).
 
+## CORS: PATCH liberado e `Retry-After` exposto (Tarefa 8)
+
+**Origens permitidas:** vêm de `CORS_ALLOWED_ORIGINS`, uma lista separada por vírgula. O padrão é `http://localhost:3000,http://localhost:5173`.
+- A comparação é exata: para produção, inclua o domínio da Vercel, por exemplo `https://ticketfy.vercel.app`.
+- Deploys de preview, com subdomínio aleatório, não são aceitos.
+
+**Métodos:** `GET, POST, PUT, PATCH, DELETE, OPTIONS`.
+- O `PATCH` foi liberado agora. Antes, o navegador bloqueava `PATCH /users/me/avatar` no preflight.
+
+**Cabeçalhos aceitos na requisição:** `Authorization`, `Content-Type`, `Idempotency-Key`.
+
+**Cabeçalhos expostos ao JavaScript:** `Retry-After`.
+
+### 429: limite de tentativas de login
+
+Depois de `LOGIN_MAX_ATTEMPTS` tentativas (padrão 5) em `LOGIN_WINDOW_SECONDS` (padrão 60) vindas do mesmo IP, o `POST /login` responde:
+
+```http
+HTTP/1.1 429 Too Many Requests
+Retry-After: 42
+Access-Control-Expose-Headers: Retry-After
+Content-Type: application/json
+
+{ "message": "Too many login attempts. Try again later." }
+```
+
+`Retry-After` traz os segundos até a janela reabrir, no mínimo 1. O frontend pode ler esse valor com `response.headers.get("Retry-After")` e mostrar "tente novamente em N segundos".
+
 ## Erros de corpo da requisição: 400 e 415 (Tarefa 7)
 
 Valem para todos os endpoints que recebem corpo JSON. Antes, esses casos respondiam **500**.
