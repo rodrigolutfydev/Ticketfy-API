@@ -28,6 +28,7 @@ public abstract class IntegrationTestBase {
         registry.add("spring.datasource.username", postgres::getUsername);
         registry.add("spring.datasource.password", postgres::getPassword);
         registry.add("api.security.token.secret", () -> "test-secret-with-at-least-32-characters");
+        registry.add("ticketfy.payout.job.enabled", () -> "false");
     }
 
     @Autowired

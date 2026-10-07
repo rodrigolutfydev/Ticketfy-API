@@ -34,7 +34,19 @@ public class LedgerService {
             return;
         }
         var event = order.event();
-        repository.saveAndFlush(new LedgerEntry(
+        repository.saveAndFlush(LedgerEntry.forOrder(
                 event.getOrganizer().getId(), event.getId(), order.getId(), type, amount, clock.instant()));
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void recordPayoutDebit(Payout payout) {
+        repository.saveAndFlush(LedgerEntry.forPayout(payout.getOrganizerId(), payout.getId(),
+                LedgerEntryType.PAYOUT_DEBIT, payout.getAmount().negate(), clock.instant()));
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void recordPayoutReversal(Payout payout) {
+        repository.saveAndFlush(LedgerEntry.forPayout(payout.getOrganizerId(), payout.getId(),
+                LedgerEntryType.PAYOUT_REVERSAL, payout.getAmount(), clock.instant()));
     }
 }

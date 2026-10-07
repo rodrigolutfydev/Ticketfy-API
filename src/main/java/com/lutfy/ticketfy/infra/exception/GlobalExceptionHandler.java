@@ -206,4 +206,20 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ProblemDetail> handleInvalidDateRange(InvalidDateRangeException ex) {
         return problems.response(ProblemType.INVALID_PARAMETER, ex.getMessage());
     }
+
+    @ExceptionHandler(ProblemException.class)
+    public ResponseEntity<ProblemDetail> handleProblem(ProblemException ex) {
+        var problem = problems.create(ex.getType(), ex.getMessage());
+        ex.getProperties().forEach(problem::setProperty);
+        return problems.response(problem);
+    }
+
+    @ExceptionHandler(TooManyPasswordAttemptsException.class)
+    public ResponseEntity<ProblemDetail> handleTooManyPasswordAttempts(TooManyPasswordAttemptsException ex) {
+        var problem = problems.create(ProblemType.TOO_MANY_PASSWORD_ATTEMPTS, ex.getMessage());
+        return ResponseEntity.status(problem.getStatus())
+                .contentType(MediaType.APPLICATION_PROBLEM_JSON)
+                .header("Retry-After", String.valueOf(ex.getRetryAfterSeconds()))
+                .body(problem);
+    }
 }

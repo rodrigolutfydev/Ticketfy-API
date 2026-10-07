@@ -37,7 +37,20 @@ public enum ProblemType {
     RESOURCE_NOT_FOUND("resource-not-found", "Resource not found", HttpStatus.NOT_FOUND),
     METHOD_NOT_ALLOWED("method-not-allowed", "Method not allowed", HttpStatus.METHOD_NOT_ALLOWED),
     INVALID_EVENT_STATE("invalid-event-state", "Invalid event state", HttpStatus.CONFLICT),
-    EVENT_HAS_SALES("event-has-sales", "Event has sales", HttpStatus.CONFLICT);
+    EVENT_HAS_SALES("event-has-sales", "Event has sales", HttpStatus.CONFLICT),
+    INVALID_PASSWORD("invalid-password", "Invalid password", HttpStatus.FORBIDDEN),
+    TOO_MANY_PASSWORD_ATTEMPTS("too-many-password-attempts", "Too many password attempts", HttpStatus.TOO_MANY_REQUESTS),
+    PAYOUT_ACCOUNT_NOT_FOUND("payout-account-not-found", "Payout account not found", HttpStatus.NOT_FOUND),
+    PAYOUT_ACCOUNT_REQUIRED("payout-account-required", "Payout account required", HttpStatus.CONFLICT),
+    PAYOUT_ACCOUNT_COOLDOWN("payout-account-cooldown", "Payout account cooldown", HttpStatus.CONFLICT),
+    PIX_KEY_NOT_FOUND("pix-key-not-found", "Pix key not found", HttpStatus.BAD_REQUEST),
+    PIX_KEY_HOLDER_MISMATCH("pix-key-holder-mismatch", "Pix key holder mismatch", HttpStatus.BAD_REQUEST),
+    PAYOUT_IN_PROGRESS("payout-in-progress", "Payout in progress", HttpStatus.CONFLICT),
+    NEGATIVE_AVAILABLE_BALANCE("negative-available-balance", "Negative available balance", HttpStatus.CONFLICT),
+    PAYOUT_BELOW_MINIMUM("payout-below-minimum", "Payout below minimum", HttpStatus.BAD_REQUEST),
+    PAYOUT_EXCEEDS_AVAILABLE("payout-exceeds-available", "Payout exceeds available balance", HttpStatus.CONFLICT),
+    PAYOUT_NOT_FOUND("payout-not-found", "Payout not found", HttpStatus.NOT_FOUND),
+    INVALID_PAYOUT_STATE("invalid-payout-state", "Invalid payout state", HttpStatus.CONFLICT);
 
     private final String slug;
     private final String title;

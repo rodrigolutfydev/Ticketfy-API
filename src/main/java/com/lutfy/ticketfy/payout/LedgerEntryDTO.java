@@ -11,5 +11,6 @@ public record LedgerEntryDTO(
         UUID eventId,
         String eventName,
         UUID orderId,
+        UUID payoutId,
         Instant createdAt
 ) {}

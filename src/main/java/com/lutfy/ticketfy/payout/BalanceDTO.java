@@ -5,7 +5,9 @@ import java.math.BigDecimal;
 public record BalanceDTO(
         BigDecimal pending,
         BigDecimal available,
+        BigDecimal inPayout,
         BigDecimal held,
         BigDecimal total,
-        int releaseDelayDays
+        int releaseDelayDays,
+        BigDecimal minPayoutAmount
 ) {}

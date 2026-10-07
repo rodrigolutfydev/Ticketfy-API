@@ -24,14 +24,18 @@ public class PayoutQueryRepository {
 
     public Balance findBalance(UUID organizerId, Instant releasedUntil) {
         var sql = """
-                SELECT COALESCE(SUM(l.amount) FILTER (WHERE e.cancelled_at IS NULL
-                                    AND COALESCE(e.ends_at, e.starts_at) > :releasedUntil), 0)  AS pending,
-                       COALESCE(SUM(l.amount) FILTER (WHERE e.cancelled_at IS NULL
-                                    AND COALESCE(e.ends_at, e.starts_at) <= :releasedUntil), 0) AS available,
-                       COALESCE(SUM(l.amount) FILTER (WHERE e.cancelled_at IS NOT NULL), 0)   AS held,
-                       COALESCE(SUM(l.amount), 0)                                             AS total
+                SELECT COALESCE(SUM(l.amount) FILTER (WHERE e.id IS NOT NULL AND e.cancelled_at IS NULL
+                                    AND COALESCE(e.ends_at, e.starts_at) > :releasedUntil), 0)   AS pending,
+                       COALESCE(SUM(l.amount) FILTER (WHERE l.payout_id IS NOT NULL
+                                    OR (e.id IS NOT NULL AND e.cancelled_at IS NULL
+                                        AND COALESCE(e.ends_at, e.starts_at) <= :releasedUntil)), 0) AS available,
+                       COALESCE(SUM(l.amount) FILTER (WHERE e.cancelled_at IS NOT NULL), 0)    AS held,
+                       COALESCE(SUM(l.amount), 0)                                              AS total,
+                       (SELECT COALESCE(SUM(p.amount), 0) FROM payouts p
+                         WHERE p.organizer_id = :organizerId
+                           AND p.status IN ('REQUESTED', 'PROCESSING'))                         AS in_payout
                   FROM organizer_ledger_entries l
-                  JOIN events e ON e.id = l.event_id
+                  LEFT JOIN events e ON e.id = l.event_id
                  WHERE l.organizer_id = :organizerId
                 """;
         var params = new MapSqlParameterSource("organizerId", organizerId)
@@ -40,7 +44,8 @@ public class PayoutQueryRepository {
                 rs.getBigDecimal("pending"),
                 rs.getBigDecimal("available"),
                 rs.getBigDecimal("held"),
-                rs.getBigDecimal("total")));
+                rs.getBigDecimal("total"),
+                rs.getBigDecimal("in_payout")));
     }
 
     public Page<LedgerEntryDTO> findEntries(UUID organizerId, UUID eventId, Instant from, Instant until,
@@ -64,9 +69,10 @@ public class PayoutQueryRepository {
                 "SELECT COUNT(*) FROM organizer_ledger_entries l" + where, params, Long.class);
 
         var sql = """
-                SELECT l.id, l.type, l.amount, l.event_id, e.name AS event_name, l.order_id, l.created_at
+                SELECT l.id, l.type, l.amount, l.event_id, e.name AS event_name, l.order_id, l.payout_id,
+                       l.created_at
                   FROM organizer_ledger_entries l
-                  JOIN events e ON e.id = l.event_id
+                  LEFT JOIN events e ON e.id = l.event_id
                 """ + where + """
                  ORDER BY l.created_at DESC, l.id DESC
                  LIMIT :limit OFFSET :offset
@@ -79,9 +85,11 @@ public class PayoutQueryRepository {
                 rs.getObject("event_id", UUID.class),
                 rs.getString("event_name"),
                 rs.getObject("order_id", UUID.class),
+                rs.getObject("payout_id", UUID.class),
                 rs.getObject("created_at", OffsetDateTime.class).toInstant()));
         return new PageImpl<>(content, pageable, total == null ? 0 : total);
     }
 
-    record Balance(BigDecimal pending, BigDecimal available, BigDecimal held, BigDecimal total) {}
+    record Balance(BigDecimal pending, BigDecimal available, BigDecimal held, BigDecimal total,
+                   BigDecimal inPayout) {}
 }

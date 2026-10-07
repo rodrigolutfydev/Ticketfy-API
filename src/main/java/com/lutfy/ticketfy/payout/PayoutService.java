@@ -37,8 +37,8 @@ public class PayoutService {
     public BalanceDTO balance(User organizer) {
         var releasedUntil = clock.instant().minus(settings.releaseDelay());
         var balance = queries.findBalance(organizer.getId(), releasedUntil);
-        return new BalanceDTO(money(balance.pending()), money(balance.available()), money(balance.held()),
-                money(balance.total()), settings.releaseDelayDays());
+        return new BalanceDTO(money(balance.pending()), money(balance.available()), money(balance.inPayout()),
+                money(balance.held()), money(balance.total()), settings.releaseDelayDays(), settings.minAmount());
     }
 
     @Transactional(readOnly = true)
@@ -52,7 +52,7 @@ public class PayoutService {
         return queries.findEntries(organizer.getId(), eventId, start, until,
                         PageRequest.of(pageable.getPageNumber(), pageable.getPageSize()))
                 .map(entry -> new LedgerEntryDTO(entry.id(), entry.type(), money(entry.amount()), entry.eventId(),
-                        entry.eventName(), entry.orderId(), entry.createdAt()));
+                        entry.eventName(), entry.orderId(), entry.payoutId(), entry.createdAt()));
     }
 
     private static BigDecimal money(BigDecimal value) {

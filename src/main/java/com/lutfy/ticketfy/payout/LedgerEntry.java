@@ -30,10 +30,12 @@ public class LedgerEntry {
     private UUID id;
     @Column(name = "organizer_id", nullable = false, updatable = false)
     private UUID organizerId;
-    @Column(name = "event_id", nullable = false, updatable = false)
+    @Column(name = "event_id", updatable = false)
     private UUID eventId;
-    @Column(name = "order_id", nullable = false, updatable = false)
+    @Column(name = "order_id", updatable = false)
     private UUID orderId;
+    @Column(name = "payout_id", updatable = false)
+    private UUID payoutId;
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, updatable = false)
     private LedgerEntryType type;
@@ -42,11 +44,23 @@ public class LedgerEntry {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
-    LedgerEntry(UUID organizerId, UUID eventId, UUID orderId, LedgerEntryType type,
-                BigDecimal amount, Instant createdAt) {
+    static LedgerEntry forOrder(UUID organizerId, UUID eventId, UUID orderId, LedgerEntryType type,
+                                BigDecimal amount, Instant createdAt) {
+        var entry = new LedgerEntry(organizerId, type, amount, createdAt);
+        entry.eventId = eventId;
+        entry.orderId = orderId;
+        return entry;
+    }
+
+    static LedgerEntry forPayout(UUID organizerId, UUID payoutId, LedgerEntryType type,
+                                 BigDecimal amount, Instant createdAt) {
+        var entry = new LedgerEntry(organizerId, type, amount, createdAt);
+        entry.payoutId = payoutId;
+        return entry;
+    }
+
+    private LedgerEntry(UUID organizerId, LedgerEntryType type, BigDecimal amount, Instant createdAt) {
         this.organizerId = organizerId;
-        this.eventId = eventId;
-        this.orderId = orderId;
         this.type = type;
         this.amount = amount;
         this.createdAt = createdAt;
