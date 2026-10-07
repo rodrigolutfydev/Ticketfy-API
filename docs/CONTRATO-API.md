@@ -3,6 +3,20 @@
 Registro das mudanças que exigem ajuste no frontend, da mais recente para a mais antiga.
 O contrato completo do dashboard do organizador está em [CONTRATO-DASHBOARD.md](CONTRATO-DASHBOARD.md).
 
+## Erros de corpo da requisição: 400 e 415 (Tarefa 7)
+
+Valem para todos os endpoints que recebem corpo JSON. Antes, esses casos respondiam **500**.
+
+| Situação | Código | Corpo |
+|---|---|---|
+| JSON malformado, corpo ausente ou campo com tipo errado (ex.: `"quantity": "abc"`, data inválida) | 400 | `{ "message": "Malformed request body" }` |
+| `Content-Type` diferente de `application/json` (ex.: `text/plain`) | 415 | `{ "message": "Unsupported media type" }` |
+
+- A resposta nunca traz detalhes do parser (linha, coluna, tipo esperado).
+- Erros de validação de campos (`@NotBlank`, `@Size`, `@URL`...) continuam com o formato de sempre: 400 com `{ "message": "Validation failed", "errors": [ { "field", "message" } ] }`.
+
+**Login:** e-mail inexistente e senha errada respondem igual, 401 `{ "message": "Invalid credentials" }`. Isso já funcionava assim e agora tem teste.
+
 ## Eventos: `imageUrl` na criação e na edição (Tarefa 4)
 
 `POST /events` e `PUT /events/{id}`.
