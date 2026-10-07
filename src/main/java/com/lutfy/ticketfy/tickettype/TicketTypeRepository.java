@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -15,6 +16,17 @@ public interface TicketTypeRepository extends JpaRepository<TicketType, UUID> {
     Optional<TicketType> findByIdAndActiveTrue(UUID id);
     boolean existsByEventIdAndQuantitySoldGreaterThan(UUID eventId, int quantity);
     Optional<TicketType> findByIdAndActiveTrueAndEventActiveTrue(UUID id);
+
+    @Query("""
+        SELECT t.event.id AS eventId,
+               MIN(CASE WHEN t.quantitySold < t.quantityTotal THEN t.price END) AS minPrice,
+               SUM(CASE WHEN t.quantitySold < t.quantityTotal THEN 1 ELSE 0 END) AS availableCount
+          FROM TicketType t
+         WHERE t.event.id IN :eventIds
+           AND t.active = true
+         GROUP BY t.event.id
+        """)
+    List<EventPricing> findPricingByEventIds(@Param("eventIds") Collection<UUID> eventIds);
 
     @Modifying
     @Query("""

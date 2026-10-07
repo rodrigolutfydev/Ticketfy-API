@@ -1,5 +1,6 @@
 package com.lutfy.ticketfy.event;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -10,10 +11,12 @@ public record EventSummaryDTO(
         String venueName,
         String city,
         Instant startsAt,
-        boolean featured
+        boolean featured,
+        BigDecimal minPrice,
+        boolean soldOut
 ) {
-    public EventSummaryDTO(Event event) {
+    public EventSummaryDTO(Event event, BigDecimal minPrice, boolean soldOut) {
         this(event.getId(), event.getName(), event.getImageUrl(), event.getVenueName(), event.getCity(), event.getStartsAt(),
-                event.isFeatured());
+                event.isFeatured(), minPrice, soldOut);
     }
 }

@@ -35,8 +35,9 @@ public class EventController {
             @RequestParam(required = false) String q,
             @RequestParam(required = false) String city,
             @RequestParam(required = false) Boolean featured,
+            @RequestParam(required = false) Boolean soldOut,
             @PageableDefault(size = 20, sort = "startsAt") Pageable pageable) {
-        var page = service.search(q, city, featured, pageable);
+        var page = service.search(q, city, featured, soldOut, pageable);
         return ResponseEntity.ok(page);
     }
 

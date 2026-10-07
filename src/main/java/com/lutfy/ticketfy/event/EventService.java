@@ -4,6 +4,7 @@ import com.lutfy.ticketfy.infra.exception.EventAccessDeniedException;
 import com.lutfy.ticketfy.infra.exception.EventHasSalesException;
 import com.lutfy.ticketfy.infra.exception.EventNotFoundException;
 import com.lutfy.ticketfy.infra.exception.InvalidEventDatesException;
+import com.lutfy.ticketfy.tickettype.EventPricing;
 import com.lutfy.ticketfy.tickettype.TicketTypeRepository;
 import com.lutfy.ticketfy.user.Role;
 import com.lutfy.ticketfy.user.User;
@@ -12,7 +13,10 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
+import java.util.Map;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 public class EventService {
@@ -47,14 +51,27 @@ public class EventService {
     }
 
     @Transactional(readOnly = true)
-    public Page<EventSummaryDTO> search(String q, String city, Boolean featured, Pageable pageable) {
+    public Page<EventSummaryDTO> search(String q, String city, Boolean featured, Boolean soldOut, Pageable pageable) {
         var spec = EventSpecifications.isActive();
         var name = normalize(q);
         if (name != null) spec = spec.and(EventSpecifications.nameContains(name));
         var cityFilter = normalize(city);
         if (cityFilter != null) spec = spec.and(EventSpecifications.cityEquals(cityFilter));
         if (featured != null) spec = spec.and(EventSpecifications.isFeatured(featured));
-        return repository.findAll(spec, pageable).map(EventSummaryDTO::new);
+        if (soldOut != null) spec = spec.and(EventSpecifications.isSoldOut(soldOut));
+        return toSummaries(repository.findAll(spec, pageable));
+    }
+
+    private Page<EventSummaryDTO> toSummaries(Page<Event> events) {
+        var ids = events.map(Event::getId).toList();
+        Map<UUID, EventPricing> pricing = ids.isEmpty() ? Map.of() : ticketTypeRepository.findPricingByEventIds(ids)
+                .stream()
+                .collect(Collectors.toMap(EventPricing::getEventId, Function.identity()));
+        return events.map(event -> {
+            var eventPricing = pricing.get(event.getId());
+            if (eventPricing == null) return new EventSummaryDTO(event, null, false);
+            return new EventSummaryDTO(event, eventPricing.getMinPrice(), eventPricing.getAvailableCount() == 0);
+        });
     }
 
     private String normalize(String value) {
@@ -91,7 +108,7 @@ public class EventService {
 
     @Transactional(readOnly = true)
     public Page<EventSummaryDTO> listMyEvents(UUID organizerID, Pageable pageable) {
-        return repository.findByOrganizerIdAndActiveTrue(organizerID, pageable).map(EventSummaryDTO::new);
+        return toSummaries(repository.findByOrganizerIdAndActiveTrue(organizerID, pageable));
     }
 
     @Transactional
