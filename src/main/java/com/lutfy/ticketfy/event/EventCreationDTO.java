@@ -28,4 +28,7 @@ public record EventCreationDTO(
         @Future
         Instant endsAt
 ) {
+    public EventCreationDTO {
+        if (imageUrl != null && imageUrl.isBlank()) imageUrl = null;
+    }
 }

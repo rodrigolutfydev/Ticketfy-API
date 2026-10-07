@@ -58,7 +58,7 @@ public class Event {
     public Event(EventCreationDTO dto, User organizer) {
         this.name = dto.name();
         this.description = dto.description();
-        this.imageUrl = dto.imageUrl();
+        this.imageUrl = blankToNull(dto.imageUrl());
         this.venueName = dto.venueName();
         this.address = dto.address();
         this.city = dto.city();
@@ -72,7 +72,7 @@ public class Event {
     public void updateFrom(EventUpdateDTO dto) {
         if (dto.name() != null) this.name = dto.name();
         if (dto.description() != null) this.description = dto.description();
-        this.imageUrl = dto.imageUrl();
+        if (dto.imageUrl() != null) this.imageUrl = blankToNull(dto.imageUrl());
         if (dto.venueName() != null) this.venueName = dto.venueName();
         if (dto.address() != null) this.address = dto.address();
         if (dto.city() != null) this.city = dto.city();
@@ -83,5 +83,9 @@ public class Event {
 
     public void deactivate() {
         this.active = false;
+    }
+
+    private static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value;
     }
 }
