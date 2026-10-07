@@ -11,6 +11,7 @@ public record PaymentDetailsDTO(
         PaymentMethod method,
         BigDecimal amount,
         Instant approvedAt,
+        Instant refundedAt,
         Instant createdAt
 ) {
     public PaymentDetailsDTO(Payment payment) {
@@ -20,6 +21,7 @@ public record PaymentDetailsDTO(
                 payment.getMethod(),
                 payment.getAmount(),
                 payment.getApprovedAt(),
+                payment.getRefundedAt(),
                 payment.getCreatedAt());
     }
 }

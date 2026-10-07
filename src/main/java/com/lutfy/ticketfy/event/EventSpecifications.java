@@ -20,6 +20,10 @@ final class EventSpecifications {
         return (root, query, cb) -> cb.isTrue(root.get("active"));
     }
 
+    static Specification<Event> isNotCancelled() {
+        return (root, query, cb) -> cb.isNull(root.get("cancelledAt"));
+    }
+
     static Specification<Event> nameContains(String name) {
         var pattern = "%" + escapeLike(name) + "%";
         return (root, query, cb) -> cb.like(cb.upper(root.get("name")), cb.upper(bound(cb, pattern)), ESCAPE);

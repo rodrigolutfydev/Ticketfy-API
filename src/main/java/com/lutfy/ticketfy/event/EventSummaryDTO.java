@@ -13,10 +13,11 @@ public record EventSummaryDTO(
         Instant startsAt,
         boolean featured,
         BigDecimal minPrice,
-        boolean soldOut
+        boolean soldOut,
+        Instant cancelledAt
 ) {
     public EventSummaryDTO(Event event, BigDecimal minPrice, boolean soldOut) {
         this(event.getId(), event.getName(), event.getImageUrl(), event.getVenueName(), event.getCity(), event.getStartsAt(),
-                event.isFeatured(), minPrice, soldOut);
+                event.isFeatured(), minPrice, soldOut, event.getCancelledAt());
     }
 }

@@ -15,7 +15,7 @@ public interface TicketTypeRepository extends JpaRepository<TicketType, UUID> {
     List<TicketType> findByEventIdOrderByCreatedAtAscNameAsc(UUID eventId);
     Optional<TicketType> findByIdAndActiveTrue(UUID id);
     boolean existsByEventIdAndQuantitySoldGreaterThan(UUID eventId, int quantity);
-    Optional<TicketType> findByIdAndActiveTrueAndEventActiveTrue(UUID id);
+    Optional<TicketType> findByIdAndActiveTrueAndEventActiveTrueAndEventCancelledAtIsNull(UUID id);
 
     @Query("""
         SELECT t.event.id AS eventId,
@@ -34,6 +34,11 @@ public interface TicketTypeRepository extends JpaRepository<TicketType, UUID> {
            SET t.quantitySold = t.quantitySold + :quantity
          WHERE t.id = :id
            AND t.quantitySold + :quantity <= t.quantityTotal
+           AND EXISTS (
+               SELECT 1 FROM Event e
+                WHERE e.id = t.event.id
+                  AND e.active = true
+                  AND e.cancelledAt IS NULL)
         """)
     int reserveStock(@Param("id") UUID id, @Param("quantity") int quantity);
 

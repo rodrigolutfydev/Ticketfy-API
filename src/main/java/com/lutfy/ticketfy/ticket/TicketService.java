@@ -56,6 +56,9 @@ public class TicketService {
         if (authenticated.getRole() != Role.ADMIN && !organizer.equals(authenticated)) {
             throw new EventAccessDeniedException("You are not the organizer of this event");
         }
+        if (ticket.getTicketType().getEvent().isCancelled()) {
+            throw new InvalidTicketStateException("Event was cancelled");
+        }
 
         int updated = ticketRepository.checkIn(code, Instant.now(), TicketStatus.USED, TicketStatus.VALID);
         if (updated == 0) {

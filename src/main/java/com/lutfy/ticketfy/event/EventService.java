@@ -3,6 +3,7 @@ package com.lutfy.ticketfy.event;
 import com.lutfy.ticketfy.infra.exception.EventAccessDeniedException;
 import com.lutfy.ticketfy.infra.exception.EventHasSalesException;
 import com.lutfy.ticketfy.infra.exception.EventNotFoundException;
+import com.lutfy.ticketfy.infra.exception.InvalidEventStateException;
 import com.lutfy.ticketfy.infra.exception.InvalidEventDatesException;
 import com.lutfy.ticketfy.tickettype.EventPricing;
 import com.lutfy.ticketfy.tickettype.TicketTypeRepository;
@@ -52,7 +53,7 @@ public class EventService {
 
     @Transactional(readOnly = true)
     public Page<EventSummaryDTO> search(String q, String city, Boolean featured, Boolean soldOut, Pageable pageable) {
-        var spec = EventSpecifications.isActive();
+        var spec = EventSpecifications.isActive().and(EventSpecifications.isNotCancelled());
         var name = normalize(q);
         if (name != null) spec = spec.and(EventSpecifications.nameContains(name));
         var cityFilter = normalize(city);
@@ -84,11 +85,35 @@ public class EventService {
         var event = repository.findByIdAndActiveTrue(id)
                 .orElseThrow(() -> new EventNotFoundException("Event not found"));
         checkOwnership(event, requester);
+        checkNotCancelled(event);
         var newStart = dto.startsAt() != null ? dto.startsAt() : event.getStartsAt();
         var newEnd = dto.endsAt() != null ? dto.endsAt() : event.getEndsAt();
         validateDates(newStart, newEnd);
         event.updateFrom(dto);
         return new EventDetailsDTO(event);
+    }
+
+    @Transactional
+    public Instant markCancelled(UUID id, String reason, User requester) {
+        var event = repository.findByIdAndActiveTrue(id)
+                .orElseThrow(() -> new EventNotFoundException("Event not found"));
+        checkOwnership(event, requester);
+        var now = Instant.now();
+        if (repository.cancel(id, reason, now) == 1) {
+            return now;
+        }
+        var current = repository.findByIdAndActiveTrue(id)
+                .orElseThrow(() -> new EventNotFoundException("Event not found"));
+        if (current.isCancelled()) {
+            throw new InvalidEventStateException("Event is already cancelled");
+        }
+        throw new InvalidEventStateException("Event has already ended");
+    }
+
+    private void checkNotCancelled(Event event) {
+        if (event.isCancelled()) {
+            throw new InvalidEventStateException("Event was cancelled");
+        }
     }
 
     private void checkOwnership(Event event, User requester) {
@@ -116,6 +141,7 @@ public class EventService {
         var event = repository.findByIdAndActiveTrue(id)
                 .orElseThrow(() -> new EventNotFoundException("Event not found"));
         checkOwnership(event, requester);
+        checkNotCancelled(event);
         if (ticketTypeRepository.existsByEventIdAndQuantitySoldGreaterThan(id, 0)) {
             throw new EventHasSalesException("Event has sold or reserved tickets");
         }

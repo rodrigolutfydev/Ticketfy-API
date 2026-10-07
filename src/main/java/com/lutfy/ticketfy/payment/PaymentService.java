@@ -1,9 +1,11 @@
 package com.lutfy.ticketfy.payment;
 
+import com.lutfy.ticketfy.infra.exception.InvalidEventStateException;
 import com.lutfy.ticketfy.infra.exception.InvalidOrderStateException;
 import com.lutfy.ticketfy.infra.exception.InvalidPaymentStateException;
 import com.lutfy.ticketfy.infra.exception.OrderAccessDeniedException;
 import com.lutfy.ticketfy.infra.exception.OrderNotFoundException;
+import com.lutfy.ticketfy.order.Order;
 import com.lutfy.ticketfy.order.OrderRepository;
 import com.lutfy.ticketfy.ticket.TicketService;
 import com.lutfy.ticketfy.user.User;
@@ -18,13 +20,16 @@ public class PaymentService {
     private final PaymentRepository paymentRepository;
     private final OrderRepository orderRepository;
     private final TicketService ticketService;
+    private final PaymentGateway paymentGateway;
 
     public PaymentService(PaymentRepository paymentRepository,
                           OrderRepository orderRepository,
-                          TicketService ticketService) {
+                          TicketService ticketService,
+                          PaymentGateway paymentGateway) {
         this.paymentRepository = paymentRepository;
         this.orderRepository = orderRepository;
         this.ticketService = ticketService;
+        this.paymentGateway = paymentGateway;
     }
 
     @Transactional
@@ -34,6 +39,9 @@ public class PaymentService {
 
         if (!order.getUser().equals(authenticated)) {
             throw new OrderAccessDeniedException("You do not own this order");
+        }
+        if (order.belongsToCancelledEvent()) {
+            throw new InvalidEventStateException("The event for this order was cancelled");
         }
         if (paymentRepository.existsByOrderIdAndStatus(orderId, PaymentStatus.APPROVED)) {
             throw new InvalidPaymentStateException("This order has already been paid");
@@ -49,5 +57,17 @@ public class PaymentService {
 
         var saved = paymentRepository.saveAndFlush(payment);
         return new PaymentDetailsDTO(saved);
+    }
+
+    @Transactional
+    public void refundApproved(Order order) {
+        var payment = paymentRepository.findByOrderIdAndStatus(order.getId(), PaymentStatus.APPROVED);
+        if (payment.isEmpty()) {
+            return;
+        }
+        var approved = payment.get();
+        var result = paymentGateway.refund(new PaymentGateway.RefundRequest(
+                approved.getId(), approved.getProviderReference(), approved.getAmount(), approved.getId().toString()));
+        approved.refund(result.reference());
     }
 }

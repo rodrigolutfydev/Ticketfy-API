@@ -33,6 +33,8 @@ public class Payment {
     private BigDecimal amount;
     private String providerReference;
     private Instant approvedAt;
+    private Instant refundedAt;
+    private String refundReference;
     @CreationTimestamp
     private Instant createdAt;
     @UpdateTimestamp
@@ -51,6 +53,15 @@ public class Payment {
         }
         this.status = PaymentStatus.APPROVED;
         this.approvedAt = Instant.now();
+    }
+
+    public void refund(String reference) {
+        if (status != PaymentStatus.APPROVED) {
+            throw new InvalidPaymentStateException("Only approved payments can be refunded");
+        }
+        this.status = PaymentStatus.REFUNDED;
+        this.refundedAt = Instant.now();
+        this.refundReference = reference;
     }
 
     public void reject() {

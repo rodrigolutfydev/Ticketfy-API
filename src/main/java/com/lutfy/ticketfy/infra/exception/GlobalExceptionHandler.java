@@ -135,6 +135,12 @@ public class GlobalExceptionHandler {
                 .body(new ErrorResponseDTO(ex.getMessage()));
     }
 
+    @ExceptionHandler(MixedEventsOrderException.class)
+    public ResponseEntity<ErrorResponseDTO> handleMixedEventsOrder(MixedEventsOrderException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(new ErrorResponseDTO(ex.getMessage()));
+    }
+
     @ExceptionHandler(MaxPerOrderExceededException.class)
     public ResponseEntity<ErrorResponseDTO> handleMaxPorOrderExceeded(MaxPerOrderExceededException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
@@ -181,6 +187,12 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponseDTO> handleMethodNotSupported(HttpRequestMethodNotSupportedException ex) {
         return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED)
                 .body(new ErrorResponseDTO("Method not allowed"));
+    }
+
+    @ExceptionHandler(InvalidEventStateException.class)
+    public ResponseEntity<ErrorResponseDTO> handleInvalidEventState(InvalidEventStateException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new ErrorResponseDTO(ex.getMessage()));
     }
 
     @ExceptionHandler(EventHasSalesException.class)

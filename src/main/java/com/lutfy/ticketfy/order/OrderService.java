@@ -1,6 +1,8 @@
 package com.lutfy.ticketfy.order;
 
+import com.lutfy.ticketfy.event.EventRepository;
 import com.lutfy.ticketfy.infra.exception.*;
+import com.lutfy.ticketfy.payment.PaymentService;
 import com.lutfy.ticketfy.ticket.TicketService;
 import com.lutfy.ticketfy.tickettype.TicketTypeRepository;
 import com.lutfy.ticketfy.user.Role;
@@ -23,17 +25,23 @@ public class OrderService {
     private final OrderRepository orderRepository;
     private final TicketTypeRepository ticketTypeRepository;
     private final TicketService ticketService;
+    private final PaymentService paymentService;
+    private final EventRepository eventRepository;
     private final long reservationMinutes;
     private final long refundDeadlineHours;
 
     public OrderService(OrderRepository orderRepository,
                         TicketTypeRepository ticketTypeRepository,
                         TicketService ticketService,
+                        PaymentService paymentService,
+                        EventRepository eventRepository,
                         @Value("${ticketfy.order.reservation-minutes}") long reservationMinutes,
                         @Value("${ticketfy.refund.deadline-hours}") long refundDeadlineHours) {
         this.orderRepository = orderRepository;
         this.ticketTypeRepository = ticketTypeRepository;
         this.ticketService = ticketService;
+        this.paymentService = paymentService;
+        this.eventRepository = eventRepository;
         this.reservationMinutes = reservationMinutes;
         this.refundDeadlineHours = refundDeadlineHours;
     }
@@ -49,9 +57,16 @@ public class OrderService {
         }
         var expiresAt = Instant.now().plus(Duration.ofMinutes(reservationMinutes));
         var order = new Order(authenticated, expiresAt, idempotencyKey);
+        UUID eventId = null;
         for (var itemRequest : dto.items()) {
-            var ticketType = ticketTypeRepository.findByIdAndActiveTrueAndEventActiveTrue(itemRequest.ticketTypeId())
+            var ticketType = ticketTypeRepository.findByIdAndActiveTrueAndEventActiveTrueAndEventCancelledAtIsNull(itemRequest.ticketTypeId())
                     .orElseThrow(() -> new TicketTypeNotFoundException("Ticket type not found"));
+            var itemEventId = ticketType.getEvent().getId();
+            if (eventId == null) {
+                eventId = itemEventId;
+            } else if (!eventId.equals(itemEventId)) {
+                throw new MixedEventsOrderException("All items of an order must belong to the same event");
+            }
             if (ticketType.getMaxPerOrder() != null
                     && itemRequest.quantity() > ticketType.getMaxPerOrder()) {
                 throw new MaxPerOrderExceededException(
@@ -59,6 +74,9 @@ public class OrderService {
             }
             int affectedRows = ticketTypeRepository.reserveStock(ticketType.getId(), itemRequest.quantity());
             if (affectedRows == 0) {
+                if (eventRepository.existsByIdAndCancelledAtIsNotNull(ticketType.getEvent().getId())) {
+                    throw new InvalidEventStateException("Event was cancelled");
+                }
                 throw new InsufficientStockException("Not enough tickets available for this ticket type");
             }
             var item = new OrderItem(order, ticketType, itemRequest.quantity());
@@ -96,11 +114,14 @@ public class OrderService {
         var order = orderRepository.findById(id)
                 .orElseThrow(() -> new OrderNotFoundException("Order not found"));
         checkOwnership(order, authenticated);
-        order.cancel();
-        for (var item : order.getItems()) {
-            ticketTypeRepository.releaseStock(item.getTicketType().getId(), item.getQuantity());
-        }
+        cancelPending(order);
         return new OrderDetailsDTO(order);
+    }
+
+    @Transactional
+    public void cancelPending(Order order) {
+        order.cancel();
+        releaseStock(order);
     }
 
     @Transactional
@@ -115,12 +136,22 @@ public class OrderService {
             }
         }
 
+        refundPaid(order);
+        return new OrderDetailsDTO(order);
+    }
+
+    @Transactional
+    public void refundPaid(Order order) {
         order.refund();
         ticketService.cancelForRefund(order.getId());
+        releaseStock(order);
+        paymentService.refundApproved(order);
+    }
+
+    private void releaseStock(Order order) {
         for (var item : order.getItems()) {
             ticketTypeRepository.releaseStock(item.getTicketType().getId(), item.getQuantity());
         }
-        return new OrderDetailsDTO(order);
     }
 
     private void checkOwnership(Order order, User authenticated) {
@@ -145,9 +176,7 @@ public class OrderService {
             return false;
         }
         order.expire();
-        for (var item : order.getItems()) {
-            ticketTypeRepository.releaseStock(item.getTicketType().getId(), item.getQuantity());
-        }
+        releaseStock(order);
         return true;
     }
 }

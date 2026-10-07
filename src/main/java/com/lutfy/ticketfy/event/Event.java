@@ -50,6 +50,12 @@ public class Event {
     private boolean active;
     private boolean featured;
 
+    @Column(name = "cancelled_at")
+    private Instant cancelledAt;
+
+    @Column(name = "cancellation_reason", length = 500)
+    private String cancellationReason;
+
     @CreationTimestamp @Column(name = "created_at", updatable = false)
     private Instant createdAt;
 
@@ -88,6 +94,10 @@ public class Event {
 
     public void changeFeatured(boolean featured) {
         this.featured = featured;
+    }
+
+    public boolean isCancelled() {
+        return cancelledAt != null;
     }
 
     private static String blankToNull(String value) {

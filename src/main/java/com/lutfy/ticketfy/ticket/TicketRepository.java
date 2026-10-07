@@ -27,6 +27,10 @@ public interface TicketRepository extends JpaRepository<Ticket, UUID> {
         UPDATE Ticket t
         SET t.status = :used, t.usedAt = :now, t.updatedAt = :now
         WHERE t.code = :code AND t.status = :valid
+          AND EXISTS (
+              SELECT 1 FROM TicketType tt JOIN tt.event e
+               WHERE tt.id = t.ticketType.id
+                 AND e.cancelledAt IS NULL)
         """)
     int checkIn(@Param("code") String code,
                 @Param("now") Instant now,
@@ -34,6 +38,8 @@ public interface TicketRepository extends JpaRepository<Ticket, UUID> {
                 @Param("valid") TicketStatus valid);
 
     long countByOrderId(UUID orderId);
+
+    boolean existsByOrderIdAndStatus(UUID orderId, TicketStatus status);
 
     @Modifying(flushAutomatically = true)
     @Query("""

@@ -18,9 +18,11 @@ import java.util.UUID;
 public class EventController {
 
     private final EventService service;
+    private final EventCancellationService cancellationService;
 
-    public EventController(EventService service) {
+    public EventController(EventService service, EventCancellationService cancellationService) {
         this.service = service;
+        this.cancellationService = cancellationService;
     }
 
     @PostMapping
@@ -60,6 +62,14 @@ public class EventController {
     public ResponseEntity<EventDetailsDTO> changeFeatured(@PathVariable UUID id,
                                                           @RequestBody @Valid EventFeaturedUpdateDTO dto) {
         return ResponseEntity.ok(service.changeFeatured(id, dto.featured()));
+    }
+
+    @PostMapping("/{id}/cancel")
+    @PreAuthorize("hasAnyRole('ORGANIZER', 'ADMIN')")
+    public ResponseEntity<EventCancellationResultDTO> cancel(@PathVariable UUID id,
+                                                             @RequestBody(required = false) @Valid EventCancellationDTO dto,
+                                                             @AuthenticationPrincipal User requester) {
+        return ResponseEntity.ok(cancellationService.cancel(id, dto, requester));
     }
 
     @GetMapping("/mine")

@@ -83,6 +83,10 @@ public class Order {
         this.status = OrderStatus.REFUNDED;
     }
 
+    public boolean belongsToCancelledEvent() {
+        return items.stream().anyMatch(item -> item.getTicketType().getEvent().isCancelled());
+    }
+
     public boolean isExpired() {
         return expiresAt.isBefore(Instant.now());
     }

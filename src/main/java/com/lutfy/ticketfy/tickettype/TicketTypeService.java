@@ -4,6 +4,7 @@ import com.lutfy.ticketfy.event.Event;
 import com.lutfy.ticketfy.event.EventRepository;
 import com.lutfy.ticketfy.infra.exception.EventAccessDeniedException;
 import com.lutfy.ticketfy.infra.exception.EventNotFoundException;
+import com.lutfy.ticketfy.infra.exception.InvalidEventStateException;
 import com.lutfy.ticketfy.infra.exception.InvalidTicketTypeQuantityException;
 import com.lutfy.ticketfy.infra.exception.TicketTypeNameAlreadyExistsException;
 import com.lutfy.ticketfy.infra.exception.TicketTypeNotFoundException;
@@ -39,6 +40,7 @@ public class TicketTypeService {
         var event = eventRepository.findByIdAndActiveTrue(eventId)
                 .orElseThrow(() -> new EventNotFoundException("Event not found"));
         checkEventOwnership(event, authenticated);
+        checkNotCancelled(event);
         var ticketType = new TicketType(dto, event);
         try {
             var saved = ticketTypeRepository.saveAndFlush(ticketType);
@@ -53,6 +55,7 @@ public class TicketTypeService {
         var event = eventRepository.findByIdAndActiveTrue(eventId)
                 .orElseThrow(() -> new EventNotFoundException("Event not found"));
         checkEventOwnership(event, authenticated);
+        checkNotCancelled(event);
         var ticketType = ticketTypeRepository.findByIdAndActiveTrue(ticketTypeId)
                 .filter(found -> found.getEvent().getId().equals(eventId))
                 .orElseThrow(() -> new TicketTypeNotFoundException("Ticket type not found"));
@@ -77,8 +80,11 @@ public class TicketTypeService {
 
     @Transactional(readOnly = true)
     public List<TicketTypeSummaryDTO> listByEvent(UUID eventId) {
-        eventRepository.findByIdAndActiveTrue(eventId)
+        var event = eventRepository.findByIdAndActiveTrue(eventId)
                 .orElseThrow(() -> new EventNotFoundException("Event not found"));
+        if (event.isCancelled()) {
+            return List.of();
+        }
         return ticketTypeRepository.findByEventIdAndActiveTrue(eventId)
                 .stream()
                 .map(TicketTypeSummaryDTO::new)
@@ -104,6 +110,12 @@ public class TicketTypeService {
             }
         }
         return ex;
+    }
+
+    private void checkNotCancelled(Event event) {
+        if (event.isCancelled()) {
+            throw new InvalidEventStateException("Event was cancelled");
+        }
     }
 
     private void checkEventOwnership(Event event, User authenticated) {

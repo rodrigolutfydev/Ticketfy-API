@@ -11,7 +11,8 @@ public record OrderDetailsDTO(
        BigDecimal totalAmount,
        Instant expiresAt,
        Instant createdAt,
-       List<OrderItemDTO> items
+       List<OrderItemDTO> items,
+       boolean eventCancelled
 ) {
     public OrderDetailsDTO(Order order) {
         this( order.getId(),
@@ -19,7 +20,8 @@ public record OrderDetailsDTO(
                 order.getTotalAmount(),
                 order.getExpiresAt(),
                 order.getCreatedAt(),
-                order.getItems().stream().map(OrderItemDTO::new).toList()
+                order.getItems().stream().map(OrderItemDTO::new).toList(),
+                order.belongsToCancelledEvent()
         );
     }
 }
