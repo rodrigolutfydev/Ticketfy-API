@@ -7,7 +7,7 @@ API de venda de ingressos que trata no banco de dados os problemas de verdade: a
 
 - **Site:** em breve
 - **API:** [ticketfy-api.onrender.com](https://ticketfy-api.onrender.com/actuator/health)
-- **Documentação:** [referência da API](docs/API.md) · [contrato OpenAPI](docs/openapi.json) · [arquitetura](docs/05%20-%20Documento%20de%20Arquitetura.md) · [roadmap](docs/ROADMAP.md)
+- **Documentação:** veja a seção [Documentação](#documentação)
 
 ## O que o sistema faz
 
@@ -96,6 +96,22 @@ Pré-requisitos: Java 17 ou mais recente e Docker.
    ```
 
    O `verify` também atualiza o [`docs/openapi.json`](docs/openapi.json). Se você mudou algum endpoint, commite o arquivo junto, porque o CI falha quando ele está desatualizado.
+
+## Documentação
+
+**Referência**
+- [Referência da API](docs/API.md)
+- [Contrato OpenAPI](docs/openapi.json)
+
+**Engenharia**
+- [01 - Documento de Visão](docs/01%20-%20Documento%20de%20Vis%C3%A3o.md): problema, proposta, objetivos, público-alvo e escopo do Ticketfy, com as premissas e as questões em aberto.
+- [02 - Documento de Requisitos](docs/02%20-%20Documento%20de%20Requisitos.md): os 18 requisitos funcionais, os não funcionais e as regras de negócio, com matriz de rastreabilidade e critérios de aceite.
+- [03 - Caso de Uso UC01 - Compra de Ingresso](docs/03%20-%20Caso%20de%20Uso%20UC01%20-%20Compra%20de%20Ingresso.md): o fluxo de compra de ingresso com atores, fluxo principal, fluxos alternativos e de exceção, critérios de aceite e cenários de teste.
+- [04 - Diagrama de Classes de Domínio](docs/04%20-%20Diagrama%20de%20Classes%20de%20Dom%C3%ADnio.md): as classes do domínio com atributos, enums, métodos e cardinalidades, e o diagrama UML em PlantUML.
+- [05 - Documento de Arquitetura](docs/05%20-%20Documento%20de%20Arquitetura.md): camadas, fluxo de uma requisição, segurança, observabilidade, persistência e as decisões arquiteturais com suas limitações.
+
+**Projeto**
+- [Roadmap](docs/ROADMAP.md)
 
 ## Licença
 
