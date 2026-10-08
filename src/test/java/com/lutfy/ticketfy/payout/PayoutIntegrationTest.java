@@ -1,7 +1,6 @@
 package com.lutfy.ticketfy.payout;
 
 import com.lutfy.ticketfy.IntegrationTestBase;
-import com.lutfy.ticketfy.infra.security.TokenService;
 import com.lutfy.ticketfy.order.OrderCreationDTO;
 import com.lutfy.ticketfy.order.OrderItemRequestDTO;
 import com.lutfy.ticketfy.order.OrderRepository;
@@ -53,8 +52,6 @@ class PayoutIntegrationTest extends IntegrationTestBase {
     @Autowired
     private UserRepository userRepository;
 
-    @Autowired
-    private TokenService tokenService;
 
     @Autowired
     private OrderService orderService;
@@ -383,7 +380,7 @@ class PayoutIntegrationTest extends IntegrationTestBase {
     }
 
     private String bearer(User user) {
-        return "Bearer " + tokenService.generateToken(user);
+        return "Bearer " + accessToken(user);
     }
 
     private UUID insertEvent(UUID organizerId, Instant startsAt, Instant endsAt) {

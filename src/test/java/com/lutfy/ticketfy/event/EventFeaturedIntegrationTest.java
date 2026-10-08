@@ -1,7 +1,6 @@
 package com.lutfy.ticketfy.event;
 
 import com.lutfy.ticketfy.IntegrationTestBase;
-import com.lutfy.ticketfy.infra.security.TokenService;
 import com.lutfy.ticketfy.user.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -29,8 +28,6 @@ class EventFeaturedIntegrationTest extends IntegrationTestBase {
     @Autowired
     private UserRepository userRepository;
 
-    @Autowired
-    private TokenService tokenService;
 
     private UUID organizerId;
     private UUID eventId;
@@ -146,6 +143,6 @@ class EventFeaturedIntegrationTest extends IntegrationTestBase {
     }
 
     private String tokenFor(UUID userId) {
-        return "Bearer " + tokenService.generateToken(userRepository.findById(userId).orElseThrow());
+        return "Bearer " + accessToken(userRepository.findById(userId).orElseThrow());
     }
 }

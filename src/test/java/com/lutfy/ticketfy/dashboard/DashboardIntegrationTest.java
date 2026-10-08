@@ -1,7 +1,6 @@
 package com.lutfy.ticketfy.dashboard;
 
 import com.lutfy.ticketfy.IntegrationTestBase;
-import com.lutfy.ticketfy.infra.security.TokenService;
 import com.lutfy.ticketfy.user.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -34,8 +33,6 @@ class DashboardIntegrationTest extends IntegrationTestBase {
     @Autowired
     private UserRepository userRepository;
 
-    @Autowired
-    private TokenService tokenService;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -384,7 +381,7 @@ class DashboardIntegrationTest extends IntegrationTestBase {
     }
 
     private String tokenFor(UUID userId) {
-        return "Bearer " + tokenService.generateToken(userRepository.findById(userId).orElseThrow());
+        return "Bearer " + accessToken(userRepository.findById(userId).orElseThrow());
     }
 
     private UUID insertBuyer(String name, String email) {

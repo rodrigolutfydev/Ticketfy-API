@@ -1,7 +1,6 @@
 package com.lutfy.ticketfy.event;
 
 import com.lutfy.ticketfy.IntegrationTestBase;
-import com.lutfy.ticketfy.infra.security.TokenService;
 import com.lutfy.ticketfy.user.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -30,8 +29,6 @@ class EventSummaryPricingIntegrationTest extends IntegrationTestBase {
     @Autowired
     private UserRepository userRepository;
 
-    @Autowired
-    private TokenService tokenService;
 
     private String tag;
     private UUID organizer;
@@ -170,7 +167,7 @@ class EventSummaryPricingIntegrationTest extends IntegrationTestBase {
         insertTicketType(available, "Lote", "65.50", 10, 0, true);
         var soldOut = insertEvent("Esgotado " + tag, "Recife " + tag, false);
         insertTicketType(soldOut, "Lote", "50.00", 10, 10, true);
-        var token = tokenService.generateToken(userRepository.findById(organizer).orElseThrow());
+        var token = accessToken(userRepository.findById(organizer).orElseThrow());
 
         mockMvc.perform(get("/events/mine").param("sort", "name").header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())

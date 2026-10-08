@@ -1,7 +1,7 @@
 package com.lutfy.ticketfy.infra.security;
 
+import com.lutfy.ticketfy.auth.AuthSessionService;
 import com.lutfy.ticketfy.user.User;
-import com.lutfy.ticketfy.user.UserRepository;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -20,12 +20,10 @@ public class SecurityFilter extends OncePerRequestFilter {
 
     private static final String BEARER_PREFIX = "Bearer ";
 
-    private final TokenService tokenService;
-    private final UserRepository userRepository;
+    private final AuthSessionService authSessions;
 
-    public SecurityFilter(TokenService tokenService, UserRepository userRepository) {
-        this.tokenService = tokenService;
-        this.userRepository = userRepository;
+    public SecurityFilter(AuthSessionService authSessions) {
+        this.authSessions = authSessions;
     }
 
     @Override
@@ -33,9 +31,7 @@ public class SecurityFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
 
         recoverToken(request)
-                .map(tokenService::validateToken)
-                .filter(email -> !email.isEmpty())
-                .flatMap(userRepository::findByEmail)
+                .flatMap(authSessions::authenticate)
                 .ifPresent(this::authenticate);
         filterChain.doFilter(request, response);
     }

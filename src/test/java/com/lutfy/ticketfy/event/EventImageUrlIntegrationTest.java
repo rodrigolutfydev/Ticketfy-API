@@ -1,7 +1,6 @@
 package com.lutfy.ticketfy.event;
 
 import com.lutfy.ticketfy.IntegrationTestBase;
-import com.lutfy.ticketfy.infra.security.TokenService;
 import com.lutfy.ticketfy.user.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -34,8 +33,6 @@ class EventImageUrlIntegrationTest extends IntegrationTestBase {
     @Autowired
     private UserRepository userRepository;
 
-    @Autowired
-    private TokenService tokenService;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -46,7 +43,7 @@ class EventImageUrlIntegrationTest extends IntegrationTestBase {
     @BeforeEach
     void setUp() {
         organizerId = insertUser("ORGANIZER");
-        token = "Bearer " + tokenService.generateToken(userRepository.findById(organizerId).orElseThrow());
+        token = "Bearer " + accessToken(userRepository.findById(organizerId).orElseThrow());
     }
 
     @Test

@@ -1,7 +1,6 @@
 package com.lutfy.ticketfy.tickettype;
 
 import com.lutfy.ticketfy.IntegrationTestBase;
-import com.lutfy.ticketfy.infra.security.TokenService;
 import com.lutfy.ticketfy.user.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -28,8 +27,6 @@ class TicketTypeNameConflictIntegrationTest extends IntegrationTestBase {
     @Autowired
     private UserRepository userRepository;
 
-    @Autowired
-    private TokenService tokenService;
 
     private UUID eventId;
     private String token;
@@ -38,7 +35,7 @@ class TicketTypeNameConflictIntegrationTest extends IntegrationTestBase {
     void setUp() {
         var organizerId = insertUser("ORGANIZER");
         eventId = insertEvent(organizerId);
-        token = "Bearer " + tokenService.generateToken(userRepository.findById(organizerId).orElseThrow());
+        token = "Bearer " + accessToken(userRepository.findById(organizerId).orElseThrow());
     }
 
     @Test

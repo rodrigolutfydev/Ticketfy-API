@@ -1,7 +1,6 @@
 package com.lutfy.ticketfy.tickettype;
 
 import com.lutfy.ticketfy.IntegrationTestBase;
-import com.lutfy.ticketfy.infra.security.TokenService;
 import com.lutfy.ticketfy.user.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -27,8 +26,6 @@ class TicketTypePublicListIntegrationTest extends IntegrationTestBase {
     @Autowired
     private UserRepository userRepository;
 
-    @Autowired
-    private TokenService tokenService;
 
     private UUID eventId;
 
@@ -97,7 +94,7 @@ class TicketTypePublicListIntegrationTest extends IntegrationTestBase {
         var buyer = userRepository.findById(insertUser("USER")).orElseThrow();
 
         mockMvc.perform(post("/orders")
-                        .header("Authorization", "Bearer " + tokenService.generateToken(buyer))
+                        .header("Authorization", "Bearer " + accessToken(buyer))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"items\":[{\"ticketTypeId\":\"" + ticketTypeId + "\",\"quantity\":5}]}"))
                 .andExpect(status().isBadRequest())

@@ -1,7 +1,6 @@
 package com.lutfy.ticketfy.order;
 
 import com.lutfy.ticketfy.IntegrationTestBase;
-import com.lutfy.ticketfy.infra.security.TokenService;
 import com.lutfy.ticketfy.user.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,8 +24,6 @@ class OrderMixedEventsIntegrationTest extends IntegrationTestBase {
     @Autowired
     private UserRepository userRepository;
 
-    @Autowired
-    private TokenService tokenService;
 
     @Test
     void rejectsItemsFromDifferentEventsWithoutReservingStock() throws Exception {
@@ -36,7 +33,7 @@ class OrderMixedEventsIntegrationTest extends IntegrationTestBase {
         var buyer = userRepository.findById(insertUser("USER")).orElseThrow();
 
         mockMvc.perform(post("/orders")
-                        .header("Authorization", "Bearer " + tokenService.generateToken(buyer))
+                        .header("Authorization", "Bearer " + accessToken(buyer))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(items(firstTicketType, secondTicketType)))
                 .andExpect(status().isBadRequest())
@@ -58,7 +55,7 @@ class OrderMixedEventsIntegrationTest extends IntegrationTestBase {
         var buyer = userRepository.findById(insertUser("USER")).orElseThrow();
 
         mockMvc.perform(post("/orders")
-                        .header("Authorization", "Bearer " + tokenService.generateToken(buyer))
+                        .header("Authorization", "Bearer " + accessToken(buyer))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(items(firstTicketType, secondTicketType)))
                 .andExpect(status().isCreated())

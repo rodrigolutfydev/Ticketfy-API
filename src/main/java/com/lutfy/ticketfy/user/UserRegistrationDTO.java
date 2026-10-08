@@ -18,4 +18,8 @@ public record UserRegistrationDTO(
         @Size(min = 8, message = "Password must be at least 8 characters long", max = 72)
         String password
 ) {
+    @Override
+    public String toString() {
+        return "UserRegistrationDTO[]";
+    }
 }

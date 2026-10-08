@@ -2,7 +2,6 @@ package com.lutfy.ticketfy.event;
 
 import com.lutfy.ticketfy.IntegrationTestBase;
 import com.lutfy.ticketfy.infra.exception.TicketTypeNotFoundException;
-import com.lutfy.ticketfy.infra.security.TokenService;
 import com.lutfy.ticketfy.order.CancelledEventOrderProcessor;
 import com.lutfy.ticketfy.order.OrderCreationDTO;
 import com.lutfy.ticketfy.order.OrderItemRequestDTO;
@@ -52,8 +51,6 @@ class EventCancellationIntegrationTest extends IntegrationTestBase {
     @Autowired
     private UserRepository userRepository;
 
-    @Autowired
-    private TokenService tokenService;
 
     @Autowired
     private OrderService orderService;
@@ -341,7 +338,7 @@ class EventCancellationIntegrationTest extends IntegrationTestBase {
     }
 
     private String bearer(User user) {
-        return "Bearer " + tokenService.generateToken(user);
+        return "Bearer " + accessToken(user);
     }
 
     private OrderCreationDTO order(int quantity) {

@@ -1,10 +1,14 @@
 package com.lutfy.ticketfy;
 
+import com.lutfy.ticketfy.auth.AuthSessionService;
+import com.lutfy.ticketfy.infra.security.AuthOriginFilter;
+import com.lutfy.ticketfy.user.User;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import java.math.BigDecimal;
@@ -15,6 +19,9 @@ import java.util.UUID;
 
 @SpringBootTest
 public abstract class IntegrationTestBase {
+
+    protected static final String PROXY_SECRET = "test-proxy-secret-with-at-least-32-chars";
+    protected static final String FRONTEND_ORIGIN = "http://localhost:5173";
 
     static final PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:16-alpine");
 
@@ -29,10 +36,29 @@ public abstract class IntegrationTestBase {
         registry.add("spring.datasource.password", postgres::getPassword);
         registry.add("api.security.token.secret", () -> "test-secret-with-at-least-32-characters");
         registry.add("ticketfy.payout.job.enabled", () -> "false");
+        registry.add("ticketfy.auth.cleanup.enabled", () -> "false");
+        registry.add("ticketfy.auth.cookie-name", () -> "__Host-ticketfy_rt");
+        registry.add("ticketfy.auth.cookie-secure", () -> "true");
+        registry.add("ticketfy.auth.proxy-secret", () -> PROXY_SECRET);
     }
 
     @Autowired
     protected JdbcTemplate jdbc;
+
+    @Autowired
+    protected AuthSessionService authSessions;
+
+    protected String accessToken(User user) {
+        return authSessions.start(user).accessToken();
+    }
+
+    protected static RequestPostProcessor fromFrontend() {
+        return request -> {
+            request.addHeader("Origin", FRONTEND_ORIGIN);
+            request.addHeader(AuthOriginFilter.HEADER, "1");
+            return request;
+        };
+    }
 
     protected UUID insertUser(String role) {
         var id = UUID.randomUUID();

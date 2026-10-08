@@ -1,7 +1,6 @@
 package com.lutfy.ticketfy.infra.exception;
 
 import com.lutfy.ticketfy.IntegrationTestBase;
-import com.lutfy.ticketfy.infra.security.TokenService;
 import com.lutfy.ticketfy.user.UserRepository;
 import jakarta.servlet.DispatcherType;
 import jakarta.servlet.RequestDispatcher;
@@ -39,8 +38,6 @@ class ErrorHandlingIntegrationTest extends IntegrationTestBase {
     @Autowired
     private UserRepository userRepository;
 
-    @Autowired
-    private TokenService tokenService;
 
     @Test
     void malformedJsonReturnsGenericBadRequest() throws Exception {
@@ -95,13 +92,13 @@ class ErrorHandlingIntegrationTest extends IntegrationTestBase {
                         .content("{\"name\":\"Ana\",\"email\":\"" + email + "\",\"password\":\"senhaCorreta123\"}"))
                 .andExpect(status().isCreated());
 
-        var wrongPassword = mockMvc.perform(post("/login").with(remoteAddr("10.0.7.1"))
+        var wrongPassword = mockMvc.perform(post("/auth/login").with(fromFrontend()).with(remoteAddr("10.0.7.1"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"email\":\"" + email + "\",\"password\":\"senhaErrada123\"}"))
                 .andExpect(status().isUnauthorized())
                 .andReturn().getResponse().getContentAsString();
 
-        var unknownEmail = mockMvc.perform(post("/login").with(remoteAddr("10.0.7.2"))
+        var unknownEmail = mockMvc.perform(post("/auth/login").with(fromFrontend()).with(remoteAddr("10.0.7.2"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"email\":\"nobody." + UUID.randomUUID() + "@mail.com\",\"password\":\"senhaErrada123\"}"))
                 .andExpect(status().isUnauthorized())
@@ -110,7 +107,7 @@ class ErrorHandlingIntegrationTest extends IntegrationTestBase {
         assertThat(unknownEmail).isEqualTo(wrongPassword).contains("\"detail\":\"Invalid credentials\"")
                 .contains("\"type\":\"" + PROBLEMS + "invalid-credentials\"");
 
-        mockMvc.perform(post("/login").with(remoteAddr("10.0.7.3"))
+        mockMvc.perform(post("/auth/login").with(fromFrontend()).with(remoteAddr("10.0.7.3"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"email\":\"" + email + "\",\"password\":\"senhaCorreta123\"}"))
                 .andExpect(status().isOk())
@@ -201,6 +198,6 @@ class ErrorHandlingIntegrationTest extends IntegrationTestBase {
     }
 
     private String tokenFor(UUID userId) {
-        return "Bearer " + tokenService.generateToken(userRepository.findById(userId).orElseThrow());
+        return "Bearer " + accessToken(userRepository.findById(userId).orElseThrow());
     }
 }

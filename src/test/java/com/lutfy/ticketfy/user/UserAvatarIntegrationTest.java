@@ -1,7 +1,6 @@
 package com.lutfy.ticketfy.user;
 
 import com.lutfy.ticketfy.IntegrationTestBase;
-import com.lutfy.ticketfy.infra.security.TokenService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,8 +27,6 @@ class UserAvatarIntegrationTest extends IntegrationTestBase {
     @Autowired
     private UserRepository userRepository;
 
-    @Autowired
-    private TokenService tokenService;
 
     private UUID userId;
     private String token;
@@ -37,7 +34,7 @@ class UserAvatarIntegrationTest extends IntegrationTestBase {
     @BeforeEach
     void setUp() {
         userId = insertUser("USER");
-        token = "Bearer " + tokenService.generateToken(userRepository.findById(userId).orElseThrow());
+        token = "Bearer " + accessToken(userRepository.findById(userId).orElseThrow());
     }
 
     @Test

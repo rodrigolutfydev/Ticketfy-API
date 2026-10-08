@@ -89,14 +89,20 @@ O raciocínio completo de cada decisão está no documento de arquitetura do pro
 
 Rotas protegidas exigem o header `Authorization: Bearer <token>`. Datas trafegam em ISO 8601 UTC: `"2026-12-10T23:00:00Z"` é 20h em Brasília.
 
+O access token vale 10 minutos. O refresh token nunca aparece no corpo: ele vai no cookie `__Host-ticketfy_rt` (`HttpOnly`, `Secure`, `SameSite=Strict`), vale 30 minutos sem uso e é trocado a cada renovação; reapresentar um refresh token já usado encerra a sessão. A sessão dura no máximo 12 horas. Todo `POST /auth/**` exige o header `Origin` igual a uma das origens de `CORS_ALLOWED_ORIGINS` e o header `X-Ticketfy-Auth: 1`; sem isso, a resposta é 403 `auth-request-rejected`.
+
 ### Usuários e autenticação
 
 | Método | Endpoint | Descrição | Acesso |
 |---|---|---|---|
 | POST | `/users` | Cadastra um usuário | Público |
-| POST | `/login` | Autentica e retorna um token JWT | Público |
+| POST | `/auth/login` | Autentica, cria uma sessão, devolve o access token e grava o cookie do refresh token | Público |
+| POST | `/auth/refresh` | Troca o refresh token do cookie por um novo e devolve outro access token; 401 `session-expired` se a sessão acabou | Público (cookie) |
+| POST | `/auth/logout` | Encerra a sessão do cookie e apaga o cookie; responde 204 mesmo sem cookie | Público (cookie) |
+| POST | `/auth/logout-all` | Encerra todas as sessões do usuário, em todos os dispositivos | Autenticado |
 | GET | `/users/me` | Dados e papel do usuário autenticado | Autenticado |
-| POST | `/users/me/organizer` | Torna o usuário organizador e devolve um token novo | Autenticado |
+| PATCH | `/users/me/password` | Troca a senha (exige a atual), encerra todas as sessões e abre uma nova para este dispositivo | Autenticado |
+| POST | `/users/me/organizer` | Torna o usuário organizador; responde 204 e o token atual continua valendo (o papel é lido do banco a cada requisição) | Autenticado |
 
 ### Eventos — `/events`
 
@@ -232,13 +238,48 @@ POST /users
 
 **Login**
 ```json
-POST /login
+POST /auth/login
+Origin: http://localhost:5173
+X-Ticketfy-Auth: 1
 
 {
   "email": "ana@email.com",
   "password": "senhaForte123"
 }
 ```
+
+Resposta `200`, com o refresh token só no cookie:
+```json
+Set-Cookie: __Host-ticketfy_rt=<refresh token>; Path=/; Max-Age=1800; Secure; HttpOnly; SameSite=Strict
+
+{
+  "token": "<access token JWT>",
+  "expiresIn": 600
+}
+```
+
+**Renovar o access token**
+```json
+POST /auth/refresh
+Origin: http://localhost:5173
+X-Ticketfy-Auth: 1
+Cookie: __Host-ticketfy_rt=<refresh token>
+```
+
+A resposta tem o mesmo formato do login e grava um cookie novo. `POST /auth/logout` usa os mesmos headers e responde `204`. `POST /auth/logout-all` usa os mesmos headers e também o `Authorization: Bearer <token>`.
+
+**Trocar a senha**
+```json
+PATCH /users/me/password
+Authorization: Bearer <token>
+
+{
+  "currentPassword": "senhaForte123",
+  "newPassword": "outraSenhaForte456"
+}
+```
+
+Senha atual errada responde 403 `invalid-password`; cinco erros em 15 minutos, 429. Em caso de sucesso, a resposta tem o mesmo formato do login.
 
 **Criar evento** (depois de `POST /users/me/organizer`)
 ```json

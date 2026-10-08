@@ -22,17 +22,20 @@ import java.util.concurrent.atomic.AtomicInteger;
 @Component
 public class LoginRateLimitFilter extends OncePerRequestFilter {
 
-    private static final RequestMatcher LOGIN = PathPatternRequestMatcher.withDefaults().matcher(HttpMethod.POST, "/login");
+    private static final RequestMatcher LOGIN = PathPatternRequestMatcher.withDefaults().matcher(HttpMethod.POST, "/auth/login");
 
     private final int maxAttempts;
     private final long windowMillis;
     private final Map<String, Window> attempts = new ConcurrentHashMap<>();
     private final ProblemDetailResponseWriter writer;
+    private final ClientAddressResolver clientAddressResolver;
 
     public LoginRateLimitFilter(@Value("${ticketfy.login.max-attempts}") int maxAttempts,
                                 @Value("${ticketfy.login.window-seconds}") long windowSeconds,
-                                ProblemDetailResponseWriter writer) {
+                                ProblemDetailResponseWriter writer,
+                                ClientAddressResolver clientAddressResolver) {
         this.writer = writer;
+        this.clientAddressResolver = clientAddressResolver;
         this.maxAttempts = maxAttempts;
         this.windowMillis = windowSeconds * 1000;
     }
@@ -47,7 +50,7 @@ public class LoginRateLimitFilter extends OncePerRequestFilter {
                                     HttpServletResponse response,
                                     FilterChain chain) throws ServletException, IOException {
         long now = System.currentTimeMillis();
-        var window = attempts.compute(request.getRemoteAddr(), (ip, current) ->
+        var window = attempts.compute(clientAddressResolver.resolve(request), (ip, current) ->
                 current == null || now - current.start() >= windowMillis
                         ? new Window(now, new AtomicInteger())
                         : current);

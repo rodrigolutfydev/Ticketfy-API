@@ -2,7 +2,6 @@ package com.lutfy.ticketfy.infra.logging;
 
 import com.lutfy.ticketfy.IntegrationTestBase;
 import com.lutfy.ticketfy.event.EventService;
-import com.lutfy.ticketfy.infra.security.TokenService;
 import com.lutfy.ticketfy.user.UserRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -39,8 +38,6 @@ class RequestIdIntegrationTest extends IntegrationTestBase {
     @Autowired
     private MockMvc mockMvc;
 
-    @Autowired
-    private TokenService tokenService;
 
     @Autowired
     private UserRepository userRepository;
@@ -179,7 +176,8 @@ class RequestIdIntegrationTest extends IntegrationTestBase {
     }
 
     private ResultActions badLogin(String address) throws Exception {
-        return mockMvc.perform(post(URI.create("/login"))
+        return mockMvc.perform(post(URI.create("/auth/login"))
+                .with(fromFrontend())
                 .with(request -> {
                     request.setRemoteAddr(address);
                     return request;
@@ -189,7 +187,7 @@ class RequestIdIntegrationTest extends IntegrationTestBase {
     }
 
     private String bearer(UUID userId) {
-        return "Bearer " + tokenService.generateToken(userRepository.findById(userId).orElseThrow());
+        return "Bearer " + accessToken(userRepository.findById(userId).orElseThrow());
     }
 
     private static String requestIdOf(MvcResult result) {

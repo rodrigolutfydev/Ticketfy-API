@@ -63,6 +63,10 @@ public class User implements UserDetails {
         this.role = Role.ORGANIZER;
     }
 
+    public void changePassword(String encodedPassword) {
+        this.password = encodedPassword;
+    }
+
     public void changeAvatar(String url) {
         this.avatarUrl = (url == null || url.isBlank()) ? null : url;
     }

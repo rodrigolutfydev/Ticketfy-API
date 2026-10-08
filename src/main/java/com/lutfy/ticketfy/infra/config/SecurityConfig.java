@@ -1,6 +1,7 @@
 package com.lutfy.ticketfy.infra.config;
 
 import com.lutfy.ticketfy.infra.logging.RequestIdFilter;
+import com.lutfy.ticketfy.infra.security.AuthOriginFilter;
 import com.lutfy.ticketfy.infra.security.JsonAccessDeniedHandler;
 import com.lutfy.ticketfy.infra.security.JsonAuthenticationEntryPoint;
 import com.lutfy.ticketfy.infra.security.SecurityFilter;
@@ -56,7 +57,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/events/mine").authenticated()
                         .requestMatchers(HttpMethod.GET, "/events", "/events/*").permitAll()
                         .requestMatchers(HttpMethod.GET, "/events/*/ticket-types").permitAll()
-                        .requestMatchers("/login", "/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/auth/login", "/auth/refresh", "/auth/logout").permitAll()
+                        .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
                         .requestMatchers(HttpMethod.GET, "/actuator/health").permitAll()
                         .anyRequest().authenticated()
                 )
@@ -70,7 +72,7 @@ public class SecurityConfig {
         var config = new CorsConfiguration();
         config.setAllowedOrigins(allowedOrigins);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        config.setAllowedHeaders(List.of("Authorization", "Content-Type", "Idempotency-Key"));
+        config.setAllowedHeaders(List.of("Authorization", "Content-Type", "Idempotency-Key", AuthOriginFilter.HEADER));
         config.setExposedHeaders(List.of("Retry-After", RequestIdFilter.HEADER));
         config.setMaxAge(3600L);
 

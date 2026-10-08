@@ -13,6 +13,8 @@ public enum ProblemType {
     UNSUPPORTED_MEDIA_TYPE("unsupported-media-type", "Unsupported media type", HttpStatus.UNSUPPORTED_MEDIA_TYPE),
     INVALID_CREDENTIALS("invalid-credentials", "Invalid credentials", HttpStatus.UNAUTHORIZED),
     AUTHENTICATION_REQUIRED("authentication-required", "Authentication required", HttpStatus.UNAUTHORIZED),
+    SESSION_EXPIRED("session-expired", "Session expired", HttpStatus.UNAUTHORIZED),
+    AUTH_REQUEST_REJECTED("auth-request-rejected", "Auth request rejected", HttpStatus.FORBIDDEN),
     ACCESS_DENIED("access-denied", "Access denied", HttpStatus.FORBIDDEN),
     TOO_MANY_LOGIN_ATTEMPTS("too-many-login-attempts", "Too many login attempts", HttpStatus.TOO_MANY_REQUESTS),
     INTERNAL_ERROR("internal-error", "Internal server error", HttpStatus.INTERNAL_SERVER_ERROR),

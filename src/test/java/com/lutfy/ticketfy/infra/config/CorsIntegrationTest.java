@@ -61,29 +61,41 @@ class CorsIntegrationTest extends IntegrationTestBase {
     void rateLimitedLoginExposesRetryAfterToTheBrowser() throws Exception {
         var address = "10.0.8." + (UUID.randomUUID().hashCode() & 0xff);
         for (int i = 0; i < 5; i++) {
-            mockMvc.perform(post("/login")
+            mockMvc.perform(post("/auth/login")
+                            .with(fromFrontend())
                             .with(request -> {
                                 request.setRemoteAddr(address);
                                 return request;
                             })
-                            .header("Origin", FRONTEND)
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("{\"email\":\"nobody@mail.com\",\"password\":\"wrong-password\"}"))
                     .andReturn();
         }
 
-        mockMvc.perform(post("/login")
+        mockMvc.perform(post("/auth/login")
+                        .with(fromFrontend())
                         .with(request -> {
                             request.setRemoteAddr(address);
                             return request;
                         })
-                        .header("Origin", FRONTEND)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"email\":\"nobody@mail.com\",\"password\":\"wrong-password\"}"))
                 .andExpect(status().isTooManyRequests())
                 .andExpect(header().exists("Retry-After"))
                 .andExpect(header().string("Access-Control-Allow-Origin", FRONTEND))
                 .andExpect(header().string("Access-Control-Expose-Headers", containsString("Retry-After")));
+    }
+
+    @Test
+    void preflightAllowsTheAuthHeader() throws Exception {
+        mockMvc.perform(options("/auth/login")
+                        .header("Origin", FRONTEND)
+                        .header("Access-Control-Request-Method", "POST")
+                        .header("Access-Control-Request-Headers", "Content-Type, X-Ticketfy-Auth"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Access-Control-Allow-Origin", FRONTEND))
+                .andExpect(header().string("Access-Control-Allow-Headers", containsStringIgnoringCase("X-Ticketfy-Auth")))
+                .andExpect(header().doesNotExist("Access-Control-Allow-Credentials"));
     }
 
     @Test
