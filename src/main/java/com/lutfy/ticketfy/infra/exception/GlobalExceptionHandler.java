@@ -2,6 +2,7 @@ package com.lutfy.ticketfy.infra.exception;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.core.PropertyReferenceException;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
@@ -115,6 +116,11 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ProblemDetail> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
         return problems.response(ProblemType.INVALID_PARAMETER,
                 "Invalid value for parameter '" + ex.getName() + "'");
+    }
+
+    @ExceptionHandler(PropertyReferenceException.class)
+    public ResponseEntity<ProblemDetail> handlePropertyReference(PropertyReferenceException ex) {
+        return problems.response(ProblemType.INVALID_PARAMETER, "Invalid value for parameter 'sort'");
     }
 
     @ExceptionHandler(TicketTypeNotFoundException.class)
