@@ -6,23 +6,92 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
 
     steps:
       - name: Baixar o código
-        uses: actions/checkout@v5
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Instalar Java 17
-        uses: actions/setup-java@v5
+      - name: Ler a versão do Java do pom.xml
+        id: java
+        run: echo "version=$(sed -n 's:.*<java.version>\(.*\)</java.version>.*:\1:p' pom.xml)" >> "$GITHUB_OUTPUT"
+
+      - name: Instalar o Java
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: ${{ steps.java.outputs.version }}
           cache: maven
 
-      - name: Dar permissão ao Maven Wrapper
-        run: chmod +x mvnw
+      - name: Rodar testes e cobertura
+        run: ./mvnw -B verify
 
-      - name: Rodar os testes
-        run: ./mvnw -B test
+      - name: Publicar relatórios como artefato
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: relatorios-testes-cobertura
+          path: |
+            target/surefire-reports/
+            target/site/jacoco/
+          retention-days: 14
+          if-no-files-found: warn
+
+      - name: Gerar selo de cobertura
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          pct=$(awk -F, 'NR>1 { m += $8; c += $9 } END { printf "%d", (100 * c / (m + c)) }' target/site/jacoco/jacoco.csv)
+          if [ "$pct" -ge 90 ]; then color="#4c1"
+          elif [ "$pct" -ge 80 ]; then color="#97ca00"
+          elif [ "$pct" -ge 70 ]; then color="#dfb317"
+          else color="#e05d44"; fi
+          mkdir -p _site/badges
+          cp -r target/site/jacoco _site/jacoco
+          cat > _site/badges/coverage.svg <<EOF
+          <svg xmlns="http://www.w3.org/2000/svg" width="104" height="20" role="img" aria-label="coverage: ${pct}%">
+            <title>coverage: ${pct}%</title>
+            <linearGradient id="s" x2="0" y2="100%"><stop offset="0" stop-color="#bbb" stop-opacity=".1"/><stop offset="1" stop-opacity=".1"/></linearGradient>
+            <clipPath id="r"><rect width="104" height="20" rx="3" fill="#fff"/></clipPath>
+            <g clip-path="url(#r)"><rect width="63" height="20" fill="#555"/><rect x="63" width="41" height="20" fill="${color}"/><rect width="104" height="20" fill="url(#s)"/></g>
+            <g fill="#fff" text-anchor="middle" font-family="Verdana,Geneva,DejaVu Sans,sans-serif" font-size="11">
+              <text x="31.5" y="15" fill="#010101" fill-opacity=".3">coverage</text><text x="31.5" y="14">coverage</text>
+              <text x="83.5" y="15" fill="#010101" fill-opacity=".3">${pct}%</text><text x="83.5" y="14">${pct}%</text>
+            </g>
+          </svg>
+          EOF
+
+      - name: Preparar publicação no Pages
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: _site/
+
+  coverage-badge:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      pages: write
+      id-token: write
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+
+    steps:
+      - name: Publicar selo e relatório no Pages
+        id: deploy
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

@@ -1,5 +1,8 @@
 # Ticketfy API
 
+[![CI](https://github.com/rodrigolutfydev/Ticketfy-API/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/rodrigolutfydev/Ticketfy-API/actions/workflows/ci.yml)
+[![Cobertura](https://rodrigolutfydev.github.io/Ticketfy-API/badges/coverage.svg)](https://rodrigolutfydev.github.io/Ticketfy-API/jacoco/)
+
 API REST de venda de ingressos para eventos, construída com Java e Spring Boot. O projeto simula o backend de uma plataforma : organizadores publicam eventos e lotes, compradores fazem pedidos e pagam, e cada ingresso recebe um código único validado na entrada.
 
 O foco está nos problemas reais de um sistema de ingressos: duas pessoas comprando a última vaga ao mesmo tempo, clique duplo, reserva abandonada, pagamento no instante da expiração e o mesmo ingresso lido por dois porteiros. Cada caso tem uma garantia no banco de dados, e não só um `if` no Java.
