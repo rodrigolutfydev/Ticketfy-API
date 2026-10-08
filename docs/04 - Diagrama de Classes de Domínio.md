@@ -4,25 +4,20 @@ Oct 7, 2026
 
 ## Fonte da modelagem
 
-O código-fonte completo não foi analisado diretamente. A modelagem combina o que já está implementado no repositório (domínio `user`) com a estrutura planejada de pacotes e os requisitos do projeto. Cada classe e atributo indica sua origem.
+Esta versão foi revisada contra o código, que é a fonte de verdade. Todas as classes descritas aqui existem no repositório: entidades JPA, enums e a tabela de auditoria, gravada por JDBC. A versão original combinava o domínio `user`, único implementado na época, com classes planejadas; as diferenças entre aquele modelo e o atual estão na seção "Conflitos identificados".
 
 | Origem | Significado | Classes |
 | --- | --- | --- |
-| Implementada | Existe no código do repositório. | `User`, `Role` |
-| Planejada | O pacote está previsto na estrutura do projeto; os atributos vêm dos requisitos e regras de negócio. | `Venue`, `Event`, `TicketType`, `Order`, `Payment`, `Ticket` |
-| Proposta | Não há pacote próprio; a classe é necessária para atender requisitos já aprovados e precisa ser confirmada. | `OrderItem` e os enums de status |
-
-**O que já está implementado no domínio `user`**
-
-- `Role` (enum) com os valores `USER` e `ADMIN`.
-- `User` (entidade JPA, tabela `users`) com `id`, `role`, `name`, `email` e `password`. A senha chega ao construtor já criptografada com BCrypt, e o `role` é definido pelo service, nunca pelo cliente da API.
-- `UserRepository`, `UserService`, `UserController`, `UserRegistrationDTO` e `UserDetailsDTO`.
+| Entidade | Classe `@Entity` mapeada para uma tabela. | `User`, `Event`, `TicketType`, `Order`, `OrderItem`, `Payment`, `Ticket`, `TicketTransfer`, `Coupon`, `AuthSession`, `RefreshToken`, `LedgerEntry`, `PayoutAccount`, `Payout`, `PayoutBlock` |
+| Tabela sem entidade | Tabela gravada e lida por JDBC, sem classe JPA. | `audit_log` |
+| Enum | Conjunto fechado de valores, gravado como texto e protegido por CHECK no banco. | `Role`, `OrderStatus`, `PaymentMethod`, `PaymentStatus`, `TicketStatus`, `DiscountType`, `RevocationReason`, `LedgerEntryType`, `PayoutStatus`, `DocumentType`, `PixKeyType`, `AuditAction`, `AuditActorType`, `AuditTargetType` |
 
 **Convenções**
 
 - Nomes de classes e atributos em inglês, como no código do projeto.
-- O tipo do `id` não foi confirmado (`Long` ou `UUID`) e aparece como `Long` neste documento; ver conflito C08.
-- Valores monetários usam `BigDecimal`, e datas usam `LocalDateTime`.
+- Os identificadores são `UUID`, gerados pelo banco (`gen_random_uuid()`) ou pela aplicação.
+- Valores monetários usam `BigDecimal` (`NUMERIC(10,2)` no banco), e datas usam `Instant` (`TIMESTAMPTZ`).
+- Os enums são gravados como texto (`@Enumerated(EnumType.STRING)`).
 
 ## Camadas: o que entra no diagrama de domínio
 
@@ -34,12 +29,12 @@ O diagrama de classes de domínio mostra apenas entidades e enums, porque são e
 | Enums | Conjuntos fechados de valores usados pelas entidades, como perfis e status. | Sim, com estereótipo «enumeration» | Diagrama de classes de domínio |
 | DTOs (records) | Contratos de entrada e saída da API. Evitam expor campos como `password` e impedem que o cliente defina campos como `role`. | Não | Diagrama de classes por módulo ou documentação da API (OpenAPI) |
 | Services | Lógica de negócio que envolve mais de uma entidade e o controle de transações. | Não | Diagrama de classes por módulo ou diagrama de sequência |
-| Repositories | Acesso aos dados via Spring Data JPA. | Não | Diagrama de classes por módulo |
+| Repositories | Acesso aos dados via Spring Data JPA, incluindo os `UPDATE` condicionais de reserva, check-in e transferência. | Não | Diagrama de classes por módulo |
 | Controllers | Exposição dos endpoints REST. | Não | Diagrama de classes por módulo ou de componentes |
 
 ### Exemplo real: módulo `user` em camadas
 
-O módulo `user` já implementado mostra como as camadas se relacionam por dependência. Este diagrama é separado do diagrama de domínio.
+O módulo `user` mostra como as camadas se relacionam por dependência. Este diagrama é separado do diagrama de domínio.
 
 ```plantuml
 @startuml user-module-layers
@@ -48,13 +43,21 @@ hide empty members
 
 package "com.lutfy.ticketfy.user" {
   class UserController <<RestController>> {
-    + register(data: UserRegistrationDTO): ResponseEntity<UserDetailsDTO>
+    + register(dto: UserRegistrationDTO): ResponseEntity<UserDetailsDTO>
+    + me(user: User): ResponseEntity<UserDetailsDTO>
+    + updateAvatar(user: User, dto: UserAvatarUpdateDTO): ResponseEntity<UserDetailsDTO>
+    + changePassword(user: User, dto: PasswordChangeDTO): ResponseEntity<LoginResponseDTO>
+    + becomeOrganizer(user: User): ResponseEntity<Void>
   }
   class UserService <<Service>> {
     + register(data: UserRegistrationDTO): User
+    + becomeOrganizer(user: User): void
+    + changePassword(userId: UUID, dto: PasswordChangeDTO): IssuedSession
+    + updateAvatar(userId: UUID, dto: UserAvatarUpdateDTO): UserDetailsDTO
   }
   interface UserRepository <<Repository>> {
     + findByEmail(email: String): Optional<User>
+    + findForUpdate(id: UUID): Optional<User>
   }
   class UserRegistrationDTO <<record>> {
     name: String
@@ -62,9 +65,11 @@ package "com.lutfy.ticketfy.user" {
     password: String
   }
   class UserDetailsDTO <<record>> {
-    id: Long
+    id: UUID
     name: String
     email: String
+    role: Role
+    avatarUrl: String
   }
   class User <<Entity>>
 }
@@ -78,161 +83,263 @@ UserRepository ..> User
 @enduml
 ```
 
-As setas tracejadas são dependências: cada camada usa a seguinte, mas não guarda referência de negócio a ela. A assinatura exata dos métodos deve ser conferida no código.
+As setas tracejadas são dependências: cada camada usa a seguinte, mas não guarda referência de negócio a ela. A troca de senha devolve uma sessão nova, porque revoga todas as anteriores; o `IssuedSession` vem do pacote `auth`.
 
 ## 1 e 2. Classes e responsabilidades
 
-O domínio tem 8 entidades e 6 enums. "Organizador", "Participante" e "Validação" não viraram classes próprias; a justificativa está logo abaixo da tabela.
+O domínio tem 15 entidades, 1 tabela sem entidade e 14 enums, organizados em quatro blocos: catálogo, vendas, financeiro do organizador e segurança e auditoria. "Organizador", "Participante", "Local" e "Validação" não viraram classes próprias; a justificativa está logo abaixo da tabela.
 
-| Classe | Tipo | Origem | Pacote | Responsabilidade |
-| --- | --- | --- | --- | --- |
-| `User` | Entidade | Implementada | `user` | Representar qualquer pessoa com conta: cliente, organizador ou administrador. Guarda credenciais e perfil de acesso. |
-| `Role` | Enum | Implementada (incompleto) | `user` | Definir o perfil de acesso do usuário. |
-| `Venue` | Entidade | Planejada | `venue` | Representar o local onde os eventos acontecem (RF05). |
-| `Event` | Entidade | Planejada | `event` | Representar um evento, seu período, seu organizador, seu local e o limite de ingressos por pedido, e controlar se está aberto para vendas (RF06, RF07, RN09, RN13). |
-| `EventStatus` | Enum | Proposta | `event` | Indicar se o evento está aberto ou encerrado para vendas. |
-| `TicketType` | Entidade | Planejada | `tickettype` | Representar uma categoria de ingresso de um evento, com preço e estoque, e controlar reservas e disponibilidade (RF09, RF10, RN10 a RN12). |
-| `Order` | Entidade | Planejada | `order` | Representar a compra de um cliente, consolidar o valor total e controlar o prazo de 15 minutos da reserva (RF11, RN12). |
-| `OrderItem` | Entidade | Proposta | `order` | Registrar quantos ingressos de cada tipo foram comprados e o preço unitário no momento da compra (RN14). |
-| `OrderStatus` | Enum | Proposta | `order` | Indicar a situação do pedido: aguardando pagamento, pago, pagamento recusado ou expirado. |
-| `Payment` | Entidade | Planejada | `payment` | Registrar cada tentativa de pagamento de um pedido, o meio usado e o resultado informado pelo provedor (RF12, RN15). |
-| `PaymentMethod` | Enum | Proposta | `payment` | Indicar o meio de pagamento: cartão de crédito ou Pix (RF12). |
-| `PaymentStatus` | Enum | Proposta | `payment` | Indicar o resultado do pagamento. |
-| `Ticket` | Entidade | Planejada | `ticket` | Representar o ingresso individual emitido após o pagamento, com código único, e controlar cancelamento e validação (RF13, RF15, RF16). |
-| `TicketStatus` | Enum | Proposta | `ticket` | Indicar se o ingresso está válido, utilizado ou cancelado (RF14). |
+| Classe | Tipo | Pacote | Responsabilidade |
+| --- | --- | --- | --- |
+| `User` | Entidade | `user` | Representar qualquer pessoa com conta: cliente, organizador ou administrador. Guarda credenciais, perfil, foto e a data de exclusão da conta, e faz a promoção a organizador e a anonimização. |
+| `Role` | Enum | `user` | Definir o perfil de acesso do usuário. |
+| `Event` | Entidade | `event` | Representar um evento, seu local, seu período, seu organizador, o destaque na vitrine e o cancelamento (RF06, RF07). |
+| `TicketType` | Entidade | `tickettype` | Representar um lote de ingressos de um evento, com preço, estoque e limite por pedido (RF09, RF10, RN10 a RN13). |
+| `Coupon` | Entidade | `coupon` | Representar um cupom de desconto de um evento, com tipo, valor, validade e controle de usos (RF19). |
+| `DiscountType` | Enum | `coupon` | Indicar se o desconto é percentual ou de valor fixo. |
+| `Order` | Entidade | `order` | Representar a compra de um usuário, congelar subtotal, desconto, total, taxa da plataforma e valor líquido, e controlar o prazo da reserva (RF11, RN12, RN14). |
+| `OrderItem` | Entidade | `order` | Registrar quantos ingressos de cada tipo foram comprados e o preço unitário no momento da compra (RN14). |
+| `OrderStatus` | Enum | `order` | Indicar a situação do pedido. |
+| `Payment` | Entidade | `payment` | Registrar o pagamento de um pedido, o meio usado, a aprovação e o reembolso (RF12, RN15). |
+| `PaymentMethod` | Enum | `payment` | Indicar o meio de pagamento. |
+| `PaymentStatus` | Enum | `payment` | Indicar o resultado do pagamento. |
+| `Ticket` | Entidade | `ticket` | Representar o ingresso individual emitido, com código único e dono atual, e controlar check-in, cancelamento e transferências (RF13, RF16, RF20). |
+| `TicketStatus` | Enum | `ticket` | Indicar se o ingresso está válido, utilizado ou cancelado (RF14). |
+| `TicketTransfer` | Entidade | `ticket` | Registrar de forma imutável cada transferência de ingresso: de quem, para quem e quando (RF20). |
+| `AuthSession` | Entidade | `auth` | Representar uma sessão de login, com validade absoluta e revogação (RF24). |
+| `RefreshToken` | Entidade | `auth` | Guardar o hash de cada refresh token da sessão e a cadeia de rotação. |
+| `RevocationReason` | Enum | `auth` | Indicar por que uma sessão foi revogada. |
+| `LedgerEntry` | Entidade | `payout.ledger` | Registrar de forma imutável cada crédito e débito no extrato do organizador (RF22). |
+| `LedgerEntryType` | Enum | `payout.ledger` | Indicar o tipo do lançamento. |
+| `PayoutAccount` | Entidade | `payout.account` | Guardar os dados de recebimento do organizador, com documento e chave Pix cifrados. |
+| `DocumentType` | Enum | `payout.account` | Indicar se o documento é CPF ou CNPJ. |
+| `PixKeyType` | Enum | `payout.account` | Indicar o tipo da chave Pix. |
+| `Payout` | Entidade | `payout.withdrawal` | Representar um saque do organizador, com cópia do destino, análise e ciclo de processamento. |
+| `PayoutStatus` | Enum | `payout.withdrawal` | Indicar a situação do saque. |
+| `PayoutBlock` | Entidade | `payout.admin` | Registrar o bloqueio de saques de um organizador por um administrador. |
+| `audit_log` | Tabela sem entidade | `audit` | Registrar de forma imutável as ações sensíveis, com autor, ação, alvo, detalhes e o identificador da requisição ou da rotina (RF23). |
+| `AuditAction`, `AuditActorType`, `AuditTargetType` | Enums | `audit` | Indicar a ação auditada, se o autor é um usuário ou o sistema, e o tipo do alvo. |
 
 **Conceitos que não viraram classes**
 
-- **Organizador:** é um `User` com perfil de organizador. Não há atributos exclusivos de organizador nos requisitos, então uma subclasse não se justifica (ver seção 4 a 6, Herança).
-- **Participante:** é o cliente dono de um ingresso válido de um evento. A lista de participantes (RF17) é uma consulta sobre `Ticket`, `OrderItem` e `Order`, não uma entidade.
-- **Validação:** é uma operação sobre o ingresso (`Ticket.validate`), que muda seu status para utilizado (RN21). Não há dados próprios que exijam uma classe.
+- **Organizador:** é um `User` com perfil `ORGANIZER`. Os dados exclusivos de organizador (dados de recebimento, bloqueio de saques) ficam em `PayoutAccount` e `PayoutBlock`, associados 1 para 0..1 a `User`, como a versão original recomendava, sem subclasse.
+- **Participante:** é o dono (`owner`) de um ingresso válido de um evento. A lista de participantes por ingresso (RF17) não está implementada; o organizador vê os pedidos e os totais de check-in.
+- **Local:** o local do evento (`venueName`, `address`, `city`, `state`) é um conjunto de atributos de `Event`, e não uma entidade.
+- **Validação:** é o check-in, uma operação sobre o ingresso que muda seu status para `USED` (RN21). É feita por um `UPDATE` condicional no repository, e não por um método da entidade, para que duas leituras simultâneas do mesmo código não validem duas vezes.
 
 ## 3. Atributos e métodos
 
-Apenas os atributos de `User` foram confirmados no código. Os demais seguem o mínimo exigido pelos requisitos; cada um indica a regra ou o requisito que o justifica. Os relacionamentos aparecem como atributos de referência (por exemplo, `organizer: User`), como ficam nas entidades JPA.
+Os atributos abaixo são os do código. Os relacionamentos aparecem como atributos de referência (por exemplo, `organizer: User`) quando a entidade usa `@ManyToOne`, e como `UUID` quando a ligação existe só no banco, por chave estrangeira.
 
 ### Atributos
 
-| Classe | Atributo | Tipo | Origem |
+**Catálogo**
+
+| Classe | Atributo | Tipo | Observação |
 | --- | --- | --- | --- |
-| `User` | `id` | `Long` | Implementado (tipo a confirmar) |
-| `User` | `name` | `String` | Implementado |
-| `User` | `email` | `String` | Implementado; único (RN01) |
-| `User` | `password` | `String` | Implementado; hash BCrypt (RNF01) |
-| `User` | `role` | `Role` | Implementado (RN02) |
-| `User` | `active` | `boolean` | Não implementado; exigido por RN03 e RNF15 (conflito C03) |
-| `Venue` | `id`, `name`, `address` | `Long`, `String`, `String` | Premissa: mínimo para identificar um local (RF05) |
-| `Event` | `id`, `name`, `description` | `Long`, `String`, `String` | RF06 |
-| `Event` | `startDateTime`, `endDateTime` | `LocalDateTime` | RF06, RN07 |
-| `Event` | `maxTicketsPerOrder` | `int` | RF06, RN13: limite definido pelo organizador |
-| `Event` | `status` | `EventStatus` | RF07, RN09 |
+| `User` | `id` | `UUID` | |
+| `User` | `name`, `email`, `password` | `String` | E-mail único (RN01); senha com hash BCrypt (RNF01). |
+| `User` | `role` | `Role` | RN02 |
+| `User` | `avatarUrl` | `String` | Endereço https opcional. |
+| `User` | `createdAt`, `updatedAt` | `Instant` | |
+| `User` | `deletedAt` | `Instant` | Preenchido na exclusão da conta, que anonimiza nome, e-mail, foto e senha (RNF15). Não há campo de ativação (ver C03). |
+| `Event` | `id` | `UUID` | |
+| `Event` | `name`, `description`, `imageUrl` | `String` | RF06 |
+| `Event` | `venueName`, `address`, `city`, `state` | `String` | Local do evento; `state` é a UF com 2 letras. |
+| `Event` | `startsAt`, `endsAt` | `Instant` | RN07; `endsAt` é opcional. |
 | `Event` | `organizer` | `User` | RN04, RN08 |
-| `Event` | `venue` | `Venue` | RN08 |
-| `TicketType` | `id`, `name` | `Long`, `String` | RF09 |
-| `TicketType` | `price` | `BigDecimal` | RF09, RN10 |
-| `TicketType` | `totalQuantity`, `soldQuantity`, `reservedQuantity` | `int` | RN11, RN12 |
-| `TicketType` | `active` | `boolean` | RF09 (desativar tipo de ingresso) |
+| `Event` | `active` | `boolean` | Falso depois da exclusão lógica. |
+| `Event` | `featured` | `boolean` | Destaque na vitrine, definido pelo administrador. |
+| `Event` | `cancelledAt`, `cancellationReason` | `Instant`, `String` | RF07 |
+| `Event` | `createdAt`, `updatedAt` | `Instant` | |
+| `TicketType` | `id`, `name`, `description` | `UUID`, `String`, `String` | Nome único no evento (RN10). |
+| `TicketType` | `price` | `BigDecimal` | RN10 |
+| `TicketType` | `quantityTotal`, `quantitySold` | `Integer` | `quantitySold` inclui as unidades reservadas por pedidos pendentes (RN11, RN12). |
+| `TicketType` | `maxPerOrder` | `Integer` | Limite por pedido, opcional (RN13). |
+| `TicketType` | `active` | `Boolean` | Existe no banco, mas não há endpoint para desativar um lote (RF09). |
 | `TicketType` | `event` | `Event` | RN10 |
-| `Order` | `id` | `Long` | RF11 |
-| `Order` | `customer` | `User` | RF11, RN05 |
-| `Order` | `createdAt` | `LocalDateTime` | RF11 |
-| `Order` | `expiresAt` | `LocalDateTime` | RN12: fim da reserva, 15 minutos após a criação |
-| `Order` | `total` | `BigDecimal` | RN15 |
+| `Coupon` | `id`, `event`, `code` | `UUID`, `Event`, `String` | Código em maiúsculas, único no evento e imutável. |
+| `Coupon` | `discountType`, `discountValue` | `DiscountType`, `BigDecimal` | Percentual de 0 a 100, ou valor fixo positivo. |
+| `Coupon` | `maxUses`, `usesCount` | `Integer` | Limite opcional; o contador é alterado só por `UPDATE` condicional. |
+| `Coupon` | `startsAt`, `endsAt`, `active` | `Instant`, `Instant`, `Boolean` | Validade e ativação. |
+| `Coupon` | `firstUsedAt` | `Instant` | A partir dele, tipo e valor não mudam e o cupom não pode ser apagado. |
+
+**Vendas**
+
+| Classe | Atributo | Tipo | Observação |
+| --- | --- | --- | --- |
+| `Order` | `id`, `user` | `UUID`, `User` | RF11, RN05 |
 | `Order` | `status` | `OrderStatus` | RN12, RN16 |
+| `Order` | `subtotalAmount`, `discountAmount`, `totalAmount` | `BigDecimal` | `total = subtotal − desconto`, garantido por CHECK. |
+| `Order` | `couponId`, `couponCode` | `UUID`, `String` | Cupom aplicado e o código congelado. |
+| `Order` | `platformFeePercent`, `platformFee`, `netAmount` | `BigDecimal` | Taxa da plataforma copiada na criação; `net = total − taxa`. |
+| `Order` | `expiresAt` | `Instant` | Fim da reserva, 15 minutos após a criação (RN12). |
+| `Order` | `idempotencyKey` | `String` | Única no banco; evita pedido duplicado. |
 | `Order` | `items` | `List<OrderItem>` | RF11 |
-| `OrderItem` | `id`, `quantity` | `Long`, `int` | RF11, RN13 |
-| `OrderItem` | `unitPrice` | `BigDecimal` | RN14 |
-| `OrderItem` | `ticketType` | `TicketType` | RF11 |
-| `Payment` | `id` | `Long` | RF12 |
-| `Payment` | `method` | `PaymentMethod` | RF12: cartão de crédito ou Pix |
-| `Payment` | `amount` | `BigDecimal` | RN15 |
-| `Payment` | `status` | `PaymentStatus` | RF12 |
-| `Payment` | `providerTransactionId` | `String` | Identifica a transação no provedor de pagamento real (Q01) |
-| `Payment` | `createdAt` | `LocalDateTime` | RF12 |
-| `Payment` | `order` | `Order` | RN15 |
-| `Ticket` | `id` | `Long` | RF13 |
-| `Ticket` | `code` | `String` | RN17; o formato depende de Q04 |
-| `Ticket` | `status` | `TicketStatus` | RF14, RN18, RN21 |
-| `Ticket` | `issuedAt` | `LocalDateTime` | RF13 |
-| `Ticket` | `orderItem` | `OrderItem` | RF13 |
+| `Order` | `createdAt`, `updatedAt`, `version` | `Instant`, `Instant`, `Long` | `version` é o controle otimista (`@Version`). |
+| `OrderItem` | `id`, `order`, `ticketType` | `UUID`, `Order`, `TicketType` | |
+| `OrderItem` | `unitPrice`, `quantity` | `BigDecimal`, `Integer` | RN14 |
+| `Payment` | `id`, `order` | `UUID`, `Order` | RN15 |
+| `Payment` | `status`, `method`, `amount` | `PaymentStatus`, `PaymentMethod`, `BigDecimal` | RF12 |
+| `Payment` | `providerReference`, `approvedAt` | `String`, `Instant` | Referência no provedor; vazia no pagamento simulado. |
+| `Payment` | `refundedAt`, `refundReference` | `Instant`, `String` | Preenchidos no reembolso. |
+| `Ticket` | `id`, `code` | `UUID`, `String` | Código único de 16 caracteres (RN17), trocado a cada transferência. |
+| `Ticket` | `order`, `orderItem`, `ticketType` | `Order`, `OrderItem`, `TicketType` | Origem do ingresso. |
+| `Ticket` | `owner` | `User` | Dono atual; começa como o comprador e muda na transferência. |
+| `Ticket` | `status`, `usedAt` | `TicketStatus`, `Instant` | RN18, RN21 |
+| `Ticket` | `transferCount` | `int` | Limitado por `TICKET_TRANSFER_MAX_PER_TICKET`. |
+| `TicketTransfer` | `id`, `ticketId`, `fromUserId`, `toUserId`, `transferredAt` | `UUID`, `UUID`, `UUID`, `UUID`, `Instant` | Sem o código do ingresso; não aceita alteração nem exclusão. |
+
+**Financeiro do organizador**
+
+| Classe | Atributo | Tipo | Observação |
+| --- | --- | --- | --- |
+| `LedgerEntry` | `id`, `organizerId`, `type`, `amount`, `createdAt` | `UUID`, `UUID`, `LedgerEntryType`, `BigDecimal`, `Instant` | Créditos positivos, débitos negativos; não aceita alteração nem exclusão. |
+| `LedgerEntry` | `eventId`, `orderId` | `UUID` | Preenchidos nos lançamentos de venda e reembolso. |
+| `LedgerEntry` | `payoutId` | `UUID` | Preenchido nos lançamentos de saque e estorno. |
+| `PayoutAccount` | `organizerId` | `UUID` | Chave primária: um registro por organizador. |
+| `PayoutAccount` | `documentType`, `document`, `holderName` | `DocumentType`, `String`, `String` | `document` cifrado com AES-256-GCM. |
+| `PayoutAccount` | `pixKeyType`, `pixKey`, `keyChangedAt` | `PixKeyType`, `String`, `Instant` | `pixKey` cifrada; a troca bloqueia saques por um período. |
+| `PayoutAccount` | `createdAt`, `updatedAt`, `version` | `Instant`, `Instant`, `Long` | |
+| `Payout` | `id`, `organizerId`, `amount`, `status`, `idempotencyKey` | `UUID`, `UUID`, `BigDecimal`, `PayoutStatus`, `String` | Um único saque em andamento por organizador. |
+| `Payout` | `documentType`, `document`, `holderName`, `pixKeyType`, `pixKey` | — | Cópia do destino no momento do pedido, com documento e chave cifrados. |
+| `Payout` | `transferReference`, `failureReason`, `rejectionReason` | `String` | |
+| `Payout` | `reviewedBy`, `reviewedAt` | `UUID`, `Instant` | Administrador que aprovou ou recusou. |
+| `Payout` | `requestedAt`, `processingStartedAt`, `finishedAt`, `updatedAt`, `version` | `Instant`, `Long` | |
+| `PayoutBlock` | `organizerId`, `reason`, `blockedBy`, `blockedAt`, `version` | `UUID`, `String`, `UUID`, `Instant`, `Long` | Um registro por organizador bloqueado. |
+
+**Segurança e auditoria**
+
+| Classe | Atributo | Tipo | Observação |
+| --- | --- | --- | --- |
+| `AuthSession` | `id`, `user` | `UUID`, `User` | O `id` vai no access token (`sid`). |
+| `AuthSession` | `createdAt`, `lastUsedAt`, `expiresAt` | `Instant` | Limite absoluto de 12 horas. |
+| `AuthSession` | `revokedAt`, `revokedReason` | `Instant`, `RevocationReason` | |
+| `RefreshToken` | `id`, `session` | `UUID`, `AuthSession` | |
+| `RefreshToken` | `tokenHash` | `byte[]` | Hash SHA-256 do token, com 32 bytes e único; o token em si nunca é gravado. |
+| `RefreshToken` | `createdAt`, `expiresAt`, `usedAt`, `replacedBy` | `Instant`, `Instant`, `Instant`, `UUID` | Cadeia de rotação. |
+| `audit_log` | `id`, `actor_type`, `actor_id`, `action`, `target_type`, `target_id`, `details`, `correlation_id`, `created_at` | — | Tabela gravada pelo `AuditService` por JDBC; `details` em JSONB. |
 
 ### Enums
 
-| Enum | Valores | Origem |
-| --- | --- | --- |
-| `Role` | `USER`, `ADMIN` | Implementado. Falta `ORGANIZER` para atender os três perfis dos requisitos (conflito C01). |
-| `EventStatus` | `OPEN`, `CLOSED` | RF07, RN09. Um valor `CANCELLED` depende de Q07. |
-| `OrderStatus` | `PENDING_PAYMENT`, `PAID`, `PAYMENT_FAILED`, `EXPIRED` | RN12, RN16 |
-| `PaymentMethod` | `CREDIT_CARD`, `PIX` | RF12 |
-| `PaymentStatus` | `PENDING`, `APPROVED`, `REFUSED` | RF12 |
-| `TicketStatus` | `VALID`, `USED`, `CANCELLED` | RF14 |
+| Enum | Valores |
+| --- | --- |
+| `Role` | `USER`, `ORGANIZER`, `ADMIN` |
+| `OrderStatus` | `PENDING`, `PAID`, `EXPIRED`, `CANCELLED`, `REFUNDED` |
+| `PaymentMethod` | `SIMULATED`, `PIX`, `CREDIT_CARD` (só `SIMULATED` é usado hoje) |
+| `PaymentStatus` | `PENDING`, `APPROVED`, `REJECTED`, `REFUNDED` |
+| `TicketStatus` | `VALID`, `USED`, `CANCELLED` |
+| `DiscountType` | `PERCENT`, `FIXED` |
+| `RevocationReason` | `LOGOUT`, `LOGOUT_ALL`, `PASSWORD_CHANGED`, `REUSE_DETECTED`, `ACCOUNT_DELETED` |
+| `LedgerEntryType` | `SALE_CREDIT`, `REFUND_DEBIT`, `PAYOUT_DEBIT`, `PAYOUT_REVERSAL` |
+| `PayoutStatus` | `UNDER_REVIEW`, `REQUESTED`, `PROCESSING`, `PAID`, `FAILED`, `CANCELLED`, `REJECTED` |
+| `DocumentType` | `CPF`, `CNPJ` |
+| `PixKeyType` | `CPF`, `CNPJ`, `EMAIL`, `PHONE`, `RANDOM` |
+| `AuditActorType` | `USER`, `SYSTEM` |
+| `AuditTargetType` | `PAYOUT_ACCOUNT`, `PAYOUT`, `ORGANIZER`, `EVENT`, `TICKET_TYPE`, `USER`, `TICKET`, `COUPON` |
+| `AuditAction` | 24 ações: dados de recebimento, ciclo do saque, bloqueio de saques, destaque e cancelamento de evento, preço de lote, troca de senha, reuso de refresh token, transferência de ingresso, ciclo do cupom, exportação de dados e exclusão de conta. |
+
+O evento não tem enum de status: sua situação vem de `active`, `cancelledAt` e das datas.
 
 ### Métodos de domínio
 
-São listados apenas métodos que protegem uma regra de negócio dentro da própria entidade. Getters, setters e construtores foram omitidos.
+São listados apenas métodos que protegem uma regra de negócio dentro da própria entidade. Getters, setters e construtores foram omitidos. Regras que dependem de concorrência (reserva de estoque, consumo de cupom, check-in e transferência) ficam em `UPDATE` condicionais nos repositories, e não em métodos da entidade.
 
 | Classe | Método | Regra que protege |
 | --- | --- | --- |
-| `Event` | `isOpenForSales(): boolean` | RN09 |
-| `Event` | `close(): void` | RF07 |
-| `TicketType` | `getAvailableQuantity(): int` | RN12: total − vendidos − reservados |
-| `TicketType` | `reserve(quantity: int): void` | RN12, RN13: recusa reserva acima do disponível |
-| `TicketType` | `confirmSale(quantity: int): void` | RN16: converte a reserva em venda após o pagamento |
-| `TicketType` | `releaseReservation(quantity: int): void` | RN12: devolve unidades de reserva expirada |
-| `TicketType` | `release(quantity: int): void` | RN18: devolve unidades de ingresso cancelado |
-| `Order` | `calculateTotal(): BigDecimal` | RN15 |
-| `Order` | `isExpired(now: LocalDateTime): boolean` | RN12 |
-| `Order` | `expire(): void` | RN12 |
-| `Order` | `markAsPaid(): void` | RN16 |
-| `OrderItem` | `getSubtotal(): BigDecimal` | RN14 |
-| `Ticket` | `validate(event: Event): void` | RN21, RN22: aceita apenas ingresso válido do próprio evento |
-| `Ticket` | `cancel(): void` | RN18, RN19: recusa ingresso já utilizado |
+| `User` | `promoteToOrganizer(): void` | Recusa promover quem já é organizador ou administrador (RF04). |
+| `User` | `changePassword(encodedPassword: String): void` | RF24 |
+| `User` | `changeAvatar(url: String): void` | — |
+| `User` | `anonymize(encodedPassword: String, now: Instant): void` | RNF15: substitui nome, e-mail, foto e senha e grava `deletedAt`. |
+| `User` | `isDeleted(): boolean` | RN03 |
+| `Event` | `updateFrom(dto: EventUpdateDTO): void` | RF07 |
+| `Event` | `deactivate(): void` | Exclusão lógica (RF07). |
+| `Event` | `changeFeatured(featured: boolean): void` | Destaque na vitrine. |
+| `Event` | `isCancelled(): boolean` | RN09 |
+| `TicketType` | `updateFrom(dto: TicketTypeUpdateDTO): void` | RF09 |
+| `TicketType` | `availableQuantity(): Integer` | RN12: total − vendidos. |
+| `Coupon` | `apply(settings: CouponSettings): void` | RF19 |
+| `Coupon` | `isUsed(): boolean` | Cupom usado não muda o desconto. |
+| `Coupon` | `changesDiscount(settings: CouponSettings): boolean` | Idem. |
+| `Order` | `addItem(item: OrderItem): void` | RF11 |
+| `Order` | `applyCoupon(couponId: UUID, couponCode: String, discount: BigDecimal): void` | RF19 |
+| `Order` | `applyPlatformFee(percent: BigDecimal): void` | Taxa e valor líquido (RF22). |
+| `Order` | `isFree(): boolean` | RN16: pedido de valor zero. |
+| `Order` | `markAsPaid(): void` | RN16: só pedido `PENDING`. |
+| `Order` | `confirmWithoutPayment(): void` | RN16: só pedido `PENDING` com total zero. |
+| `Order` | `isExpired(): boolean` | RN12 |
+| `Order` | `expire(): void` | RN12: só pedido `PENDING` e vencido. |
+| `Order` | `cancel(): void` | Só pedido `PENDING`. |
+| `Order` | `refund(): void` | RN18: só pedido `PAID`. |
+| `Order` | `belongsToCancelledEvent(): boolean` | RN09 |
+| `OrderItem` | `subtotal(): BigDecimal` | RN14 |
+| `Payment` | `approve(): void` | Só pagamento `PENDING`. |
+| `Payment` | `refund(reference: String): void` | Reembolso do pagamento aprovado. |
+| `Payment` | `reject(): void` | Só pagamento `PENDING`. |
+| `Ticket` | `cancel(): void` | RN18 |
+| `AuthSession` | `isActive(now: Instant): boolean`, `touch(now: Instant): void`, `revoke(reason: RevocationReason, now: Instant): boolean` | RF24 |
+| `RefreshToken` | `isExpired(now: Instant): boolean`, `replaceWith(successor: RefreshToken, now: Instant): void` | Rotação do refresh token. |
+| `PayoutAccount` | `update(destination: PayoutDestination, now: Instant): boolean`, `payoutsBlockedUntil(cooldown: Duration): Instant` | Bloqueio de saques depois da troca de chave. |
+| `Payout` | `approve`, `reject`, `cancel`, `startProcessing`, `markPaid`, `markFailed`, `inProgress` | Transições válidas do saque. |
 
 ## 4 a 6. Relacionamentos, cardinalidades e herança
 
-O modelo tem 6 associações, 2 composições e 1 dependência. Não há agregação nem herança; os motivos estão ao final da seção.
+O modelo tem associações, uma composição e ligações por chave estrangeira sem mapeamento JPA. Não há agregação nem herança; os motivos estão ao final da seção.
 
 | Origem | Cardinalidade | Tipo | Cardinalidade | Destino | Significado |
 | --- | --- | --- | --- | --- | --- |
-| `User` (organizador) | 1 | Associação "organiza" | 0..\* | `Event` | Um organizador pode ter nenhum ou vários eventos; todo evento tem exatamente um organizador (RN08). |
-| `Venue` | 1 | Associação "sedia" | 0..\* | `Event` | Um local pode sediar vários eventos, ou nenhum ainda; todo evento ocorre em exatamente um local (RN08). |
-| `Event` | 1 | Composição | 0..\* | `TicketType` | Os tipos de ingresso são partes do evento e não existem sem ele (RN10). Um evento recém-cadastrado pode ainda não ter tipos. |
-| `User` (cliente) | 1 | Associação "compra" | 0..\* | `Order` | Um cliente pode ter nenhum ou vários pedidos; cada pedido pertence a um único cliente (RN05). |
-| `Order` | 1 | Composição | 1..\* | `OrderItem` | Um pedido tem pelo menos um item, e os itens não existem fora do pedido. |
-| `OrderItem` | 0..\* | Associação | 1 | `TicketType` | Cada item se refere a um tipo de ingresso; um tipo pode aparecer em vários itens de pedidos diferentes. |
-| `Order` | 1 | Associação | 0..\* | `Payment` | Cada pagamento pertence a um único pedido (RN15). A cardinalidade 0..\* permite registrar tentativas recusadas (RF12); ver conflito C06. |
-| `OrderItem` | 1 | Associação "gera" | 0..\* | `Ticket` | Um item com quantidade N gera N ingressos após o pagamento; antes disso, gera zero (RN16). |
-| `Ticket` | — | Dependência «use» | — | `Event` | `Ticket.validate(event)` recebe o evento da portaria para conferir se o ingresso pertence a ele (RN22), sem guardar referência permanente. |
+| `User` (organizador) | 1 | Associação "organiza" | 0..\* | `Event` | Todo evento tem exatamente um organizador (RN08). |
+| `Event` | 1 | Associação | 0..\* | `TicketType` | Os tipos de ingresso pertencem ao evento (RN10). |
+| `Event` | 1 | Associação | 0..\* | `Coupon` | Cada cupom pertence a um único evento. |
+| `User` (comprador) | 1 | Associação "compra" | 0..\* | `Order` | Cada pedido pertence a um único usuário (RN05). |
+| `Order` | 1 | Composição | 1..\* | `OrderItem` | Os itens são salvos e removidos com o pedido. |
+| `OrderItem` | 0..\* | Associação | 1 | `TicketType` | Cada item se refere a um tipo de ingresso. |
+| `Order` | 0..\* | Ligação por id (`couponId`) | 0..1 | `Coupon` | O pedido guarda o cupom aplicado. |
+| `Order` | 1 | Associação | 0..\* | `Payment` | Um pedido tem no máximo um pagamento aprovado (índice único parcial); pedidos de valor zero não têm pagamento. |
+| `OrderItem` | 1 | Associação "gera" | 0..\* | `Ticket` | Um item com quantidade N gera N ingressos (RN16). O ingresso também aponta para o pedido e o tipo. |
+| `User` (dono) | 1 | Associação "possui" | 0..\* | `Ticket` | O dono atual do ingresso, que muda na transferência. |
+| `Ticket` | 1 | Ligação por id | 0..\* | `TicketTransfer` | Histórico de transferências, com remetente e destinatário (`User`, por id). |
+| `User` | 1 | Associação | 0..\* | `AuthSession` | Sessões de login do usuário. |
+| `AuthSession` | 1 | Associação | 1..\* | `RefreshToken` | Cadeia de refresh tokens da sessão. |
+| `User` (organizador) | 1 | Ligação por id | 0..1 | `PayoutAccount` | Dados de recebimento. |
+| `User` (organizador) | 1 | Ligação por id | 0..1 | `PayoutBlock` | Bloqueio de saques, com o administrador autor (`blockedBy`). |
+| `User` (organizador) | 1 | Ligação por id | 0..\* | `Payout` | Saques, com o administrador revisor (`reviewedBy`). |
+| `User` (organizador) | 1 | Ligação por id | 0..\* | `LedgerEntry` | Lançamentos do extrato, ligados ao pedido e ao evento ou ao saque. |
+| `User` | 0..1 | Ligação por id (`actor_id`) | 0..\* | `audit_log` | Autor da ação; vazio quando o autor é o sistema. |
 
 ### Como ler uma cardinalidade
 
-Tomando a linha `User 1 ─── 0..* Order`: lendo da esquerda para a direita, um usuário está associado a zero ou mais pedidos. Lendo da direita para a esquerda, um pedido está associado a exatamente um usuário. No banco, isso vira uma chave estrangeira `customer_id` obrigatória na tabela de pedidos; no Java, um `@ManyToOne` em `Order` e, opcionalmente, um `@OneToMany` em `User`.
+Tomando a linha `User 1 ─── 0..* Order`: lendo da esquerda para a direita, um usuário está associado a zero ou mais pedidos. Lendo da direita para a esquerda, um pedido está associado a exatamente um usuário. No banco, isso vira uma chave estrangeira `user_id` obrigatória na tabela de pedidos; no Java, um `@ManyToOne` em `Order`.
+
+### Por que há ligações só por id
+
+O extrato, os saques, os dados de recebimento, o bloqueio de saques, as transferências e o cupom do pedido guardam o `UUID` da outra ponta, com chave estrangeira no banco, mas sem `@ManyToOne`. São registros consultados por SQL próprio ou gravados uma única vez, e a referência por id evita carregar o `User` ou o `Order` inteiro sem necessidade.
 
 ### Por que não há agregação
 
-Agregação indica uma relação todo-parte em que a parte vive independentemente do todo. O candidato mais próximo seria `Venue`–`Event`, mas um evento não é "parte" de um local: os dois apenas se relacionam. Por isso foi usada associação simples, que é a leitura mais precisa.
+Agregação indica uma relação todo-parte em que a parte vive independentemente do todo. Nenhuma relação do modelo tem esse significado: um tipo de ingresso ou um cupom não existe fora do seu evento, e um pedido não é "parte" de um usuário. Por isso foram usadas associações simples e, para os itens do pedido, composição.
 
 ### Por que não há herança
 
 Uma alternativa seria `Customer`, `Organizer` e `Admin` herdando de `User`. Ela foi descartada por três motivos:
 
-1. O código implementado já representa perfis com o enum `Role`, e não com subclasses.
-2. Os requisitos não definem atributos exclusivos de nenhum perfil; as diferenças estão apenas nas permissões (RF03), que o Spring Security trata pelo `role`.
+1. O código representa perfis com o enum `Role`, e não com subclasses.
+2. As diferenças entre perfis estão nas permissões (RF03), que o Spring Security trata pelo `role`.
 3. Herança em JPA exige uma estratégia de mapeamento (`SINGLE_TABLE`, `JOINED` ou `TABLE_PER_CLASS`), o que adiciona complexidade sem ganho para este domínio.
 
-Se no futuro o organizador precisar de dados próprios, como CNPJ ou dados bancários, a opção recomendada é uma entidade `OrganizerProfile` associada 1 para 0..1 a `User`, mantendo o enum de perfis.
+Os dados próprios do organizador ficaram em entidades associadas 1 para 0..1 a `User` (`PayoutAccount` e `PayoutBlock`), mantendo o enum de perfis, como a versão original recomendava.
 
 ## 7. Diagrama UML
 
-O desenho abaixo mostra as entidades e seus relacionamentos; os enums, atributos e métodos estão no código PlantUML logo em seguida.
+O desenho embutido abaixo é da versão original e mostra o modelo planejado na época, com 8 entidades. O diagrama atual é o código PlantUML logo em seguida.
 
 &#91;embedded content: domínio do Ticketfy · 8 entidades, 6 associações, 2 composições, 1 dependência\]
 
-O catálogo (`Venue`, `Event`, `TicketType`) fica na parte superior e central; as vendas (`Order`, `OrderItem`, `Payment`, `Ticket`) ficam na parte inferior e à direita, ligadas ao catálogo por `OrderItem → TicketType`.
+O catálogo (`Event`, `TicketType`, `Coupon`) fica na parte superior; as vendas (`Order`, `OrderItem`, `Payment`, `Ticket`, `TicketTransfer`) no centro; o financeiro do organizador e a segurança, à direita e embaixo.
 
 ### Código PlantUML
 
-Para renderizar, cole o código em [plantuml.com](https://www.plantuml.com/plantuml) ou use a extensão PlantUML do IntelliJ ou do VS Code.
+Para renderizar, cole o código em [plantuml.com](https://www.plantuml.com/plantuml) ou use a extensão PlantUML do IntelliJ ou do VS Code. Os enums de auditoria e os atributos de data de criação e atualização foram omitidos para não poluir o desenho.
 
 ```plantuml
 @startuml ticketfy-domain
@@ -244,111 +351,149 @@ title Ticketfy — Diagrama de Classes de Domínio
 package "user" {
   enum Role <<enumeration>> {
     USER
+    ORGANIZER
     ADMIN
   }
   class User <<Entity>> {
-    - id: Long
+    - id: UUID
     - name: String
     - email: String
     - password: String
     - role: Role
-    - active: boolean
-  }
-}
-
-package "venue" {
-  class Venue <<Entity>> {
-    - id: Long
-    - name: String
-    - address: String
+    - avatarUrl: String
+    - deletedAt: Instant
+    + promoteToOrganizer(): void
+    + anonymize(encodedPassword: String, now: Instant): void
+    + isDeleted(): boolean
   }
 }
 
 package "event" {
-  enum EventStatus <<enumeration>> {
-    OPEN
-    CLOSED
-  }
   class Event <<Entity>> {
-    - id: Long
+    - id: UUID
     - name: String
     - description: String
-    - startDateTime: LocalDateTime
-    - endDateTime: LocalDateTime
-    - maxTicketsPerOrder: int
-    - status: EventStatus
+    - imageUrl: String
+    - venueName: String
+    - address: String
+    - city: String
+    - state: String
+    - startsAt: Instant
+    - endsAt: Instant
     - organizer: User
-    - venue: Venue
-    + isOpenForSales(): boolean
-    + close(): void
+    - active: boolean
+    - featured: boolean
+    - cancelledAt: Instant
+    - cancellationReason: String
+    + deactivate(): void
+    + changeFeatured(featured: boolean): void
+    + isCancelled(): boolean
   }
 }
 
 package "tickettype" {
   class TicketType <<Entity>> {
-    - id: Long
+    - id: UUID
     - name: String
+    - description: String
     - price: BigDecimal
-    - totalQuantity: int
-    - soldQuantity: int
-    - reservedQuantity: int
-    - active: boolean
+    - quantityTotal: Integer
+    - quantitySold: Integer
+    - maxPerOrder: Integer
+    - active: Boolean
     - event: Event
-    + getAvailableQuantity(): int
-    + reserve(quantity: int): void
-    + confirmSale(quantity: int): void
-    + releaseReservation(quantity: int): void
-    + release(quantity: int): void
+    + availableQuantity(): Integer
+  }
+}
+
+package "coupon" {
+  enum DiscountType <<enumeration>> {
+    PERCENT
+    FIXED
+  }
+  class Coupon <<Entity>> {
+    - id: UUID
+    - event: Event
+    - code: String
+    - discountType: DiscountType
+    - discountValue: BigDecimal
+    - maxUses: Integer
+    - usesCount: Integer
+    - startsAt: Instant
+    - endsAt: Instant
+    - active: Boolean
+    - firstUsedAt: Instant
+    + isUsed(): boolean
   }
 }
 
 package "order" {
   enum OrderStatus <<enumeration>> {
-    PENDING_PAYMENT
+    PENDING
     PAID
-    PAYMENT_FAILED
     EXPIRED
+    CANCELLED
+    REFUNDED
   }
   class Order <<Entity>> {
-    - id: Long
-    - customer: User
-    - createdAt: LocalDateTime
-    - expiresAt: LocalDateTime
-    - total: BigDecimal
+    - id: UUID
+    - user: User
     - status: OrderStatus
+    - subtotalAmount: BigDecimal
+    - discountAmount: BigDecimal
+    - totalAmount: BigDecimal
+    - couponId: UUID
+    - couponCode: String
+    - platformFeePercent: BigDecimal
+    - platformFee: BigDecimal
+    - netAmount: BigDecimal
+    - expiresAt: Instant
+    - idempotencyKey: String
     - items: List<OrderItem>
-    + calculateTotal(): BigDecimal
-    + isExpired(now: LocalDateTime): boolean
-    + expire(): void
+    - version: Long
+    + applyCoupon(couponId: UUID, couponCode: String, discount: BigDecimal): void
+    + applyPlatformFee(percent: BigDecimal): void
     + markAsPaid(): void
+    + confirmWithoutPayment(): void
+    + expire(): void
+    + cancel(): void
+    + refund(): void
   }
   class OrderItem <<Entity>> {
-    - id: Long
-    - quantity: int
-    - unitPrice: BigDecimal
+    - id: UUID
+    - order: Order
     - ticketType: TicketType
-    + getSubtotal(): BigDecimal
+    - unitPrice: BigDecimal
+    - quantity: Integer
+    + subtotal(): BigDecimal
   }
 }
 
 package "payment" {
   enum PaymentMethod <<enumeration>> {
-    CREDIT_CARD
+    SIMULATED
     PIX
+    CREDIT_CARD
   }
   enum PaymentStatus <<enumeration>> {
     PENDING
     APPROVED
-    REFUSED
+    REJECTED
+    REFUNDED
   }
   class Payment <<Entity>> {
-    - id: Long
+    - id: UUID
     - order: Order
+    - status: PaymentStatus
     - method: PaymentMethod
     - amount: BigDecimal
-    - status: PaymentStatus
-    - providerTransactionId: String
-    - createdAt: LocalDateTime
+    - providerReference: String
+    - approvedAt: Instant
+    - refundedAt: Instant
+    - refundReference: String
+    + approve(): void
+    + refund(reference: String): void
+    + reject(): void
   }
 }
 
@@ -359,79 +504,207 @@ package "ticket" {
     CANCELLED
   }
   class Ticket <<Entity>> {
-    - id: Long
+    - id: UUID
     - code: String
-    - status: TicketStatus
-    - issuedAt: LocalDateTime
+    - order: Order
     - orderItem: OrderItem
-    + validate(event: Event): void
+    - ticketType: TicketType
+    - owner: User
+    - status: TicketStatus
+    - usedAt: Instant
+    - transferCount: int
     + cancel(): void
+  }
+  class TicketTransfer <<Entity>> {
+    - id: UUID
+    - ticketId: UUID
+    - fromUserId: UUID
+    - toUserId: UUID
+    - transferredAt: Instant
   }
 }
 
-' Relacionamentos
+package "auth" {
+  enum RevocationReason <<enumeration>> {
+    LOGOUT
+    LOGOUT_ALL
+    PASSWORD_CHANGED
+    REUSE_DETECTED
+    ACCOUNT_DELETED
+  }
+  class AuthSession <<Entity>> {
+    - id: UUID
+    - user: User
+    - lastUsedAt: Instant
+    - expiresAt: Instant
+    - revokedAt: Instant
+    - revokedReason: RevocationReason
+    + isActive(now: Instant): boolean
+    + revoke(reason: RevocationReason, now: Instant): boolean
+  }
+  class RefreshToken <<Entity>> {
+    - id: UUID
+    - session: AuthSession
+    - tokenHash: byte[]
+    - expiresAt: Instant
+    - usedAt: Instant
+    - replacedBy: UUID
+    + replaceWith(successor: RefreshToken, now: Instant): void
+  }
+}
+
+package "payout" {
+  enum LedgerEntryType <<enumeration>> {
+    SALE_CREDIT
+    REFUND_DEBIT
+    PAYOUT_DEBIT
+    PAYOUT_REVERSAL
+  }
+  enum PayoutStatus <<enumeration>> {
+    UNDER_REVIEW
+    REQUESTED
+    PROCESSING
+    PAID
+    FAILED
+    CANCELLED
+    REJECTED
+  }
+  class LedgerEntry <<Entity>> {
+    - id: UUID
+    - organizerId: UUID
+    - eventId: UUID
+    - orderId: UUID
+    - payoutId: UUID
+    - type: LedgerEntryType
+    - amount: BigDecimal
+  }
+  class PayoutAccount <<Entity>> {
+    - organizerId: UUID
+    - documentType: DocumentType
+    - document: String {cifrado}
+    - holderName: String
+    - pixKeyType: PixKeyType
+    - pixKey: String {cifrado}
+    - keyChangedAt: Instant
+  }
+  class Payout <<Entity>> {
+    - id: UUID
+    - organizerId: UUID
+    - amount: BigDecimal
+    - status: PayoutStatus
+    - idempotencyKey: String
+    - reviewedBy: UUID
+    - rejectionReason: String
+    - transferReference: String
+    + approve(reviewer: UUID, now: Instant): void
+    + reject(reviewer: UUID, reason: String, now: Instant): void
+    + markPaid(reference: String, now: Instant): void
+    + markFailed(reason: String, now: Instant): void
+  }
+  class PayoutBlock <<Entity>> {
+    - organizerId: UUID
+    - reason: String
+    - blockedBy: UUID
+    - blockedAt: Instant
+  }
+}
+
+package "audit" {
+  class audit_log <<table>> {
+    - id: UUID
+    - actor_type: AuditActorType
+    - actor_id: UUID
+    - action: AuditAction
+    - target_type: AuditTargetType
+    - target_id: UUID
+    - details: JSONB
+    - correlation_id: String
+  }
+}
+
+' Catálogo
 User "1" -- "0..*" Event : organiza >
-Venue "1" -- "0..*" Event : sedia >
-Event "1" *-- "0..*" TicketType
+Event "1" -- "0..*" TicketType
+Event "1" -- "0..*" Coupon
+
+' Vendas
 User "1" -- "0..*" Order : compra >
 Order "1" *-- "1..*" OrderItem
 OrderItem "0..*" --> "1" TicketType
+Order "0..*" ..> "0..1" Coupon : couponId
 Order "1" -- "0..*" Payment
 OrderItem "1" -- "0..*" Ticket : gera >
-Ticket ..> Event : <<use>>
+User "1" -- "0..*" Ticket : possui >
+Ticket "1" .. "0..*" TicketTransfer : ticketId
+
+' Segurança
+User "1" -- "0..*" AuthSession
+AuthSession "1" *-- "1..*" RefreshToken
+
+' Financeiro (ligações por id)
+User "1" .. "0..1" PayoutAccount : organizerId
+User "1" .. "0..1" PayoutBlock : organizerId
+User "1" .. "0..*" Payout : organizerId
+User "1" .. "0..*" LedgerEntry : organizerId
+LedgerEntry "0..*" .. "0..1" Payout : payoutId
+User "0..1" .. "0..*" audit_log : actor_id
 
 ' Uso dos enums
 User ..> Role
-Event ..> EventStatus
+Coupon ..> DiscountType
 Order ..> OrderStatus
 Payment ..> PaymentMethod
 Payment ..> PaymentStatus
 Ticket ..> TicketStatus
+AuthSession ..> RevocationReason
+LedgerEntry ..> LedgerEntryType
+Payout ..> PayoutStatus
 
-' Pendências
-note right of Role
-  Falta ORGANIZER (conflito C01)
+note bottom of LedgerEntry
+  Append-only: trigger recusa
+  UPDATE, DELETE e TRUNCATE
 end note
-note right of User
-  active: não implementado (C03)
-end note
-note bottom of OrderItem
-  Classe proposta (C04)
+note bottom of audit_log
+  Gravada por JDBC (AuditService),
+  append-only
 end note
 @enduml
 ```
 
-No PlantUML, `*--` é composição (losango no lado do todo), `--` é associação, `-->` é associação navegável e `..>` é dependência. As setas tracejadas para os enums indicam que a entidade usa o enum como tipo de atributo.
+No PlantUML, `*--` é composição (losango no lado do todo), `--` é associação, `-->` é associação navegável, `..` é ligação só por id (chave estrangeira sem mapeamento JPA) e `..>` é dependência. As setas tracejadas para os enums indicam que a entidade usa o enum como tipo de atributo. `AuthSession` e `RefreshToken` aparecem como composição porque os tokens são apagados em cascata com a sessão (`ON DELETE CASCADE`), embora a entidade não mapeie a coleção.
 
 ## 8. Explicação do diagrama
 
-O modelo se divide em dois blocos ligados pelo `TicketType`: o **catálogo** (`Venue`, `Event`, `TicketType`), mantido pelo organizador, e as **vendas** (`Order`, `OrderItem`, `Payment`, `Ticket`), geradas pelo cliente. O `User` participa dos dois blocos em papéis diferentes, definidos pelo `Role`.
+O modelo se divide em quatro blocos. O **catálogo** (`Event`, `TicketType`, `Coupon`) é mantido pelo organizador. As **vendas** (`Order`, `OrderItem`, `Payment`, `Ticket`, `TicketTransfer`) são geradas pelo comprador. O **financeiro** (`LedgerEntry`, `PayoutAccount`, `Payout`, `PayoutBlock`) acompanha o dinheiro do organizador. A **segurança e auditoria** (`AuthSession`, `RefreshToken`, `audit_log`) registra sessões e ações sensíveis. O `User` participa de todos os blocos em papéis diferentes, definidos pelo `Role`.
 
 **Fluxo representado no modelo**
 
-1. O organizador (`User` com perfil de organizador) cadastra um `Event` em um `Venue` e define seus `TicketType`.
-2. O cliente cria um `Order` com um ou mais `OrderItem`. Cada item aponta para um `TicketType` e guarda o preço unitário daquele momento (RN14). `TicketType.`reserve() reserva as unidades por 15 minutos e impede reservar acima do disponível (RN12); o limite por pedido do evento também é verificado (RN13).
-3. O pedido recebe um ou mais `Payment`, cada um com o identificador da transação no provedor. Quando um pagamento é aprovado, `Order.markAsPaid()` muda o status do pedido e TicketType.confirmSale() converte a reserva em venda. Se os 15 minutos passarem sem aprovação, Order.expire() e TicketType.releaseReservation() devolvem as unidades.
-4. Com o pedido pago, cada `OrderItem` gera tantos `Ticket` quanto sua quantidade, cada um com código único (RN16, RN17).
-5. Na entrada, o organizador valida o ingresso com `Ticket.validate(event)`, que confere o evento e muda o status para `USED` (RN21, RN22). Um cancelamento chama `Ticket.cancel()` e `TicketType.release()` (RN18, RN19).
+1. O organizador (`User` com perfil `ORGANIZER`) cadastra um `Event`, com o local nos próprios campos, e define seus `TicketType` e, se quiser, `Coupon`.
+2. O comprador cria um `Order` com um ou mais `OrderItem` de um mesmo evento. Cada item aponta para um `TicketType` e guarda o preço unitário daquele momento (RN14). A reserva soma a quantidade em `quantitySold` por um `UPDATE` condicional que impede passar do total (RN12); o limite por pedido de cada tipo também é verificado (RN13). Se houver cupom, um `UPDATE` condicional consome um uso, e `Order.applyCoupon()` grava o desconto. `Order.applyPlatformFee()` congela a taxa e o líquido.
+3. Se o total é zero, `Order.confirmWithoutPayment()` confirma o pedido na hora. Caso contrário, o pagamento simulado cria um `Payment` aprovado, `Order.markAsPaid()` muda o status do pedido e um `LedgerEntry` `SALE_CREDIT` credita o líquido ao organizador. Se os 15 minutos passarem sem pagamento, `Order.expire()` e a devolução do estoque e do cupom liberam as unidades.
+4. Com o pedido pago, cada `OrderItem` gera tantos `Ticket` quanto sua quantidade, cada um com código único, tendo o comprador como `owner` (RN16, RN17).
+5. O dono pode transferir o ingresso: um `UPDATE` condicional troca `owner` e `code` e soma `transferCount`, e um `TicketTransfer` registra a operação.
+6. Na entrada, o organizador faz o check-in, um `UPDATE` condicional que só passa ingressos `VALID` de evento não cancelado e muda o status para `USED` (RN21, RN22). O reembolso chama `Order.refund()`, cancela os ingressos, devolve o estoque, reembolsa o `Payment` e grava um `REFUND_DEBIT`.
+7. O organizador cadastra a `PayoutAccount` e pede um `Payout`, que gera um `PAYOUT_DEBIT` no extrato; o administrador pode analisá-lo ou bloquear os saques com um `PayoutBlock`.
 
 **Decisões de modelagem**
 
-- **`Ticket` ligado a `OrderItem`, e não diretamente a `TicketType`:** o tipo, o evento e o cliente do ingresso são alcançados pelo item e pelo pedido, sem duplicar dados que poderiam ficar inconsistentes.
-- **Regras dentro das entidades:** métodos como `sell()`, `validate()` e `cancel()` mantêm as regras junto aos dados que elas protegem. Os services coordenam transações e repositórios, mas não duplicam essas verificações.
-- **Controle de concorrência:** `reserve()` garante a regra dentro de um objeto, mas não impede duas transações simultâneas de vender a última unidade. Isso deve ser resolvido na persistência, com lock pessimista ou um campo `@Version` em `TicketType` (RNF07). O campo não aparece no diagrama por ser um detalhe técnico, não de negócio.
+- **`Ticket` ligado ao pedido, ao item e ao tipo:** o item preserva a origem e o preço; o pedido e o tipo permitem consultas e travas diretas, sem passar pelo item. O dono é separado do comprador desde a transferência de ingressos.
+- **Regras dentro das entidades quando não há concorrência:** métodos como `markAsPaid()`, `expire()` e `refund()` validam as transições de estado junto aos dados. Os services coordenam transações e repositórios.
+- **Controle de concorrência no banco:** reserva de estoque, consumo de cupom, check-in e transferência são `UPDATE` condicionais, que o PostgreSQL serializa por linha; `Order`, `PayoutAccount`, `Payout` e `PayoutBlock` têm `@Version`. A ordem fixa de travas (evento → pedido → ingresso) está na Documentação de Arquitetura (DA15).
+- **Registros imutáveis:** `LedgerEntry`, `TicketTransfer` e `audit_log` só aceitam inserção; um trigger no banco recusa alteração e exclusão.
 
 ## Conflitos identificados
 
-Foram encontrados 8 conflitos entre código, requisitos e casos de uso. C01 e C02 são os mais importantes, porque afetam quem pode fazer o quê no sistema.
+A versão original encontrou 8 conflitos entre código, requisitos e casos de uso. A revisão contra o código resolveu todos; a tabela registra o histórico e a resolução.
 
-| ID | Conflito | Elementos envolvidos | Decisão necessária |
+| ID | Conflito | Elementos envolvidos | Resolução |
 | --- | --- | --- | --- |
-| C01 | O enum `Role` implementado tem `USER` e `ADMIN`, mas os requisitos definem três perfis: cliente, organizador e administrador. | Código, RN02, Documento de Visão | Adicionar `ORGANIZER` ao enum e decidir se `USER` passa a significar cliente ou se é renomeado para `CUSTOMER`. |
-| C02 | O README do repositório diz que administradores cadastram locais, eventos e tipos de ingresso; os requisitos atribuem isso ao organizador. | README, RF06, RF09, RN04 | Definir quem cadastra eventos e atualizar o documento que estiver desatualizado. |
-| C03 | `User` não tem campo de ativação, mas RN03 e RNF15 exigem desativação lógica. | Código, RN03, RNF15 | Adicionar `active` (ou equivalente) a `User` e criar a migration correspondente. |
-| C04 | `OrderItem` não está entre os pacotes planejados, mas é necessário para registrar vários tipos de ingresso por pedido com preço congelado. | Estrutura de pacotes, RF11, RN14 | Confirmar a classe no pacote `order`. |
-| C05 | O documento do UC01 usa entidades e atributos não confirmados: `Attendee`, `AuditLog`, `reservedQuantity`, `serviceFee`, `expiresAt` e CPF do participante. | UC01, Documento de Requisitos | Resolvido: reservedQuantity e expiresAt foram confirmados pela reserva de 15 minutos e entraram no modelo; Attendee, AuditLog, serviceFee e CPF foram removidos do UC01. |
-| C06 | Não está definido se um pedido pode ter mais de uma tentativa de pagamento. | RF12, RN15 | Confirmar a cardinalidade `Order 1 ── 0..* Payment` ou trocar por `0..1`. |
-| C07 | O tratamento de evento cancelado com ingressos vendidos está em aberto. | RF07, Q07 | Definir se `EventStatus` terá `CANCELLED` e o que acontece com os ingressos. |
-| C08 | O tipo do identificador não foi confirmado: o UC01 assume `UUID`, e este documento usa `Long`. | Migration `V1__create_table_users.sql`, UC01 | Conferir a migration e padronizar o tipo em todas as entidades. |
+| C01 | O enum `Role` tinha `USER` e `ADMIN`, mas os requisitos definem três perfis. | Código, RN02, Documento de Visão | Resolvido: o enum tem `USER`, `ORGANIZER` e `ADMIN`, com CHECK no banco (V12). `USER` significa cliente. |
+| C02 | O README dizia que administradores cadastram locais, eventos e tipos de ingresso; os requisitos atribuem isso ao organizador. | README, RF06, RF09, RN04 | Resolvido: organizadores e administradores cadastram eventos e tipos de ingresso; não há cadastro de locais. |
+| C03 | `User` não tem campo de ativação, mas RN03 e RNF15 exigiam desativação lógica. | Código, RN03, RNF15 | Resolvido em parte: a exclusão da conta é lógica, por anonimização (`deletedAt`). A suspensão pelo administrador não está implementada (RF18). |
+| C04 | `OrderItem` não estava entre os pacotes planejados. | Estrutura de pacotes, RF11, RN14 | Resolvido: a classe existe no pacote `order`. |
+| C05 | O UC01 usava entidades e atributos não confirmados: `Attendee`, `AuditLog`, `reservedQuantity`, `serviceFee`, `expiresAt` e CPF do participante. | UC01, Documento de Requisitos | Resolvido: `expiresAt` existe; não há `reservedQuantity` (as reservas contam em `quantitySold`); a auditoria existe como tabela `audit_log`; a taxa existe como taxa da plataforma, cobrada do organizador; `Attendee` e CPF do participante não existem. |
+| C06 | Não estava definido se um pedido pode ter mais de uma tentativa de pagamento. | RF12, RN15 | Resolvido: `Order 1 ── 0..* Payment`, com no máximo um pagamento aprovado por índice único parcial. |
+| C07 | O tratamento de evento cancelado com ingressos vendidos estava em aberto. | RF07, Q07 | Resolvido: não há `EventStatus`; o cancelamento grava `cancelledAt` e reembolsa os pedidos. |
+| C08 | O tipo do identificador não estava confirmado. | Migration `V1__create-table-users.sql`, UC01 | Resolvido: todas as entidades usam `UUID`. |

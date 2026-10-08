@@ -4,28 +4,30 @@ Oct 7, 2026
 
 ## Base desta documentação
 
-Esta documentação descreve a arquitetura com base no repositório do Ticketfy e no histórico de desenvolvimento do projeto. O código-fonte não foi anexado a esta análise; por isso, cada componente indica se está implementado, em andamento ou planejado. O último estado conhecido é: domínio `user` implementado, autenticação por JWT em andamento e demais domínios planejados.
+Esta documentação descreve a arquitetura com base no código do repositório do Ticketfy, que é a fonte de verdade. Todos os domínios estão implementados: usuários, eventos, tipos de ingresso, cupons, pedidos, pagamentos, ingressos, painel, financeiro do organizador, auditoria, sessões e privacidade. O que ainda não foi implementado aparece como planejado, coerente com o [roadmap](ROADMAP.md).
 
 ### Tecnologias do projeto
 
 | Tecnologia | Uso | Situação |
 | --- | --- | --- |
 | Java 17 | Linguagem do backend | Em uso |
-| Spring Boot 4 | Framework da aplicação | Em uso |
+| Spring Boot 4.1 | Framework da aplicação | Em uso |
 | Spring Web | Exposição da API REST | Em uso |
-| Spring Data JPA / Hibernate | Mapeamento objeto-relacional e repositórios | Em uso |
-| PostgreSQL | Banco de dados relacional | Em uso |
-| Flyway | Versionamento do esquema do banco | Em uso (`V1__create_table_users.sql`) |
-| Spring Security | Autenticação e autorização | Em uso (configuração inicial) |
+| Spring Data JPA / Hibernate 7 | Mapeamento objeto-relacional e repositórios | Em uso |
+| PostgreSQL 16 | Banco de dados relacional (Neon em produção) | Em uso |
+| Flyway | Versionamento do esquema do banco | Em uso (V1 a V21) |
+| Spring Security | Autenticação e autorização | Em uso |
 | BCrypt | Hash de senhas | Em uso |
-| java-jwt (Auth0) | Geração e validação de tokens JWT | Dependência adicionada; emissão do token em andamento |
+| java-jwt (Auth0) | Geração e validação dos access tokens JWT | Em uso |
 | Bean Validation (Jakarta) | Validação dos dados de entrada | Em uso |
-| Springdoc OpenAPI / Swagger UI | Documentação interativa da API | Configurado |
+| Springdoc OpenAPI / Swagger UI | Documentação interativa da API e contrato `docs/openapi.json` | Em uso |
 | Lombok | Redução de código repetitivo (`@Getter`, `@Setter`, construtores) | Em uso |
 | Maven | Build e dependências | Em uso |
-| Docker Compose | Execução do PostgreSQL no ambiente de desenvolvimento | Em uso (apenas o banco) |
+| JUnit 5, Testcontainers e JaCoCo | Testes com PostgreSQL real e cobertura mínima no build | Em uso |
+| Docker e Docker Compose | Imagem multi-stage da aplicação e execução local da API com o banco | Em uso |
+| GitHub Actions e Render | Integração contínua e hospedagem | Em uso |
 
-O pagamento será processado por um provedor real, ainda não escolhido, com cartão de crédito e Pix. Por isso, nenhum serviço externo aparece nos diagramas como componente existente.
+O pagamento e a transferência dos saques são simulados, atrás das portas `PaymentGateway` e `PayoutGateway`. A integração com um provedor real (Pix com Asaas) está planejada; por isso, nenhum serviço externo de pagamento aparece nos diagramas.
 
 ## 1. Visão geral da arquitetura
 
@@ -131,7 +133,7 @@ O 500 genérico responde sempre `detail: "Internal server error"`. A exceção v
 
 Autenticação e autorização com Spring Security. Intercepta a requisição antes do controller e decide se ela pode seguir.
 
-*No projeto:* **parcialmente implementado.** O `SecurityConfig` já define sessão stateless, rotas públicas e o `PasswordEncoder`. O login com emissão de JWT e o filtro que valida o token estão em andamento (detalhes na seção 5).
+*No projeto:* **implementado.** O `SecurityConfig` define a política sem `HttpSession`, as rotas públicas e o `PasswordEncoder`; o `SecurityFilter` valida o access token e a sessão no banco; `@PreAuthorize` restringe as rotas por perfil (detalhes na seção 5).
 
 ### Config
 
@@ -174,7 +176,7 @@ Todas as requisições passam pelo Spring Security antes de chegar a um controll
 
 &#91;embedded content: arquitetura do Ticketfy · 4 camadas, 1 banco, componente planejado tracejado\]
 
-O Flyway não participa das requisições: ele aplica as migrations uma vez, quando a aplicação inicia. O Exception handler aparece tracejado porque ainda será implementado. O provedor de pagamento não aparece porque ainda não foi escolhido.
+O diagrama embutido acima é da versão original, quando o exception handler ainda era planejado; o diagrama atual é o PlantUML abaixo. O Flyway não participa das requisições: ele aplica as migrations uma vez, quando a aplicação inicia. As rotinas agendadas (expiração de pedidos, retomada de cancelamentos de evento, processamento de saques e limpeza de sessões) chamam os services sem passar pelos filtros. Os gateways de pagamento e de saque são simulados; o provedor real (Pix com Asaas) está planejado.
 
 ### PlantUML
 
@@ -183,36 +185,38 @@ O Flyway não participa das requisições: ele aplica as migrations uma vez, qua
 skinparam componentStyle rectangle
 title Ticketfy — Arquitetura em camadas
 
-actor "Cliente HTTP\n(Swagger UI / frontend futuro)" as Client
+actor "Navegador" as Browser
+component "Frontend React\n(proxy em Cloudflare Pages Functions)" as Front
 
-node "Aplicação Spring Boot (monólito)" {
-  component "Spring Security\n(SecurityConfig, filtro JWT)" as Security
-  component "Controllers\n(@RestController, DTOs)" as Controllers
+node "Aplicação Spring Boot (monólito, Render)" {
+  component "Filtros\n(RequestIdFilter, AuthOriginFilter,\nLoginRateLimitFilter, SecurityFilter)" as Filters
+  component "Controllers\n(@RestController, DTOs, @PreAuthorize)" as Controllers
   component "Services\n(regras de negócio, @Transactional)" as Services
-  component "Repositories\n(Spring Data JPA)" as Repositories
-  component "Exception handler\n(@RestControllerAdvice)" as ExceptionHandler #line.dashed
+  component "Rotinas agendadas\n(@Scheduled)" as Jobs
+  component "Repositories\n(Spring Data JPA e JDBC)" as Repositories
+  component "Exception handler\n(@RestControllerAdvice, RFC 7807)" as ExceptionHandler
+  component "Gateways simulados\n(PaymentGateway, PayoutGateway)" as Gateways
 }
 
-database "PostgreSQL\n(Docker em desenvolvimento)" as DB
+database "PostgreSQL\n(Neon em produção,\nDocker em desenvolvimento)" as DB
 component "Flyway" as Flyway
 
-Client --> Security : JSON sobre HTTP
-Security --> Controllers
+Browser --> Front
+Front --> Filters : JSON sobre HTTP\n(cookie só em /auth/**)
+Filters --> Controllers
 Controllers --> Services
+Jobs --> Services
 Services --> Repositories
+Services --> Gateways
 Repositories --> DB : SQL via JDBC
 Services ..> ExceptionHandler : exceções
 Flyway --> DB : migrations na inicialização
-
-note right of ExceptionHandler
-  Planejado
-end note
 @enduml
 ```
 
 ## 4. Fluxo de uma requisição
 
-São mostrados dois fluxos: o cadastro de usuário, que já está implementado, e a compra de ingresso, que é planejada. O primeiro descreve o sistema como ele é; o segundo, como ele deverá funcionar seguindo a mesma arquitetura.
+São mostrados dois fluxos implementados: o cadastro de usuário, o mais simples, e a criação do pedido na compra de ingresso, o que mais exercita transação e concorrência.
 
 ### 4.1 Cadastro de usuário (implementado)
 
@@ -257,66 +261,72 @@ S --> C : User
 C --> Cliente : 201 Created + UserDetailsDTO
 
 alt e-mail já cadastrado
-  S --> C : IllegalArgumentException
-  C --> Cliente : 500 (até existir o exception handler)
+  S --> C : EmailAlreadyExistsException
+  C --> Cliente : 409 email-already-exists (GlobalExceptionHandler)
 end
 @enduml
 ```
 
-### 4.2 Compra de ingresso (planejado)
+### 4.2 Criação do pedido (implementado)
 
-O recurso REST da compra é o pedido, então o endpoint planejado é `POST /orders`, e não `POST /ingressos/compra`: em REST, a URL nomeia o recurso criado e o verbo HTTP indica a ação. O fluxo abaixo cobre a criação do pedido; o pagamento é uma etapa seguinte, que depende do provedor ainda não escolhido.
+O recurso REST da compra é o pedido, então o endpoint é `POST /orders`, e não `POST /ingressos/compra`: em REST, a URL nomeia o recurso criado e o verbo HTTP indica a ação. O fluxo abaixo cobre a criação do pedido; o pagamento é a etapa seguinte (`POST /orders/{id}/payment`). O fluxo completo, com cupom, pedido de valor zero e erros, está no caso de uso UC01.
 
 | Etapa | Componente | O que acontece |
 | --- | --- | --- |
-| 1 | Cliente | Envia `POST /orders` com o token JWT e a lista de tipos de ingresso e quantidades. |
-| 2 | Spring Security | O filtro valida o token e identifica o usuário. Sem token válido, responde 401; com perfil diferente de cliente, 403. |
-| 3 | `OrderController` | Valida o DTO de entrada com `@Valid` e chama o service com o usuário autenticado. |
-| 4 | `OrderService` | Abre a transação (`@Transactional`) e busca os tipos de ingresso com bloqueio para escrita, evitando venda simultânea da mesma unidade. |
-| 5 | Entidades | `Event.isOpenForSales()` confere se o evento aceita vendas (RN09); a quantidade é comparada ao limite por pedido do evento (RN13); `TicketType.reserve()` reserva as unidades e recusa quantidade acima do disponível (RN12). |
-| 6 | `OrderService` | Cria o `Order` com seus `OrderItem`, registrando o preço unitário do momento (RN14), calcula o total e define o fim da reserva para 15 minutos depois (RN12). |
-| 7 | Repositories | Gravam o pedido, os itens e a nova quantidade reservada na mesma transação. Qualquer falha desfaz tudo. |
-| 8 | `OrderController` | Responde 201 com o DTO do pedido, em situação "aguardando pagamento". |
+| 1 | Cliente | Envia `POST /orders` com o access token, a lista de tipos de ingresso e quantidades, o cupom opcional e o header opcional `Idempotency-Key`. |
+| 2 | Filtros | O `SecurityFilter` valida o token e a sessão e identifica o usuário. Sem token válido, responde 401. Qualquer perfil autenticado pode comprar. |
+| 3 | `OrderController` | Valida o `OrderCreationDTO` com `@Valid` e chama o service com o usuário autenticado. |
+| 4 | `OrderService` | Abre a transação (`@Transactional`), trava a linha do usuário para conferir que a conta não foi excluída e, se a chave de idempotência já existe, devolve o pedido já criado. |
+| 5 | `OrderService` | Para cada item, busca o tipo de ingresso ativo de evento ativo e não cancelado, confere que todos são do mesmo evento e que a quantidade respeita o `maxPerOrder` do tipo (RN13). |
+| 6 | `TicketTypeRepository` | Reserva as unidades com um `UPDATE` condicional (`quantity_sold + n <= quantity_total`, evento ativo e não cancelado). Se nenhuma linha muda, o service responde 409, sem ler e travar a linha antes (RN12, RNF07). |
+| 7 | `OrderService` | Cria o `Order` com seus `OrderItem`, registrando o preço unitário do momento (RN14). Consome o cupom, se houver, congela a taxa da plataforma e define o fim da reserva para 15 minutos depois (RN12). Se o total é zero, confirma o pedido e emite os ingressos. |
+| 8 | Repositories | Gravam o pedido e os itens na mesma transação da reserva. Qualquer falha desfaz tudo, inclusive a reserva e o uso do cupom. Duas requisições com a mesma chave de idempotência esbarram na restrição de unicidade, e o controller devolve o pedido da primeira. |
+| 9 | `OrderController` | Responde 201 com o `OrderDetailsDTO`, em situação `PENDING`, ou `PAID` no pedido de valor zero. |
 
-Depois de criado o pedido, o cliente paga com cartão de crédito ou Pix pelo provedor de pagamento, ainda a escolher. Quando o provedor confirma o pagamento, a reserva vira venda e os ingressos são emitidos. Pedidos não pagos em 15 minutos serão expirados por uma tarefa agendada do próprio Spring (`@Scheduled`, planejada), que devolve as unidades reservadas.
+Pedidos não pagos em 15 minutos são expirados pelo `OrderExpirationJob` (`@Scheduled`, a cada 60 segundos), que marca cada pedido como `EXPIRED` numa transação própria e devolve as unidades e o uso do cupom.
 
 ```plantuml
 @startuml order-creation
-title Ticketfy — Compra de ingresso (planejado)
+title Ticketfy — Criação do pedido
 actor Cliente
-participant "Spring Security\n(filtro JWT)" as Sec
+participant "SecurityFilter" as Sec
 participant OrderController as C
 participant OrderService as S
-participant "TicketType\n(entidade)" as TT
+participant CouponService as CS
 participant "Repositories" as R
 database PostgreSQL as DB
 
-Cliente -> Sec : POST /orders + Bearer token
-Sec -> Sec : valida JWT e perfil
+Cliente -> Sec : POST /orders + Bearer token + Idempotency-Key
+Sec -> Sec : valida JWT e sessão
 Sec -> C : usuário autenticado
-C -> C : @Valid OrderRequestDTO
-C -> S : createOrder(customer, dto)
+C -> C : @Valid OrderCreationDTO
+C -> S : create(dto, idempotencyKey, user)
 activate S
 note right of S : @Transactional
-S -> R : busca tipos de ingresso (lock)
-R -> DB : SELECT ... FOR UPDATE
-S -> TT : reserve(quantity)
-alt quantidade disponível
-  S -> S : cria Order (reserva de 15 min) e OrderItems
-  S -> R : save(order)
-  R -> DB : INSERT / UPDATE
-  S --> C : Order
-  C --> Cliente : 201 Created + OrderResponseDTO
-else indisponível ou evento encerrado
-  TT --> S : exceção de negócio
+S -> R : trava o usuário e busca pedido pela chave
+R -> DB : SELECT ... FOR KEY SHARE / SELECT
+loop cada item
+  S -> R : busca tipo de ingresso ativo
+  S -> R : reserveStock(id, quantidade)
+  R -> DB : UPDATE ... WHERE quantity_sold + n <= quantity_total
+end
+alt todas as reservas passaram
+  opt cupom informado
+    S -> CS : redeem(eventId, código)
+    CS -> DB : UPDATE coupons ... RETURNING
+  end
+  S -> S : cria Order (reserva de 15 min), taxa e total
+  S -> R : saveAndFlush(order)
+  R -> DB : INSERT
+  S --> C : OrderDetailsDTO
+  C --> Cliente : 201 Created
+else alguma reserva não passou
   S --> C : rollback
-  C --> Cliente : 409 (indisponível) ou 422 (evento encerrado)
+  C --> Cliente : 409 insufficient-stock ou invalid-event-state
 end
 deactivate S
 @enduml
 ```
-
-Os nomes `OrderController`, `OrderService`, `OrderRequestDTO` e `OrderResponseDTO` seguem o padrão do módulo `user` e serão confirmados na implementação. As respostas 409 e 422 dependem do exception handler planejado.
 
 ## 5. Segurança
 
@@ -333,10 +343,10 @@ A segurança usa Spring Security sem `HttpSession`. Senhas, validação de entra
 | Tokens | O `SecurityFilter` lê o header `Authorization: Bearer <token>`, valida o JWT e busca a sessão pelo `sid` junto com o usuário, numa única consulta. Sessão revogada ou vencida responde 401 na hora, sem esperar o JWT expirar. | Implementado |
 | CSRF | O `AuthOriginFilter` roda antes do Spring Security e recusa todo `POST /auth/**` sem `Origin` idêntico a uma origem de `ticketfy.cors.allowed-origins` ou sem o header `X-Ticketfy-Auth: 1` (403 `auth-request-rejected`). A comparação exata também barra os deploys de preview. | Implementado |
 | IP do cliente | O front chega às rotas de sessão por um proxy em Cloudflare Pages Functions. O `ClientAddressResolver` só aceita o IP do header `X-Client-IP` quando o header `X-Proxy-Secret` confere com `PROXY_SHARED_SECRET` (comparação em tempo constante); fora isso, usa o endereço remoto. O limite de login (`POST /auth/login`) conta tentativas por esse IP. Em produção, a aplicação não sobe sem `PROXY_SHARED_SECRET` ou com `ticketfy.auth.cookie-secure=false`. | Implementado |
-| Autorização por perfil | `User` implementará `UserDetails`, expondo o `role` como autoridade. Regras por perfil, como "só organizador cria evento", serão declaradas por rota ou por método. | Planejado |
-| Controle de acesso ao recurso | Verificar no service se o recurso pertence ao usuário (um cliente só vê os próprios pedidos; um organizador só edita os próprios eventos). | Planejado |
+| Autorização por perfil | `User` implementa `UserDetails` e expõe o `role` como autoridade (`ROLE_USER`, `ROLE_ORGANIZER`, `ROLE_ADMIN`). As regras por perfil são declaradas por método com `@PreAuthorize`: por exemplo, criar evento, lote ou cupom e fazer check-in exigem `ORGANIZER` ou `ADMIN`; extrato, saldo, dados de recebimento e saques exigem `ORGANIZER`; destaque de evento, análise de saques e auditoria exigem `ADMIN`. | Implementado |
+| Controle de acesso ao recurso | Os services conferem se o recurso pertence ao usuário: um cliente só vê os próprios pedidos e ingressos, e um organizador só gerencia os próprios eventos, lotes e cupons; o `ADMIN` passa por essas verificações. Pedido de outro usuário responde 404 `order-not-found`, para não revelar que existe; evento de outro organizador responde 403 `event-access-denied`. | Implementado |
 
-O enum `Role` tem hoje apenas `USER` e `ADMIN`. A autorização por perfil depende da inclusão do perfil de organizador, conforme o conflito C01 do Diagrama de Classes.
+O enum `Role` tem os três perfis, `USER`, `ORGANIZER` e `ADMIN`, protegidos por CHECK no banco (V12). O próprio usuário passa a organizador por `POST /users/me/organizer`. A compra não exige perfil específico: qualquer usuário autenticado compra, o que diverge da RN13 do Documento de Requisitos (I09).
 
 ## 6. Observabilidade
 
@@ -366,7 +376,7 @@ As entidades são mapeadas com anotações JPA (`@Entity`, `@Table`, `@Id`, `@En
 
 ### Migrations
 
-O Flyway executa as migrations na inicialização da aplicação, em ordem de versão. Hoje existe `V1__create_table_users.sql`, que cria a tabela `users` com e-mail único. Cada novo domínio ganha suas migrations (`V2__...`, `V3__...`), e uma migration já aplicada nunca é editada: correções entram em uma nova versão.
+O Flyway executa as migrations na inicialização da aplicação, em ordem de versão. Hoje existem as versões V1 a V21, sem a V7: de `V1__create-table-users.sql`, que cria a tabela `users` com e-mail único, a `V21__add_account_deletion.sql`. Cada novo domínio ou mudança ganha sua migration, e uma migration já aplicada nunca é editada: correções entram em uma nova versão. Regras que precisam valer mesmo fora da aplicação ficam no banco: CHECKs de status e valores, índices únicos parciais (um pagamento aprovado por pedido, um saque em andamento por organizador) e triggers que tornam append-only o extrato, as transferências e a auditoria.
 
 ### Repositories
 
@@ -374,10 +384,11 @@ Cada entidade tem uma interface que estende `JpaRepository`. O Spring gera a imp
 
 ### Relacionamentos entre entidades
 
-Os relacionamentos planejados são detalhados no Diagrama de Classes de Domínio. No mapeamento JPA, eles seguem três orientações:
+Os relacionamentos são detalhados no Diagrama de Classes de Domínio. No mapeamento JPA, eles seguem quatro orientações:
 
 - `@ManyToOne` com carregamento `LAZY` no lado "muitos" (por exemplo, `Order` → `User`), que vira uma chave estrangeira.
 - Composições, como `Order` e seus itens, com `@OneToMany(mappedBy = ..., cascade = ALL, orphanRemoval = true)`, para que os itens sejam salvos e removidos junto com o pedido.
+- Registros consultados por SQL próprio ou gravados uma única vez (extrato, saques, dados de recebimento, bloqueio de saques, transferências e o cupom do pedido) guardam só o `UUID` da outra ponta, com chave estrangeira no banco e sem `@ManyToOne`. A auditoria é gravada e lida por JDBC, sem entidade.
 - Entidades nunca são serializadas diretamente na resposta: a conversão para DTO acontece dentro da transação, evitando erros de carregamento preguiçoso fora dela.
 
 ## 8. Organização do projeto
@@ -439,12 +450,12 @@ As decisões abaixo já foram tomadas e aplicadas no projeto. Cada uma registra 
 
 | ID | Decisão | Motivo | Consequência |
 | --- | --- | --- | --- |
-| DA01 | Expor o backend como API REST. | Permitir que qualquer frontend, web ou móvel, consuma o sistema sem acoplamento ao servidor. | O frontend será desenvolvido depois, sobre o contrato já documentado no Swagger. |
+| DA01 | Expor o backend como API REST. | Permitir que qualquer frontend, web ou móvel, consuma o sistema sem acoplamento ao servidor. | O frontend React foi desenvolvido sobre o contrato OpenAPI, que é gerado no build e conferido no CI; a publicação na Cloudflare Pages está planejada. |
 | DA02 | Monólito em camadas (controller, service, repository). | Escopo acadêmico, um time e um banco: o padrão resolve o problema com pouca infraestrutura e é bem conhecido no ecossistema Spring. | Deploy simples e transações locais; todos os domínios compartilham o mesmo processo. |
 | DA03 | Organizar pacotes por domínio, e não por camada técnica. | Manter juntas as classes que mudam juntas e permitir visibilidade package-private entre elas. | Cada domínio pode evoluir de forma isolada e ser extraído como módulo no futuro. |
 | DA04 | Usar PostgreSQL como banco relacional. | O domínio tem relacionamentos fortes e exige consistência transacional, principalmente no controle de estoque de ingressos. | Integridade garantida por chaves estrangeiras e transações. |
 | DA05 | Versionar o esquema com Flyway. | Tornar o banco reproduzível em qualquer máquina e registrar o histórico de alterações junto ao código. | Nenhuma alteração manual no banco; migrations aplicadas nunca são editadas. |
-| DA06 | Autenticação stateless com JWT. | Dispensar sessão no servidor e manter a API independente do cliente. | O token precisa de prazo de expiração, já que não pode ser revogado individualmente sem estrutura extra. |
+| DA06 | Autenticação stateless com JWT. | Dispensar sessão no servidor e manter a API independente do cliente. | Substituída em parte pela DA14: o JWT continua sendo o access token, mas dura 10 minutos e carrega o id de uma sessão guardada no banco, que pode ser revogada a qualquer momento. |
 | DA07 | Usar DTOs (records) na entrada e saída da API. | Impedir vazamento de campos sensíveis e a alteração de campos protegidos, como `role`. | Exige conversão entre DTO e entidade em cada operação. |
 | DA08 | Usar `@Getter` e `@Setter` do Lombok em vez de `@Data` nas entidades. | `@Data` gera `equals`, `hashCode` e `toString` que conflitam com proxies e relacionamentos do JPA. | Menos código repetitivo sem os riscos do `@Data`. |
 | DA09 | Escrever código e mensagens de commit em inglês. | Seguir o padrão do mercado e a nomenclatura das bibliotecas usadas. | A documentação em português mantém um glossário com os termos equivalentes. |
@@ -473,22 +484,29 @@ A arquitetura atende ao escopo acadêmico, mas tem limitações conhecidas.
 
 | ID | Limitação | Impacto |
 | --- | --- | --- |
-| L01 | A autenticação por JWT ainda não está concluída: hoje, nenhuma rota protegida pode ser acessada. | Os domínios planejados dependem do login para serem testados com perfis diferentes. |
+| L01 | Resolvida: login, access token JWT, refresh token e sessões revogáveis estão implementados (DA14). | — |
 | L02 | Resolvida: os erros seguem a RFC 7807 com `type` estável por tipo de erro (seção Exception). Os textos de `detail` são em inglês e não são traduzidos pela API. | O frontend precisa usar o `type`, o status ou `errors` para mostrar mensagens próprias em português. |
-| L03 | O enum `Role` não tem o perfil de organizador exigido pelos requisitos. | A autorização por perfil não pode ser implementada como especificada. |
+| L03 | Resolvida: o enum `Role` tem o perfil `ORGANIZER`, e a autorização por perfil está implementada (seção 5). Continuam não implementadas a suspensão de contas pelo `ADMIN`, a desativação de lotes e a lista de participantes por ingresso. | Listadas em "Possíveis melhorias" no [roadmap](ROADMAP.md). |
 | L04 | Os services dependem diretamente dos repositories JPA. | Testar regras de negócio exige simular os repositórios; o domínio não é totalmente independente da persistência. Para o porte do projeto, é uma troca aceitável. |
 | L05 | Por ser um monólito, todos os domínios escalam juntos e uma falha grave afeta o sistema inteiro. | Aceitável para o volume de um projeto acadêmico. |
 | L06 | Resolvida: cada access token carrega o id da sessão, e o `SecurityFilter` confere a sessão no banco a cada requisição (DA14). Logout, logout de todos os dispositivos, troca de senha e exclusão da conta (DA17, motivo `ACCOUNT_DELETED`) valem na hora. | Ainda não existe revogação de sessões nem desativação de conta por um ADMIN; quando existirem, devem revogar as sessões do usuário pelo `AuthSessionService`. |
-| L07 | O provedor de pagamento (cartão de crédito e Pix) ainda não foi escolhido. | O fluxo de compra não pode ser implementado de ponta a ponta. |
-| L08 | Apenas o banco roda em Docker; a aplicação ainda não tem imagem própria. | O ambiente de execução depende de Java instalado na máquina. |
+| L07 | O pagamento e a transferência dos saques são simulados, atrás das portas `PaymentGateway` e `PayoutGateway`. A integração com o Asaas (Pix) está planejada; cartão de crédito não está no roadmap. | Nenhum dinheiro real circula. A confirmação assíncrona do provedor e o pagamento aprovado depois da expiração da reserva (Q08 do Documento de Requisitos) ainda não foram tratados. |
+| L08 | Resolvida: a aplicação tem imagem Docker multi-stage, com usuário sem privilégios, e o `docker-compose.yml` sobe a API junto com o banco. | — |
 | L09 | Pendente de revisão jurídica: a retenção do destino dos saques (documento e chave Pix cifrados e `holder_name` em texto puro) em todos os status depois da exclusão da conta, o prazo de retenção citado como justificativa (DA17) e o texto da página de privacidade do frontend. Não existe rotina de expurgo dos dados retidos depois do prazo. | Até a revisão, nada na documentação ou no produto deve afirmar conformidade com a LGPD. Os dados retidos ficam guardados por tempo indeterminado. |
 
 ### Evoluções futuras sugeridas
 
-Os itens abaixo não fazem parte do projeto atual.
+As evoluções sugeridas na versão original já foram feitas: o pacote `exception` com respostas RFC 7807 (L02), o controle de estoque por `UPDATE` condicional, os testes de integração com Testcontainers e a imagem Docker da aplicação (L08).
 
-- **Evolução futura sugerida:** criar o pacote `exception` com `@RestControllerAdvice` e respostas no formato Problem Details (RFC 7807), resolvendo a L02.
-- **Evolução futura sugerida:** usar lock pessimista ou `@Version` em `TicketType` para impedir venda acima do estoque com compras simultâneas.
-- **Evolução futura sugerida:** adicionar testes de integração com Testcontainers, usando um PostgreSQL real nos testes.
-- **Evolução futura sugerida:** criar um Dockerfile da aplicação e incluí-la no `docker-compose.yml`, resolvendo a L08.
+Os itens abaixo não fazem parte do código atual. Os planejados seguem o [roadmap](ROADMAP.md):
+
+- **Planejado:** idioma preferido salvo na conta.
+- **Planejado:** adicionar o evento à agenda com arquivo `.ics`.
+- **Planejado:** e-mails transacionais com Brevo.
+- **Planejado:** pagamento via Pix com Asaas, substituindo o gateway simulado (L07).
+- **Planejado:** publicar o frontend na Cloudflare Pages.
+- **Planejado:** login com Google.
+- **Planejado:** monitoramento de erros com Sentry.
+- **Planejado:** upload de foto de perfil e de capa de evento, hoje informadas como endereço https.
+- **Planejado:** teste de carga com k6.
 - **Evolução futura sugerida:** evoluir para um monólito modular, com fronteiras entre módulos verificadas por ferramentas como o Spring Modulith, se o projeto crescer.

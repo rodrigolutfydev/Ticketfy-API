@@ -56,3 +56,11 @@ O que já está pronto na API do Ticketfy e o que vem a seguir. Os detalhes de c
 - [ ] Monitoramento de erros com Sentry
 - [ ] Upload de foto de perfil e de capa de evento
 - [ ] Teste de carga com k6
+
+## Possíveis melhorias
+
+Lacunas encontradas na revisão dos documentos de engenharia contra o código. Ainda não têm prioridade definida.
+
+- [ ] Desativar um lote para novas vendas sem excluí-lo (a coluna `active` já existe em `ticket_types`, mas não há endpoint)
+- [ ] Lista de participantes por ingresso para o organizador, com o dono atual e a situação de cada ingresso
+- [ ] Suspensão e reativação de contas pelo administrador, com revogação das sessões
