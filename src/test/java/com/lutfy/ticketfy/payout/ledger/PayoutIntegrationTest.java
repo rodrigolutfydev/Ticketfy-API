@@ -224,9 +224,10 @@ class PayoutIntegrationTest extends IntegrationTestBase {
     void freeOrderCreatesNoLedgerEntry() throws Exception {
         var ticketTypeId = insertTicketType(eventId, "0.00");
 
-        var orderId = paidOrder(ticketTypeId, 2);
+        var orderId = orderService.create(order(ticketTypeId, 2), null, buyer).id();
 
         var order = orderRow(orderId);
+        assertThat(jdbc.queryForObject("SELECT status FROM orders WHERE id = ?", String.class, orderId)).isEqualTo("PAID");
         assertThat(order.get("platform_fee")).isEqualTo(new BigDecimal("0.00"));
         assertThat(order.get("net_amount")).isEqualTo(new BigDecimal("0.00"));
         assertThat(entries(orderId)).isEmpty();

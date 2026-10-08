@@ -18,7 +18,8 @@ public record EventDashboardDTO(
         List<StatusSummary> ordersByStatus,
         CheckIn checkIn,
         List<TicketTypeSales> ticketTypes,
-        List<DailySales> dailySales
+        List<DailySales> dailySales,
+        List<CouponUsage> coupons
 ) {
     public record Totals(
             long ticketsSold,
@@ -31,7 +32,8 @@ public record EventDashboardDTO(
             BigDecimal netRevenue,
             long paidOrders,
             BigDecimal averageOrderValue,
-            BigDecimal averageTicketPrice
+            BigDecimal averageTicketPrice,
+            BigDecimal discounts
     ) {}
 
     public record StatusSummary(OrderStatus status, long orders, long tickets) {}
@@ -51,4 +53,14 @@ public record EventDashboardDTO(
     ) {}
 
     public record DailySales(LocalDate date, long tickets, BigDecimal revenue) {}
+
+    public record CouponUsage(
+            UUID id,
+            String code,
+            boolean active,
+            int uses,
+            Integer maxUses,
+            long paidOrders,
+            BigDecimal discountTotal
+    ) {}
 }

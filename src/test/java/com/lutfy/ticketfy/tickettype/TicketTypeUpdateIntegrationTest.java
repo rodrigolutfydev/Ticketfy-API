@@ -199,7 +199,7 @@ class TicketTypeUpdateIntegrationTest extends IntegrationTestBase {
     @Test
     void validatesFields() throws Exception {
         var invalidBodies = Map.of(
-                "price", "{\"price\":0}",
+                "price", "{\"price\":-1}",
                 "name", "{\"name\":\"   \"}",
                 "maxPerOrder", "{\"maxPerOrder\":0}",
                 "quantityTotal", "{\"quantityTotal\":0}",

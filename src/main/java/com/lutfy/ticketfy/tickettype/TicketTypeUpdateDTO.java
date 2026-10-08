@@ -2,6 +2,7 @@ package com.lutfy.ticketfy.tickettype;
 
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
@@ -11,7 +12,7 @@ public record TicketTypeUpdateDTO(
         String name,
         @Size(max = 500)
         String description,
-        @Positive
+        @PositiveOrZero
         BigDecimal price,
         @Positive
         Integer quantityTotal,

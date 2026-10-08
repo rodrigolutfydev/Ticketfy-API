@@ -60,7 +60,13 @@ public enum ProblemType {
     INVALID_PAYOUT_STATE("invalid-payout-state", "Invalid payout state", HttpStatus.CONFLICT),
     PAYOUTS_BLOCKED("payouts-blocked", "Payouts blocked", HttpStatus.CONFLICT),
     INVALID_PAYOUT_BLOCK_STATE("invalid-payout-block-state", "Invalid payout block state", HttpStatus.CONFLICT),
-    ORGANIZER_NOT_FOUND("organizer-not-found", "Organizer not found", HttpStatus.NOT_FOUND);
+    ORGANIZER_NOT_FOUND("organizer-not-found", "Organizer not found", HttpStatus.NOT_FOUND),
+    COUPON_NOT_FOUND("coupon-not-found", "Coupon not found", HttpStatus.NOT_FOUND),
+    COUPON_CODE_ALREADY_EXISTS("coupon-code-already-exists", "Coupon code already exists", HttpStatus.CONFLICT),
+    COUPON_ALREADY_USED("coupon-already-used", "Coupon already used", HttpStatus.CONFLICT),
+    INVALID_COUPON_SETTINGS("invalid-coupon-settings", "Invalid coupon settings", HttpStatus.BAD_REQUEST),
+    INVALID_COUPON("invalid-coupon", "Invalid coupon", HttpStatus.UNPROCESSABLE_ENTITY),
+    TOO_MANY_COUPON_ATTEMPTS("too-many-coupon-attempts", "Too many coupon attempts", HttpStatus.TOO_MANY_REQUESTS);
 
     private final String slug;
     private final String title;

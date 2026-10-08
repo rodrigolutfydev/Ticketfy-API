@@ -1,5 +1,7 @@
 package com.lutfy.ticketfy.order;
 
+import com.lutfy.ticketfy.coupon.CouponCodes;
+import com.lutfy.ticketfy.coupon.CouponService;
 import com.lutfy.ticketfy.event.EventRepository;
 import com.lutfy.ticketfy.infra.exception.*;
 import com.lutfy.ticketfy.payment.PaymentService;
@@ -31,6 +33,7 @@ public class OrderService {
     private final EventRepository eventRepository;
     private final LedgerService ledgerService;
     private final PayoutSettings payoutSettings;
+    private final CouponService couponService;
     private final long reservationMinutes;
     private final long refundDeadlineHours;
 
@@ -41,6 +44,7 @@ public class OrderService {
                         EventRepository eventRepository,
                         LedgerService ledgerService,
                         PayoutSettings payoutSettings,
+                        CouponService couponService,
                         @Value("${ticketfy.order.reservation-minutes}") long reservationMinutes,
                         @Value("${ticketfy.refund.deadline-hours}") long refundDeadlineHours) {
         this.orderRepository = orderRepository;
@@ -50,6 +54,7 @@ public class OrderService {
         this.eventRepository = eventRepository;
         this.ledgerService = ledgerService;
         this.payoutSettings = payoutSettings;
+        this.couponService = couponService;
         this.reservationMinutes = reservationMinutes;
         this.refundDeadlineHours = refundDeadlineHours;
     }
@@ -62,6 +67,10 @@ public class OrderService {
                 checkOwnership(existing.get(), authenticated);
                 return details(existing.get());
             }
+        }
+        var couponCode = CouponCodes.normalize(dto.couponCode());
+        if (couponCode != null) {
+            couponService.checkAttemptsAllowed(authenticated);
         }
         var expiresAt = Instant.now().plus(Duration.ofMinutes(reservationMinutes));
         var order = new Order(authenticated, expiresAt, idempotencyKey);
@@ -90,8 +99,19 @@ public class OrderService {
             var item = new OrderItem(order, ticketType, itemRequest.quantity());
             order.addItem(item);
         }
+        if (couponCode != null) {
+            var redemption = couponService.redeem(eventId, couponCode, authenticated);
+            order.applyCoupon(redemption.couponId(), redemption.code(),
+                    redemption.discountFor(order.getSubtotalAmount()));
+        }
         order.applyPlatformFee(payoutSettings.platformFeePercent());
+        if (order.isFree()) {
+            order.confirmWithoutPayment();
+        }
         var saved = orderRepository.saveAndFlush(order);
+        if (saved.getStatus() == OrderStatus.PAID) {
+            ticketService.issueForOrder(saved);
+        }
         return details(saved);
     }
 
@@ -131,6 +151,7 @@ public class OrderService {
     public void cancelPending(Order order) {
         order.cancel();
         releaseStock(order);
+        releaseCoupon(order);
     }
 
     @Transactional
@@ -169,6 +190,12 @@ public class OrderService {
         }
     }
 
+    private void releaseCoupon(Order order) {
+        if (order.getCouponId() != null) {
+            couponService.releaseUse(order.getCouponId());
+        }
+    }
+
     private OrderDetailsDTO details(Order order) {
         return new OrderDetailsDTO(order, ticketService.findByOrder(order.getId()));
     }
@@ -196,6 +223,7 @@ public class OrderService {
         }
         order.expire();
         releaseStock(order);
+        releaseCoupon(order);
         return true;
     }
 }

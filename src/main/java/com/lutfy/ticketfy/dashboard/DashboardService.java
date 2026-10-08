@@ -77,7 +77,8 @@ public class DashboardService {
                 money(fees.map(DashboardQueryRepository.EventFees::platformFee).orElse(null)),
                 money(fees.map(DashboardQueryRepository.EventFees::netAmount).orElse(null)),
                 paidOrders,
-                average(revenue, paidOrders), paidOrders == 0 ? null : average(revenue, sold));
+                average(revenue, paidOrders), paidOrders == 0 ? null : average(revenue, sold),
+                money(fees.map(DashboardQueryRepository.EventFees::discounts).orElse(null)));
 
         var ordersByStatus = STATUS_ORDER.stream()
                 .map(status -> {
@@ -92,7 +93,14 @@ public class DashboardService {
                 checkIns.checkedIn(), checkIns.issued(), percent(checkIns.checkedIn(), checkIns.issued()));
 
         return new EventDashboardDTO(event.getId(), event.getName(), event.getStartsAt(), zone.getId(), Instant.now(),
-                totals, ordersByStatus, checkIn, ticketTypes, continuousDailySales(eventId));
+                totals, ordersByStatus, checkIn, ticketTypes, continuousDailySales(eventId), couponUsage(eventId));
+    }
+
+    private List<EventDashboardDTO.CouponUsage> couponUsage(UUID eventId) {
+        return queries.findCouponUsage(eventId).stream()
+                .map(coupon -> new EventDashboardDTO.CouponUsage(coupon.id(), coupon.code(), coupon.active(),
+                        coupon.uses(), coupon.maxUses(), coupon.paidOrders(), money(coupon.discountTotal())))
+                .toList();
     }
 
     private List<EventDashboardDTO.DailySales> continuousDailySales(UUID eventId) {
@@ -131,7 +139,10 @@ public class DashboardService {
                         .toList(),
                 money(order.total()),
                 money(order.platformFee()),
-                money(order.netAmount())));
+                money(order.netAmount()),
+                money(order.subtotal()),
+                money(order.discount()),
+                order.couponCode()));
     }
 
     @Transactional(readOnly = true)
@@ -153,13 +164,14 @@ public class DashboardService {
                     event.getImageUrl(), sold, capacity, percent(sold, capacity),
                     money(sales == null ? null : sales.revenue()),
                     money(fees == null ? null : fees.platformFee()),
-                    money(fees == null ? null : fees.netAmount()));
+                    money(fees == null ? null : fees.netAmount()),
+                    money(fees == null ? null : fees.discounts()));
         });
 
         var overall = queries.findOrganizerSales(requester.getId());
         var overallFees = queries.findOrganizerFees(requester.getId());
         var totals = new OrganizerDashboardDTO.Totals(events.getTotalElements(), overall.sold(), money(overall.revenue()),
-                money(overallFees.platformFee()), money(overallFees.netAmount()));
+                money(overallFees.platformFee()), money(overallFees.netAmount()), money(overallFees.discounts()));
         return new OrganizerDashboardDTO(totals, page);
     }
 

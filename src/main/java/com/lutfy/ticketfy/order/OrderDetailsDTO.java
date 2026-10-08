@@ -10,7 +10,10 @@ import java.util.UUID;
 public record OrderDetailsDTO(
        UUID id,
        OrderStatus status,
+       BigDecimal subtotalAmount,
+       BigDecimal discountAmount,
        BigDecimal totalAmount,
+       String couponCode,
        Instant expiresAt,
        Instant createdAt,
        List<OrderItemDTO> items,
@@ -20,7 +23,10 @@ public record OrderDetailsDTO(
     public OrderDetailsDTO(Order order, List<Ticket> tickets) {
         this( order.getId(),
                 order.getStatus(),
+                order.getSubtotalAmount(),
+                order.getDiscountAmount(),
                 order.getTotalAmount(),
+                order.getCouponCode(),
                 order.getExpiresAt(),
                 order.getCreatedAt(),
                 order.getItems().stream().map(OrderItemDTO::new).toList(),

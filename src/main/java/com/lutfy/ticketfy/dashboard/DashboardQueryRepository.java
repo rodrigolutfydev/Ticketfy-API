@@ -43,7 +43,7 @@ public class DashboardQueryRepository {
             """;
 
     private static final String PAID_ORDER_EVENTS = """
-            SELECT DISTINCT o.id, o.platform_fee, o.net_amount, tt.event_id
+            SELECT DISTINCT o.id, o.platform_fee, o.net_amount, o.discount_amount, tt.event_id
               FROM orders o
               JOIN order_items oi ON oi.order_id = o.id
               JOIN ticket_types tt ON tt.id = oi.ticket_type_id
@@ -98,13 +98,13 @@ public class DashboardQueryRepository {
 
     public List<DailySales> findDailySales(UUID eventId, ZoneId zone) {
         var sql = """
-                SELECT CAST(p.approved_at AT TIME ZONE :zone AS DATE) AS day,
+                SELECT CAST(COALESCE(p.approved_at, o.created_at) AT TIME ZONE :zone AS DATE) AS day,
                        SUM(oi.quantity)                               AS tickets,
                        SUM(oi.unit_price * oi.quantity)               AS revenue
                   FROM order_items oi
                   JOIN orders o ON o.id = oi.order_id
                   JOIN ticket_types tt ON tt.id = oi.ticket_type_id
-                  JOIN payments p ON p.order_id = o.id AND p.status = 'APPROVED'
+                  LEFT JOIN payments p ON p.order_id = o.id AND p.status = 'APPROVED'
                  WHERE tt.event_id = :eventId
                    AND o.status = 'PAID'
                  GROUP BY day
@@ -134,9 +134,12 @@ public class DashboardQueryRepository {
 
         var sql = """
                 SELECT o.id, o.status, o.created_at, u.name, u.email, o.platform_fee, o.net_amount,
-                       SUM(oi.unit_price * oi.quantity) AS total,
-                       (SELECT p.approved_at FROM payments p
-                         WHERE p.order_id = o.id AND p.status = 'APPROVED') AS paid_at
+                       SUM(oi.unit_price * oi.quantity) AS subtotal, o.discount_amount, o.coupon_code,
+                       SUM(oi.unit_price * oi.quantity) - o.discount_amount AS total,
+                       CASE WHEN o.status = 'PAID'
+                            THEN COALESCE((SELECT p.approved_at FROM payments p
+                                            WHERE p.order_id = o.id AND p.status = 'APPROVED'), o.created_at)
+                       END AS paid_at
                 """ + EVENT_ORDERS_FROM + where + """
                  GROUP BY o.id, u.name, u.email
                  ORDER BY o.created_at DESC, o.id
@@ -152,7 +155,10 @@ public class DashboardQueryRepository {
                 rs.getString("email"),
                 rs.getBigDecimal("total"),
                 rs.getBigDecimal("platform_fee"),
-                rs.getBigDecimal("net_amount")));
+                rs.getBigDecimal("net_amount"),
+                rs.getBigDecimal("subtotal"),
+                rs.getBigDecimal("discount_amount"),
+                rs.getString("coupon_code")));
         return new PageImpl<>(content, pageable, total == null ? 0 : total);
     }
 
@@ -193,7 +199,8 @@ public class DashboardQueryRepository {
     public List<EventFees> findFeesByEvent(Collection<UUID> eventIds) {
         if (eventIds.isEmpty()) return List.of();
         var sql = "WITH paid AS (" + PAID_ORDER_EVENTS + ") " + """
-                SELECT event_id, SUM(platform_fee) AS platform_fee, SUM(net_amount) AS net_amount
+                SELECT event_id, SUM(platform_fee) AS platform_fee, SUM(net_amount) AS net_amount,
+                       SUM(discount_amount) AS discounts
                   FROM paid
                  WHERE event_id IN (:eventIds)
                  GROUP BY event_id
@@ -201,17 +208,20 @@ public class DashboardQueryRepository {
         return jdbc.query(sql, new MapSqlParameterSource("eventIds", eventIds), (rs, i) -> new EventFees(
                 rs.getObject("event_id", UUID.class),
                 rs.getBigDecimal("platform_fee"),
-                rs.getBigDecimal("net_amount")));
+                rs.getBigDecimal("net_amount"),
+                rs.getBigDecimal("discounts")));
     }
 
     public Fees findOrganizerFees(UUID organizerId) {
         var sql = "WITH paid AS (" + PAID_ORDER_EVENTS + ") " + """
-                SELECT COALESCE(SUM(platform_fee), 0) AS platform_fee, COALESCE(SUM(net_amount), 0) AS net_amount
+                SELECT COALESCE(SUM(platform_fee), 0) AS platform_fee, COALESCE(SUM(net_amount), 0) AS net_amount,
+                       COALESCE(SUM(discount_amount), 0) AS discounts
                   FROM paid
                  WHERE event_id IN (SELECT e.id FROM events e WHERE e.organizer_id = :organizerId AND e.active)
                 """;
         return jdbc.queryForObject(sql, new MapSqlParameterSource("organizerId", organizerId), (rs, i) ->
-                new Fees(rs.getBigDecimal("platform_fee"), rs.getBigDecimal("net_amount")));
+                new Fees(rs.getBigDecimal("platform_fee"), rs.getBigDecimal("net_amount"),
+                        rs.getBigDecimal("discounts")));
     }
 
     public OrganizerSales findOrganizerSales(UUID organizerId) {
@@ -223,6 +233,27 @@ public class DashboardQueryRepository {
                 """;
         return jdbc.queryForObject(sql, new MapSqlParameterSource("organizerId", organizerId), (rs, i) ->
                 new OrganizerSales(rs.getLong("sold"), rs.getBigDecimal("revenue")));
+    }
+
+    public List<CouponUsage> findCouponUsage(UUID eventId) {
+        var sql = """
+                SELECT c.id, c.code, c.active, c.uses_count, c.max_uses,
+                       COUNT(o.id) FILTER (WHERE o.status = 'PAID')                        AS paid_orders,
+                       COALESCE(SUM(o.discount_amount) FILTER (WHERE o.status = 'PAID'), 0) AS discount_total
+                  FROM coupons c
+                  LEFT JOIN orders o ON o.coupon_id = c.id
+                 WHERE c.event_id = :eventId
+                 GROUP BY c.id
+                 ORDER BY c.created_at, c.code
+                """;
+        return jdbc.query(sql, new MapSqlParameterSource("eventId", eventId), (rs, i) -> new CouponUsage(
+                rs.getObject("id", UUID.class),
+                rs.getString("code"),
+                rs.getBoolean("active"),
+                rs.getInt("uses_count"),
+                rs.getObject("max_uses", Integer.class),
+                rs.getLong("paid_orders"),
+                rs.getBigDecimal("discount_total")));
     }
 
     private static String escapeLike(String value) {
@@ -245,7 +276,8 @@ public class DashboardQueryRepository {
 
     record EventOrder(UUID id, OrderStatus status, Instant createdAt, Instant paidAt,
                       String buyerName, String buyerEmail, BigDecimal total,
-                      BigDecimal platformFee, BigDecimal netAmount) {}
+                      BigDecimal platformFee, BigDecimal netAmount,
+                      BigDecimal subtotal, BigDecimal discount, String couponCode) {}
 
     record EventOrderItem(UUID orderId, UUID ticketTypeId, String ticketTypeName, int quantity, BigDecimal unitPrice) {}
 
@@ -253,7 +285,10 @@ public class DashboardQueryRepository {
 
     record OrganizerSales(long sold, BigDecimal revenue) {}
 
-    record EventFees(UUID eventId, BigDecimal platformFee, BigDecimal netAmount) {}
+    record EventFees(UUID eventId, BigDecimal platformFee, BigDecimal netAmount, BigDecimal discounts) {}
 
-    record Fees(BigDecimal platformFee, BigDecimal netAmount) {}
+    record Fees(BigDecimal platformFee, BigDecimal netAmount, BigDecimal discounts) {}
+
+    record CouponUsage(UUID id, String code, boolean active, int uses, Integer maxUses,
+                       long paidOrders, BigDecimal discountTotal) {}
 }

@@ -123,6 +123,16 @@ O access token vale 10 minutos. O refresh token nunca aparece no corpo: ele vai 
 | POST | `/events/{eventId}/ticket-types` | Cria um lote | Dono do evento ou ADMIN |
 | GET | `/events/{eventId}/ticket-types/manage` | Lotes com dados internos (total, vendido, reservado) | Dono do evento ou ADMIN |
 
+### Cupons — `/events/{eventId}/coupons`
+
+| Método | Endpoint | Descrição | Acesso |
+|---|---|---|---|
+| GET | `/events/{eventId}/coupons` | Lista os cupons do evento com usos, pedidos pagos e desconto concedido | Dono do evento ou ADMIN |
+| POST | `/events/{eventId}/coupons` | Cria um cupom percentual ou de valor fixo | Dono do evento ou ADMIN |
+| PUT | `/events/{eventId}/coupons/{couponId}` | Altera tipo, valor, limite, validade e ativo; tipo e valor ficam fixos depois do primeiro uso | Dono do evento ou ADMIN |
+| DELETE | `/events/{eventId}/coupons/{couponId}` | Apaga um cupom nunca usado; usado responde 409 e deve ser desativado | Dono do evento ou ADMIN |
+| POST | `/events/{eventId}/coupons/preview` | Calcula subtotal, desconto e total sem consumir o cupom; 10 falhas em 15 min por usuário | Autenticado |
+
 ### Dashboard do organizador
 
 | Método | Endpoint | Descrição | Acesso |
@@ -137,7 +147,7 @@ Receita considera só pedidos `PAID`, pelo preço congelado nos itens. Como um p
 
 | Método | Endpoint | Descrição | Acesso |
 |---|---|---|---|
-| POST | `/orders` | Cria um pedido e reserva o estoque | Autenticado |
+| POST | `/orders` | Cria um pedido e reserva o estoque; aceita `couponCode`; pedido com total zero já sai `PAID` com os ingressos, sem pagamento | Autenticado |
 | GET | `/orders` | Lista os pedidos do usuário | Autenticado |
 | GET | `/orders/{id}` | Detalha um pedido, com os ingressos emitidos (ingresso transferido aparece com `transferred: true` e sem `code`) | Dono ou ADMIN |
 | DELETE | `/orders/{id}` | Cancela um pedido pendente | Dono ou ADMIN |

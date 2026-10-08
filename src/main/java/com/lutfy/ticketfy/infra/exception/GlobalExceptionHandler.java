@@ -224,6 +224,15 @@ public class GlobalExceptionHandler {
                 .body(problem);
     }
 
+    @ExceptionHandler(TooManyCouponAttemptsException.class)
+    public ResponseEntity<ProblemDetail> handleTooManyCouponAttempts(TooManyCouponAttemptsException ex) {
+        var problem = problems.create(ProblemType.TOO_MANY_COUPON_ATTEMPTS, ex.getMessage());
+        return ResponseEntity.status(problem.getStatus())
+                .contentType(MediaType.APPLICATION_PROBLEM_JSON)
+                .header("Retry-After", String.valueOf(ex.getRetryAfterSeconds()))
+                .body(problem);
+    }
+
     @ExceptionHandler(TooManyPasswordAttemptsException.class)
     public ResponseEntity<ProblemDetail> handleTooManyPasswordAttempts(TooManyPasswordAttemptsException ex) {
         var problem = problems.create(ProblemType.TOO_MANY_PASSWORD_ATTEMPTS, ex.getMessage());

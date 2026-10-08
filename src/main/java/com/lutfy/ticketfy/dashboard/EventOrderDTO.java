@@ -16,7 +16,10 @@ public record EventOrderDTO(
         List<Item> items,
         BigDecimal total,
         BigDecimal platformFee,
-        BigDecimal netAmount
+        BigDecimal netAmount,
+        BigDecimal subtotal,
+        BigDecimal discount,
+        String couponCode
 ) {
     public record Buyer(String name, String email) {}
 

@@ -33,7 +33,11 @@ public class Order {
     private User user;
     @Enumerated(EnumType.STRING)
     private OrderStatus status;
+    private BigDecimal subtotalAmount;
+    private BigDecimal discountAmount;
     private BigDecimal totalAmount;
+    private UUID couponId;
+    private String couponCode;
     private BigDecimal platformFeePercent;
     private BigDecimal platformFee;
     private BigDecimal netAmount;
@@ -54,10 +58,23 @@ public class Order {
         this.idempotencyKey = idempotencyKey;
         this.status = OrderStatus.PENDING;
         this.items = new ArrayList<>();
+        this.subtotalAmount = BigDecimal.ZERO;
+        this.discountAmount = BigDecimal.ZERO;
         this.totalAmount = BigDecimal.ZERO;
         this.platformFeePercent = BigDecimal.ZERO;
         this.platformFee = BigDecimal.ZERO;
         this.netAmount = BigDecimal.ZERO;
+    }
+
+    public void applyCoupon(UUID couponId, String couponCode, BigDecimal discount) {
+        this.couponId = couponId;
+        this.couponCode = couponCode;
+        this.discountAmount = discount;
+        this.totalAmount = subtotalAmount.subtract(discount);
+    }
+
+    public boolean isFree() {
+        return totalAmount.signum() == 0;
     }
 
     public void applyPlatformFee(BigDecimal percent) {
@@ -74,6 +91,13 @@ public class Order {
     public void markAsPaid() {
         if (status != OrderStatus.PENDING) {
             throw new InvalidOrderStateException("Only pending orders can be paid");
+        }
+        this.status = OrderStatus.PAID;
+    }
+
+    public void confirmWithoutPayment() {
+        if (status != OrderStatus.PENDING || !isFree()) {
+            throw new InvalidOrderStateException("Only pending orders with a zero total can be confirmed without payment");
         }
         this.status = OrderStatus.PAID;
     }
@@ -112,7 +136,8 @@ public class Order {
 
     public void addItem(OrderItem item) {
         this.items.add(item);
-        this.totalAmount = this.totalAmount.add(item.subtotal());
+        this.subtotalAmount = this.subtotalAmount.add(item.subtotal());
+        this.totalAmount = this.subtotalAmount.subtract(this.discountAmount);
     }
 
 }
