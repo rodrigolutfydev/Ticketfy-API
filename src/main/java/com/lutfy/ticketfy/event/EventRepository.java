@@ -33,6 +33,15 @@ public interface EventRepository extends JpaRepository<Event, UUID>, JpaSpecific
         """)
     int cancel(@Param("id") UUID id, @Param("reason") String reason, @Param("now") Instant now);
 
+    @Modifying(flushAutomatically = true)
+    @Query("""
+        UPDATE Event e
+           SET e.active = false, e.updatedAt = :now
+         WHERE e.organizer.id = :organizerId
+           AND e.active = true
+        """)
+    int deactivateAllByOrganizer(@Param("organizerId") UUID organizerId, @Param("now") Instant now);
+
     @Lock(LockModeType.PESSIMISTIC_READ)
     @Query("SELECT e FROM Event e WHERE e.id = :id")
     Optional<Event> findForShareById(@Param("id") UUID id);

@@ -66,7 +66,15 @@ public enum ProblemType {
     COUPON_ALREADY_USED("coupon-already-used", "Coupon already used", HttpStatus.CONFLICT),
     INVALID_COUPON_SETTINGS("invalid-coupon-settings", "Invalid coupon settings", HttpStatus.BAD_REQUEST),
     INVALID_COUPON("invalid-coupon", "Invalid coupon", HttpStatus.UNPROCESSABLE_ENTITY),
-    TOO_MANY_COUPON_ATTEMPTS("too-many-coupon-attempts", "Too many coupon attempts", HttpStatus.TOO_MANY_REQUESTS);
+    TOO_MANY_COUPON_ATTEMPTS("too-many-coupon-attempts", "Too many coupon attempts", HttpStatus.TOO_MANY_REQUESTS),
+    EMAIL_NOT_ALLOWED("email-not-allowed", "Email not allowed", HttpStatus.BAD_REQUEST),
+    TOO_MANY_DATA_EXPORTS("too-many-data-exports", "Too many data exports", HttpStatus.TOO_MANY_REQUESTS),
+    ADMIN_ACCOUNT_DELETION("admin-account-deletion", "Admin account deletion", HttpStatus.CONFLICT),
+    ACCOUNT_HAS_PAYOUT_BLOCK("account-has-payout-block", "Account has payout block", HttpStatus.CONFLICT),
+    ACCOUNT_HAS_PAYOUT_IN_PROGRESS("account-has-payout-in-progress", "Account has payout in progress", HttpStatus.CONFLICT),
+    ACCOUNT_HAS_BALANCE("account-has-balance", "Account has balance", HttpStatus.CONFLICT),
+    ACCOUNT_HAS_ACTIVE_EVENTS("account-has-active-events", "Account has active events", HttpStatus.CONFLICT),
+    ACCOUNT_HAS_UPCOMING_TICKETS("account-has-upcoming-tickets", "Account has upcoming tickets", HttpStatus.CONFLICT);
 
     private final String slug;
     private final String title;

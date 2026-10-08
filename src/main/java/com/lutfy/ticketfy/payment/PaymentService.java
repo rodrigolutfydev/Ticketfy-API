@@ -9,6 +9,7 @@ import com.lutfy.ticketfy.order.OrderRepository;
 import com.lutfy.ticketfy.payout.ledger.LedgerService;
 import com.lutfy.ticketfy.ticket.TicketService;
 import com.lutfy.ticketfy.user.User;
+import com.lutfy.ticketfy.user.UserLocks;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,22 +23,26 @@ public class PaymentService {
     private final TicketService ticketService;
     private final PaymentGateway paymentGateway;
     private final LedgerService ledgerService;
+    private final UserLocks userLocks;
 
     public PaymentService(PaymentRepository paymentRepository,
                           OrderRepository orderRepository,
                           TicketService ticketService,
                           PaymentGateway paymentGateway,
-                          LedgerService ledgerService) {
+                          LedgerService ledgerService,
+                          UserLocks userLocks) {
         this.paymentRepository = paymentRepository;
         this.orderRepository = orderRepository;
         this.ticketService = ticketService;
         this.paymentGateway = paymentGateway;
         this.ledgerService = ledgerService;
+        this.userLocks = userLocks;
     }
 
     @Transactional
     public PaymentDetailsDTO paySimulated(UUID orderId, User authenticated) {
-        var order = orderRepository.findById(orderId)
+        userLocks.requireActive(authenticated.getId());
+        var order = orderRepository.findForUpdateById(orderId)
                 .orElseThrow(() -> new OrderNotFoundException("Order not found"));
 
         if (!order.getUser().equals(authenticated)) {

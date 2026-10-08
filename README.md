@@ -104,6 +104,15 @@ O access token vale 10 minutos. O refresh token nunca aparece no corpo: ele vai 
 | PATCH | `/users/me/password` | Troca a senha (exige a atual), encerra todas as sessões e abre uma nova para este dispositivo | Autenticado |
 | POST | `/users/me/organizer` | Torna o usuário organizador; responde 204 e o token atual continua valendo (o papel é lido do banco a cada requisição) | Autenticado |
 
+### Privacidade (LGPD) — `/users/me`
+
+| Método | Endpoint | Descrição | Acesso |
+|---|---|---|---|
+| POST | `/users/me/data-export` | Corpo `{ "password" }`. Devolve um JSON para download (`ticketfy-meus-dados-AAAA-MM-DD.json`) com perfil, pedidos, ingressos, transferências e, para organizador, eventos, saldo, extrato, saques e dados de recebimento (documento e chave Pix completos). Não inclui dados de outras pessoas. Limite de 3 exportações a cada 24 h (429 `too-many-data-exports` com `Retry-After`); senha errada responde 403 `invalid-password` | Autenticado |
+| POST | `/users/me/deletion` | Corpo `{ "password", "confirmation": "EXCLUIR" }`. Anonimiza a conta (nome, e-mail, foto e senha), apaga os dados de recebimento, cancela pedidos pendentes, desativa os eventos do usuário e revoga todas as sessões; responde 204 e apaga o cookie. Recusa com 409: `admin-account-deletion`, `account-has-payout-block`, `account-has-payout-in-progress`, `account-has-balance`, `account-has-active-events`, `account-has-upcoming-tickets` | Autenticado |
+
+Pedidos, pagamentos, extrato, saques e auditoria continuam existindo, ligados à conta anonimizada, e o e-mail original pode ser usado num novo cadastro. Detalhes e pendências de revisão jurídica no `docs/05 - Documento de Arquitetura.md` (DA17 e L09).
+
 ### Eventos — `/events`
 
 | Método | Endpoint | Descrição | Acesso |
@@ -235,6 +244,8 @@ Os testes de integração sobem um PostgreSQL descartável com Testcontainers, e
 | `REFUND_DEADLINE_HOURS` | `48` | Antecedência mínima para reembolso |
 | `LOGIN_MAX_ATTEMPTS` | `5` | Tentativas de login por janela |
 | `LOGIN_WINDOW_SECONDS` | `60` | Duração da janela de tentativas |
+| `DATA_EXPORT_MAX_PER_WINDOW` | `3` | Exportações de dados permitidas por usuário na janela |
+| `DATA_EXPORT_WINDOW_HOURS` | `24` | Duração da janela de exportações |
 
 ---
 

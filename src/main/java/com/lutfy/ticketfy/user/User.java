@@ -29,6 +29,9 @@ import java.util.UUID;
 @EqualsAndHashCode(of = "id")
 public class User implements UserDetails {
 
+    public static final String DELETED_NAME = "Usuário excluído";
+    public static final String DELETED_EMAIL_DOMAIN = "deleted.ticketfy.invalid";
+
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
@@ -48,6 +51,8 @@ public class User implements UserDetails {
 
     @UpdateTimestamp
     private Instant updatedAt;
+
+    private Instant deletedAt;
 
     public User(UserRegistrationDTO data, Role role, String encodedPassword) {
         this.role = role;
@@ -69,6 +74,18 @@ public class User implements UserDetails {
 
     public void changeAvatar(String url) {
         this.avatarUrl = (url == null || url.isBlank()) ? null : url;
+    }
+
+    public void anonymize(String encodedPassword, Instant now) {
+        this.name = DELETED_NAME;
+        this.email = "deleted-" + id + "@" + DELETED_EMAIL_DOMAIN;
+        this.avatarUrl = null;
+        this.password = encodedPassword;
+        this.deletedAt = now;
+    }
+
+    public boolean isDeleted() {
+        return deletedAt != null;
     }
 
     @Override
@@ -98,6 +115,6 @@ public class User implements UserDetails {
 
     @Override
     public boolean isEnabled() {
-        return true;
+        return deletedAt == null;
     }
 }

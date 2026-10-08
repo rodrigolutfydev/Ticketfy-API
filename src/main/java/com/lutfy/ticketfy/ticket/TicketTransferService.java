@@ -12,6 +12,7 @@ import com.lutfy.ticketfy.infra.exception.TicketNotFoundException;
 import com.lutfy.ticketfy.infra.security.PasswordConfirmation;
 import com.lutfy.ticketfy.order.OrderRepository;
 import com.lutfy.ticketfy.user.User;
+import com.lutfy.ticketfy.user.UserLocks;
 import com.lutfy.ticketfy.user.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,12 +33,14 @@ public class TicketTransferService {
     private final TransferRecipientLimiter recipientLimiter;
     private final PasswordConfirmation passwordConfirmation;
     private final AuditService auditService;
+    private final UserLocks userLocks;
 
     public TicketTransferService(TicketRepository ticketRepository, TicketTransferRepository transferRepository,
                                  EventRepository eventRepository, OrderRepository orderRepository,
                                  UserRepository userRepository, TicketService ticketService,
                                  TicketTransferPolicy policy, TransferRecipientLimiter recipientLimiter,
-                                 PasswordConfirmation passwordConfirmation, AuditService auditService) {
+                                 PasswordConfirmation passwordConfirmation, AuditService auditService,
+                                 UserLocks userLocks) {
         this.ticketRepository = ticketRepository;
         this.transferRepository = transferRepository;
         this.eventRepository = eventRepository;
@@ -48,6 +51,7 @@ public class TicketTransferService {
         this.recipientLimiter = recipientLimiter;
         this.passwordConfirmation = passwordConfirmation;
         this.auditService = auditService;
+        this.userLocks = userLocks;
     }
 
     @Transactional
@@ -86,7 +90,7 @@ public class TicketTransferService {
         }
         recipientLimiter.checkAllowed(sender.getId());
         var recipient = userRepository.findByEmail(email).orElse(null);
-        if (recipient == null) {
+        if (recipient == null || !userLocks.lockActive(recipient.getId())) {
             recipientLimiter.recordFailure(sender.getId());
             throw new ProblemException(ProblemType.TRANSFER_RECIPIENT_UNAVAILABLE,
                     "The ticket cannot be transferred to this recipient");

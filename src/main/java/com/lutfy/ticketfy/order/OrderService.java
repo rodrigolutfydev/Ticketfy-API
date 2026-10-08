@@ -11,6 +11,7 @@ import com.lutfy.ticketfy.ticket.TicketService;
 import com.lutfy.ticketfy.tickettype.TicketTypeRepository;
 import com.lutfy.ticketfy.user.Role;
 import com.lutfy.ticketfy.user.User;
+import com.lutfy.ticketfy.user.UserLocks;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -34,6 +35,7 @@ public class OrderService {
     private final LedgerService ledgerService;
     private final PayoutSettings payoutSettings;
     private final CouponService couponService;
+    private final UserLocks userLocks;
     private final long reservationMinutes;
     private final long refundDeadlineHours;
 
@@ -45,6 +47,7 @@ public class OrderService {
                         LedgerService ledgerService,
                         PayoutSettings payoutSettings,
                         CouponService couponService,
+                        UserLocks userLocks,
                         @Value("${ticketfy.order.reservation-minutes}") long reservationMinutes,
                         @Value("${ticketfy.refund.deadline-hours}") long refundDeadlineHours) {
         this.orderRepository = orderRepository;
@@ -55,12 +58,14 @@ public class OrderService {
         this.ledgerService = ledgerService;
         this.payoutSettings = payoutSettings;
         this.couponService = couponService;
+        this.userLocks = userLocks;
         this.reservationMinutes = reservationMinutes;
         this.refundDeadlineHours = refundDeadlineHours;
     }
 
     @Transactional
     public OrderDetailsDTO create(OrderCreationDTO dto, String idempotencyKey, User authenticated) {
+        userLocks.requireActive(authenticated.getId());
         if (idempotencyKey != null) {
             var existing = orderRepository.findByIdempotencyKey(idempotencyKey);
             if (existing.isPresent()) {

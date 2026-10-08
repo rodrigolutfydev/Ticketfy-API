@@ -12,6 +12,7 @@ import com.lutfy.ticketfy.tickettype.EventPricing;
 import com.lutfy.ticketfy.tickettype.TicketTypeRepository;
 import com.lutfy.ticketfy.user.Role;
 import com.lutfy.ticketfy.user.User;
+import com.lutfy.ticketfy.user.UserLocks;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -29,12 +30,14 @@ public class EventService {
     private final EventRepository repository;
     private final TicketTypeRepository ticketTypeRepository;
     private final AuditService auditService;
+    private final UserLocks userLocks;
 
     public EventService(EventRepository repository, TicketTypeRepository ticketTypeRepository,
-                        AuditService auditService) {
+                        AuditService auditService, UserLocks userLocks) {
         this.repository = repository;
         this.ticketTypeRepository = ticketTypeRepository;
         this.auditService = auditService;
+        this.userLocks = userLocks;
     }
 
     private void validateDates(Instant startsAt, Instant endsAt) {
@@ -45,6 +48,7 @@ public class EventService {
 
     @Transactional
     public EventDetailsDTO create(EventCreationDTO dto, User organizer) {
+        userLocks.requireActive(organizer.getId());
         validateDates(dto.startsAt(), dto.endsAt());
         var event = new Event(dto, organizer);
         var saved = repository.saveAndFlush(event);

@@ -241,4 +241,13 @@ public class GlobalExceptionHandler {
                 .header("Retry-After", String.valueOf(ex.getRetryAfterSeconds()))
                 .body(problem);
     }
+
+    @ExceptionHandler(TooManyDataExportsException.class)
+    public ResponseEntity<ProblemDetail> handleTooManyDataExports(TooManyDataExportsException ex) {
+        var problem = problems.create(ProblemType.TOO_MANY_DATA_EXPORTS, ex.getMessage());
+        return ResponseEntity.status(problem.getStatus())
+                .contentType(MediaType.APPLICATION_PROBLEM_JSON)
+                .header("Retry-After", String.valueOf(ex.getRetryAfterSeconds()))
+                .body(problem);
+    }
 }

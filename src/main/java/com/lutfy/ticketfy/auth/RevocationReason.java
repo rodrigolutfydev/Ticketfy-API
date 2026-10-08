@@ -4,5 +4,6 @@ public enum RevocationReason {
     LOGOUT,
     LOGOUT_ALL,
     PASSWORD_CHANGED,
-    REUSE_DETECTED
+    REUSE_DETECTED,
+    ACCOUNT_DELETED
 }

@@ -9,6 +9,7 @@ import com.lutfy.ticketfy.infra.security.PasswordConfirmation;
 import com.lutfy.ticketfy.payout.PayoutSettings;
 import com.lutfy.ticketfy.payout.withdrawal.PayoutGateway;
 import com.lutfy.ticketfy.user.User;
+import com.lutfy.ticketfy.user.UserLocks;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,16 +25,18 @@ public class PayoutAccountService {
     private final PayoutSettings settings;
     private final AuditService auditService;
     private final Clock clock;
+    private final UserLocks userLocks;
 
     public PayoutAccountService(PayoutAccountRepository repository, PayoutGateway gateway,
                                 PasswordConfirmation passwordConfirmation, PayoutSettings settings,
-                                AuditService auditService, Clock clock) {
+                                AuditService auditService, Clock clock, UserLocks userLocks) {
         this.repository = repository;
         this.gateway = gateway;
         this.passwordConfirmation = passwordConfirmation;
         this.settings = settings;
         this.auditService = auditService;
         this.clock = clock;
+        this.userLocks = userLocks;
     }
 
     @Transactional(readOnly = true)
@@ -55,6 +58,7 @@ public class PayoutAccountService {
             throw new ProblemException(ProblemType.PIX_KEY_HOLDER_MISMATCH,
                     "The pix key does not belong to the informed document");
         }
+        userLocks.requireActive(organizer.getId());
         var existing = repository.findForUpdate(organizer.getId());
         boolean keyChanged = existing.map(account -> account.update(destination, clock.instant())).orElse(false);
         var saved = repository.saveAndFlush(existing.orElseGet(() -> new PayoutAccount(organizer.getId(), destination)));

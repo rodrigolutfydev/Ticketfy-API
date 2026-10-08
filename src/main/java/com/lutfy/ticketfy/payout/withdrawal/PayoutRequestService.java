@@ -12,6 +12,7 @@ import com.lutfy.ticketfy.payout.admin.PayoutBlockRepository;
 import com.lutfy.ticketfy.payout.ledger.LedgerQueryRepository;
 import com.lutfy.ticketfy.payout.ledger.LedgerService;
 import com.lutfy.ticketfy.user.User;
+import com.lutfy.ticketfy.user.UserLocks;
 import org.springframework.data.domain.Page;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.data.domain.PageRequest;
@@ -38,11 +39,13 @@ public class PayoutRequestService {
     private final PasswordConfirmation passwordConfirmation;
     private final PayoutSettings settings;
     private final Clock clock;
+    private final UserLocks userLocks;
 
     public PayoutRequestService(PayoutRepository payoutRepository, PayoutAccountRepository accountRepository,
                                 PayoutBlockRepository blockRepository, AuditService auditService,
                                 LedgerQueryRepository queries, LedgerService ledgerService,
-                                PasswordConfirmation passwordConfirmation, PayoutSettings settings, Clock clock) {
+                                PasswordConfirmation passwordConfirmation, PayoutSettings settings, Clock clock,
+                                UserLocks userLocks) {
         this.payoutRepository = payoutRepository;
         this.accountRepository = accountRepository;
         this.blockRepository = blockRepository;
@@ -52,6 +55,7 @@ public class PayoutRequestService {
         this.passwordConfirmation = passwordConfirmation;
         this.settings = settings;
         this.clock = clock;
+        this.userLocks = userLocks;
     }
 
     @Transactional
@@ -61,6 +65,7 @@ public class PayoutRequestService {
                     "Idempotency-Key must have between 1 and 100 characters");
         }
         passwordConfirmation.verify(organizer, dto.password());
+        userLocks.requireActive(organizer.getId());
         var account = accountRepository.findForUpdate(organizer.getId())
                 .orElseThrow(() -> new ProblemException(ProblemType.PAYOUT_ACCOUNT_REQUIRED,
                         "Register your payout account before requesting a payout"));
