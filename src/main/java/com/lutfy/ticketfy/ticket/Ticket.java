@@ -41,6 +41,7 @@ public class Ticket {
     @Enumerated(EnumType.STRING)
     private TicketStatus status;
     private Instant usedAt;
+    private int transferCount;
     @CreationTimestamp
     private Instant createdAt;
     @UpdateTimestamp

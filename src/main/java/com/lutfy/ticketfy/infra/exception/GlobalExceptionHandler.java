@@ -157,11 +157,6 @@ public class GlobalExceptionHandler {
         return problems.response(ProblemType.ORDER_NOT_FOUND, ex.getMessage());
     }
 
-    @ExceptionHandler(OrderAccessDeniedException.class)
-    public ResponseEntity<ProblemDetail> handleOrderAccesdenied(OrderAccessDeniedException ex) {
-        return problems.response(ProblemType.ORDER_ACCESS_DENIED, ex.getMessage());
-    }
-
     @ExceptionHandler(InvalidPaymentStateException.class)
     public ResponseEntity<ProblemDetail> handleInvalidPaymentState(InvalidPaymentStateException ex) {
         return problems.response(ProblemType.INVALID_PAYMENT_STATE, ex.getMessage());
@@ -212,6 +207,15 @@ public class GlobalExceptionHandler {
         var problem = problems.create(ex.getType(), ex.getMessage());
         ex.getProperties().forEach(problem::setProperty);
         return problems.response(problem);
+    }
+
+    @ExceptionHandler(TooManyTransferAttemptsException.class)
+    public ResponseEntity<ProblemDetail> handleTooManyTransferAttempts(TooManyTransferAttemptsException ex) {
+        var problem = problems.create(ProblemType.TOO_MANY_TRANSFER_ATTEMPTS, ex.getMessage());
+        return ResponseEntity.status(problem.getStatus())
+                .contentType(MediaType.APPLICATION_PROBLEM_JSON)
+                .header("Retry-After", String.valueOf(ex.getRetryAfterSeconds()))
+                .body(problem);
     }
 
     @ExceptionHandler(TooManyPasswordAttemptsException.class)

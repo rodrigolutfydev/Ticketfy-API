@@ -1,9 +1,11 @@
 package com.lutfy.ticketfy.order;
 
+import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -44,4 +46,8 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
                   AND t.status = com.lutfy.ticketfy.ticket.TicketStatus.USED)
         """)
     List<UUID> findIdsAwaitingEventCancellation(@Param("statuses") Collection<OrderStatus> statuses);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT o FROM Order o WHERE o.id = :id")
+    Optional<Order> findForUpdateById(@Param("id") UUID id);
 }

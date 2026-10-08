@@ -6,5 +6,6 @@ public enum AuditTargetType {
     ORGANIZER,
     EVENT,
     TICKET_TYPE,
-    USER
+    USER,
+    TICKET
 }

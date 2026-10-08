@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -24,10 +25,12 @@ public class TicketService {
     private static final int CODE_LENGTH = 16;
 
     private final TicketRepository ticketRepository;
+    private final TicketTransferPolicy transferPolicy;
     private final SecureRandom random = new SecureRandom();
 
-    public TicketService(TicketRepository ticketRepository) {
+    public TicketService(TicketRepository ticketRepository, TicketTransferPolicy transferPolicy) {
         this.ticketRepository = ticketRepository;
+        this.transferPolicy = transferPolicy;
     }
 
     @Transactional
@@ -44,7 +47,7 @@ public class TicketService {
     @Transactional(readOnly = true)
     public Page<TicketDetailsDTO> listMyTickets(User authenticated, Pageable pageable) {
         return ticketRepository.findByOwnerId(authenticated.getId(), pageable)
-                .map(TicketDetailsDTO::new);
+                .map(ticket -> new TicketDetailsDTO(ticket, transferPolicy.allows(ticket)));
     }
 
     @Transactional
@@ -67,10 +70,20 @@ public class TicketService {
 
         var usedTicket = ticketRepository.findByCode(code)
                 .orElseThrow(() -> new TicketNotFoundException("Ticket not found"));
-        return new TicketDetailsDTO(usedTicket);
+        return new TicketDetailsDTO(usedTicket, transferPolicy.allows(usedTicket));
     }
 
-    private String generateCode() {
+    @Transactional(readOnly = true)
+    public List<Ticket> findByOrder(UUID orderId) {
+        return ticketRepository.findByOrderIdOrderByCreatedAtAscIdAsc(orderId);
+    }
+
+    @Transactional(readOnly = true)
+    public boolean hasTransferredTickets(UUID orderId) {
+        return ticketRepository.existsByOrderIdAndTransferCountGreaterThan(orderId, 0);
+    }
+
+    String generateCode() {
         var code = new StringBuilder(CODE_LENGTH);
         for (int i = 0; i < CODE_LENGTH; i++) {
             code.append(CODE_ALPHABET.charAt(random.nextInt(CODE_ALPHABET.length())));

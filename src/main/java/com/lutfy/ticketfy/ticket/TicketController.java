@@ -1,6 +1,7 @@
 package com.lutfy.ticketfy.ticket;
 
 import com.lutfy.ticketfy.user.User;
+import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
@@ -8,14 +9,18 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.UUID;
+
 @RestController
 @RequestMapping("/tickets")
 public class TicketController {
 
     private final TicketService service;
+    private final TicketTransferService transferService;
 
-    public TicketController(TicketService service) {
+    public TicketController(TicketService service, TicketTransferService transferService) {
         this.service = service;
+        this.transferService = transferService;
     }
 
     @GetMapping("/me")
@@ -31,5 +36,13 @@ public class TicketController {
             @PathVariable String code,
             @AuthenticationPrincipal User authenticated) {
         return ResponseEntity.ok(service.checkIn(code, authenticated));
+    }
+
+    @PostMapping("/{id}/transfer")
+    public ResponseEntity<TicketTransferResultDTO> transfer(
+            @PathVariable UUID id,
+            @RequestBody @Valid TicketTransferRequestDTO dto,
+            @AuthenticationPrincipal User authenticated) {
+        return ResponseEntity.ok(transferService.transfer(id, dto, authenticated));
     }
 }

@@ -11,9 +11,10 @@ public record TicketDetailsDTO(
         Instant eventStartsAt,
         String ticketTypeName,
         Instant usedAt,
-        Instant createdAt
+        Instant createdAt,
+        boolean transferable
 ) {
-    public TicketDetailsDTO(Ticket ticket) {
+    public TicketDetailsDTO(Ticket ticket, boolean transferable) {
         this(ticket.getId(),
                 ticket.getCode(),
                 ticket.getStatus(),
@@ -21,6 +22,7 @@ public record TicketDetailsDTO(
                 ticket.getTicketType().getEvent().getStartsAt(),
                 ticket.getTicketType().getName(),
                 ticket.getUsedAt(),
-                ticket.getCreatedAt());
+                ticket.getCreatedAt(),
+                transferable);
     }
 }

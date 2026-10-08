@@ -139,17 +139,22 @@ Receita considera só pedidos `PAID`, pelo preço congelado nos itens. Como um p
 |---|---|---|---|
 | POST | `/orders` | Cria um pedido e reserva o estoque | Autenticado |
 | GET | `/orders` | Lista os pedidos do usuário | Autenticado |
-| GET | `/orders/{id}` | Detalha um pedido | Dono ou ADMIN |
+| GET | `/orders/{id}` | Detalha um pedido, com os ingressos emitidos (ingresso transferido aparece com `transferred: true` e sem `code`) | Dono ou ADMIN |
 | DELETE | `/orders/{id}` | Cancela um pedido pendente | Dono ou ADMIN |
 | POST | `/orders/{id}/payment` | Paga (simulado) e emite os ingressos | Dono |
-| POST | `/orders/{id}/refund` | Reembolsa dentro do prazo | Dono |
+| POST | `/orders/{id}/refund` | Reembolsa dentro do prazo; pedido com ingresso transferido responde 409 `order-has-transferred-tickets` | Dono |
+
+Pedido de outro usuário responde 404 `order-not-found` em todos os endpoints acima, sem revelar que o pedido existe.
 
 ### Ingressos — `/tickets`
 
 | Método | Endpoint | Descrição | Acesso |
 |---|---|---|---|
-| GET | `/tickets/me` | Lista os ingressos do usuário | Autenticado |
+| GET | `/tickets/me` | Lista os ingressos de que o usuário é o dono atual, com `transferable` | Autenticado |
+| POST | `/tickets/{id}/transfer` | Transfere o ingresso para outro usuário cadastrado e gera um código novo | Dono atual |
 | POST | `/tickets/{code}/check-in` | Valida o ingresso na entrada | Organizador do evento ou ADMIN |
+
+A transferência recebe `{"recipientEmail": "...", "password": "..."}` e responde `{"ticketId", "transferredAt"}`, sem o código novo. Só vale para ingresso `VALID`, de evento não cancelado e que ainda não começou, até `ticketfy.ticket-transfer.max-per-ticket` vezes (padrão 3). Erros: 403 `invalid-password`, 404 `ticket-not-found` (ingresso de outra pessoa), 400 `self-transfer`, 409 `invalid-ticket-state`, `invalid-event-state`, `ticket-transfer-closed` ou `ticket-transfer-limit-reached`, 422 `transfer-recipient-unavailable` (e-mail não cadastrado, com mensagem genérica) e 429 `too-many-transfer-attempts` depois de cinco destinatários inexistentes em 15 minutos.
 
 ### Saúde
 

@@ -1,9 +1,11 @@
 package com.lutfy.ticketfy.event;
 
+import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -30,4 +32,8 @@ public interface EventRepository extends JpaRepository<Event, UUID>, JpaSpecific
            AND COALESCE(e.endsAt, e.startsAt) > :now
         """)
     int cancel(@Param("id") UUID id, @Param("reason") String reason, @Param("now") Instant now);
+
+    @Lock(LockModeType.PESSIMISTIC_READ)
+    @Query("SELECT e FROM Event e WHERE e.id = :id")
+    Optional<Event> findForShareById(@Param("id") UUID id);
 }

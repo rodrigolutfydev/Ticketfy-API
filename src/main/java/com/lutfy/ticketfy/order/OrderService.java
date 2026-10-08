@@ -60,7 +60,7 @@ public class OrderService {
             var existing = orderRepository.findByIdempotencyKey(idempotencyKey);
             if (existing.isPresent()) {
                 checkOwnership(existing.get(), authenticated);
-                return new OrderDetailsDTO(existing.get());
+                return details(existing.get());
             }
         }
         var expiresAt = Instant.now().plus(Duration.ofMinutes(reservationMinutes));
@@ -92,7 +92,7 @@ public class OrderService {
         }
         order.applyPlatformFee(payoutSettings.platformFeePercent());
         var saved = orderRepository.saveAndFlush(order);
-        return new OrderDetailsDTO(saved);
+        return details(saved);
     }
 
     @Transactional(readOnly = true)
@@ -100,7 +100,7 @@ public class OrderService {
         var order = orderRepository.findWithItemsById(id)
                 .orElseThrow(() -> new OrderNotFoundException("Order not found"));
         checkOwnership(order, authenticated);
-        return new OrderDetailsDTO(order);
+        return details(order);
     }
 
     @Transactional(readOnly = true)
@@ -108,7 +108,7 @@ public class OrderService {
         return orderRepository.findByIdempotencyKey(idempotencyKey)
                 .map(order -> {
                     checkOwnership(order, authenticated);
-                    return new OrderDetailsDTO(order);
+                    return details(order);
                 });
     }
 
@@ -124,7 +124,7 @@ public class OrderService {
                 .orElseThrow(() -> new OrderNotFoundException("Order not found"));
         checkOwnership(order, authenticated);
         cancelPending(order);
-        return new OrderDetailsDTO(order);
+        return details(order);
     }
 
     @Transactional
@@ -135,7 +135,7 @@ public class OrderService {
 
     @Transactional
     public OrderDetailsDTO refund(UUID id, User authenticated) {
-        var order = orderRepository.findById(id)
+        var order = orderRepository.findForUpdateById(id)
                 .orElseThrow(() -> new OrderNotFoundException("Order not found"));
         checkOwnership(order, authenticated);
         var deadline = Instant.now().plus(Duration.ofHours(refundDeadlineHours));
@@ -145,8 +145,13 @@ public class OrderService {
             }
         }
 
+        if (ticketService.hasTransferredTickets(order.getId())) {
+            throw new ProblemException(ProblemType.ORDER_HAS_TRANSFERRED_TICKETS,
+                    "Orders with transferred tickets cannot be refunded");
+        }
+
         refundPaid(order);
-        return new OrderDetailsDTO(order);
+        return details(order);
     }
 
     @Transactional
@@ -164,10 +169,14 @@ public class OrderService {
         }
     }
 
+    private OrderDetailsDTO details(Order order) {
+        return new OrderDetailsDTO(order, ticketService.findByOrder(order.getId()));
+    }
+
     private void checkOwnership(Order order, User authenticated) {
         if (authenticated.getRole() == Role.ADMIN) return;
         if (!order.getUser().equals(authenticated)) {
-            throw new OrderAccessDeniedException("You do not own this order");
+            throw new OrderNotFoundException("Order not found");
         }
     }
 

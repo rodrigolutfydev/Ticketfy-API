@@ -3,7 +3,6 @@ package com.lutfy.ticketfy.payment;
 import com.lutfy.ticketfy.infra.exception.InvalidEventStateException;
 import com.lutfy.ticketfy.infra.exception.InvalidOrderStateException;
 import com.lutfy.ticketfy.infra.exception.InvalidPaymentStateException;
-import com.lutfy.ticketfy.infra.exception.OrderAccessDeniedException;
 import com.lutfy.ticketfy.infra.exception.OrderNotFoundException;
 import com.lutfy.ticketfy.order.Order;
 import com.lutfy.ticketfy.order.OrderRepository;
@@ -42,7 +41,7 @@ public class PaymentService {
                 .orElseThrow(() -> new OrderNotFoundException("Order not found"));
 
         if (!order.getUser().equals(authenticated)) {
-            throw new OrderAccessDeniedException("You do not own this order");
+            throw new OrderNotFoundException("Order not found");
         }
         if (order.belongsToCancelledEvent()) {
             throw new InvalidEventStateException("The event for this order was cancelled");
