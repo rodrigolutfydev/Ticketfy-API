@@ -1,6 +1,6 @@
 # Ticketfy 05 - Documento de Arquitetura
 
-Oct 7, 2026 · @Rodrigo
+Oct 7, 2026
 
 ## Base desta documentação
 
@@ -123,18 +123,7 @@ Quem gera cada resposta:
 - `AuthController`: 401 `session-expired` quando `POST /auth/refresh` recebe um refresh token ausente, vencido, revogado ou já usado; a resposta também apaga o cookie.
 - `ProblemDetailErrorController`: substitui o `/error` do Spring Boot. Erros que escapam do MVC (por exemplo, exceção num filtro) viram um problem genérico por status, sem mensagem interna.
 
-| Status | Tipos (`slug`) |
-| --- | --- |
-| 400 | `validation-failed`, `malformed-request-body`, `missing-parameter`, `missing-header`, `invalid-parameter`, `invalid-event-dates`, `invalid-ticket-type-quantity`, `mixed-events-order`, `max-per-order-exceeded`, `self-transfer`, `invalid-coupon-settings`, `email-not-allowed`, `bad-request` |
-| 401 | `invalid-credentials`, `authentication-required`, `session-expired` |
-| 403 | `access-denied`, `event-access-denied`, `auth-request-rejected` |
-| 404 | `user-not-found`, `event-not-found`, `ticket-type-not-found`, `order-not-found`, `ticket-not-found`, `coupon-not-found`, `resource-not-found` |
-| 405 | `method-not-allowed` (com o cabeçalho `Allow`) |
-| 409 | `email-already-exists`, `invalid-role-change`, `ticket-type-name-already-exists`, `invalid-order-state`, `insufficient-stock`, `invalid-payment-state`, `invalid-ticket-state`, `invalid-event-state`, `event-has-sales`, `ticket-transfer-closed`, `ticket-transfer-limit-reached`, `order-has-transferred-tickets`, `coupon-code-already-exists`, `coupon-already-used`, `admin-account-deletion`, `account-has-payout-block`, `account-has-payout-in-progress`, `account-has-balance`, `account-has-active-events`, `account-has-upcoming-tickets` |
-| 415 | `unsupported-media-type` |
-| 422 | `transfer-recipient-unavailable`, `invalid-coupon` |
-| 429 | `too-many-login-attempts`, `too-many-transfer-attempts`, `too-many-coupon-attempts`, `too-many-data-exports` |
-| 500 | `internal-error` |
+A lista completa de tipos, com o status e quando cada um acontece, está na [referência da API](API.md#erros).
 
 O 500 genérico responde sempre `detail: "Internal server error"`. A exceção vai apenas para o log, e a resposta nunca expõe mensagem, stack trace ou nome de classe. Um status de erro sem tipo próprio que chegue ao `/error` responde com `type: about:blank` e o nome padrão do status.
 
@@ -146,7 +135,38 @@ Autenticação e autorização com Spring Security. Intercepta a requisição an
 
 ### Config
 
-Classes de configuração transversais, como os beans do Spring (`ClockConfig`, `SchedulingConfig`). O `SecurityConfig` fica no pacote `infra/config`, e as classes de autenticação (login, tokens e filtros) ficam no pacote `infra/security`. O Springdoc é configurado apenas por propriedades.
+Classes de configuração transversais, como os beans do Spring (`ClockConfig`, `SchedulingConfig`). O `SecurityConfig` fica no pacote `infra/config`, e as classes de autenticação (login, tokens e filtros) ficam no pacote `infra/security`. O `OpenApiConfig` define título, versão (lida do `build-info` do Maven), servidor de produção e o esquema `bearerAuth` do contrato OpenAPI; o `OpenApiExportTest` grava esse contrato em `docs/openapi.json` a cada build, e o CI falha se o arquivo commitado estiver desatualizado.
+
+Variáveis de ambiente lidas pela aplicação:
+
+| Variável | Padrão | Descrição |
+| --- | --- | --- |
+| `SPRING_PROFILES_ACTIVE` | `dev` | Perfil (`dev` ou `prod`) |
+| `DB_URL` | `jdbc:postgresql://localhost:5432/ticketfy` | URL do banco |
+| `DB_USERNAME` | `ticketfy_user` | Usuário do banco |
+| `DB_PASSWORD` | — | Senha do banco (obrigatória) |
+| `JWT_SECRET` | — | Chave de assinatura dos access tokens, com 32 ou mais caracteres (obrigatória) |
+| `PAYOUT_ENCRYPTION_KEY` | chave fixa de desenvolvimento no perfil `dev` | Chave AES-256 em base64 que cifra documento e chave Pix (obrigatória em `prod`, que recusa a chave de desenvolvimento) |
+| `PROXY_SHARED_SECRET` | vazio | Segredo do proxy do frontend para aceitar `X-Client-IP`, com 32 ou mais caracteres (obrigatório em `prod`) |
+| `CORS_ALLOWED_ORIGINS` | `http://localhost:3000,http://localhost:5173` | Origens autorizadas, separadas por vírgula; também valem para a checagem de `Origin` em `/auth/**` |
+| `DASHBOARD_TIME_ZONE` | `America/Sao_Paulo` | Fuso dos agrupamentos por dia e dos filtros por data |
+| `ORDER_RESERVATION_MINUTES` | `15` | Duração da reserva de um pedido |
+| `REFUND_DEADLINE_HOURS` | `48` | Antecedência mínima, em relação ao início do evento, para pedir reembolso |
+| `LOGIN_MAX_ATTEMPTS` | `5` | Tentativas de login por IP na janela |
+| `LOGIN_WINDOW_SECONDS` | `60` | Janela do limite de login |
+| `PASSWORD_CONFIRMATION_MAX_ATTEMPTS` | `5` | Erros de senha de confirmação por usuário na janela (vale também para destinatários inexistentes na transferência) |
+| `PASSWORD_CONFIRMATION_WINDOW_SECONDS` | `900` | Janela do limite de senha de confirmação |
+| `TICKET_TRANSFER_MAX_PER_TICKET` | `3` | Transferências permitidas por ingresso |
+| `COUPON_MAX_FAILED_ATTEMPTS` | `10` | Cupons inválidos por usuário na janela |
+| `COUPON_WINDOW_SECONDS` | `900` | Janela do limite de cupons |
+| `DATA_EXPORT_MAX_PER_WINDOW` | `3` | Exportações de dados por usuário na janela |
+| `DATA_EXPORT_WINDOW_HOURS` | `24` | Janela do limite de exportações |
+| `PLATFORM_FEE_PERCENT` | `5` | Taxa da plataforma sobre o valor pago, de 0 a 100 com até 2 casas |
+| `PAYOUT_RELEASE_DELAY_DAYS` | `2` | Dias depois do fim do evento até o crédito ficar disponível |
+| `PAYOUT_MIN_AMOUNT` | `20.00` | Valor mínimo de saque |
+| `PAYOUT_KEY_CHANGE_COOLDOWN_HOURS` | `48` | Bloqueio de saques depois de trocar a chave Pix |
+| `PAYOUT_STUCK_AFTER_MINUTES` | `10` | Tempo em processamento depois do qual a rotina reconsulta o saque |
+| `PAYOUT_REVIEW_THRESHOLD` | `5000.00` | Saques acima deste valor passam por análise |
 
 ## 3. Diagrama de arquitetura
 

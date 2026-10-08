@@ -1,6 +1,6 @@
 # Ticketfy — Caso de Uso
 
-Oct 7, 2026 · @Rodrigo
+Oct 7, 2026
 
 ## 0. Análise do contexto e premissas
 

@@ -36,6 +36,14 @@ jobs:
       - name: Rodar testes e cobertura
         run: ./mvnw -B verify
 
+      - name: Conferir se o docs/openapi.json está atualizado
+        run: |
+          if [ -n "$(git status --porcelain -- docs/openapi.json)" ]; then
+            echo "::error file=docs/openapi.json::docs/openapi.json desatualizado: rode ./mvnw verify e commite o arquivo."
+            git --no-pager diff --stat -- docs/openapi.json
+            exit 1
+          fi
+
       - name: Publicar relatórios como artefato
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

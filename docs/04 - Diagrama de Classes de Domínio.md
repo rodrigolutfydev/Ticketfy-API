@@ -1,6 +1,6 @@
 # Ticketfy 04 - Diagrama de Classes de Domínio
 
-Oct 7, 2026 · @Rodrigo
+Oct 7, 2026
 
 ## Fonte da modelagem
 

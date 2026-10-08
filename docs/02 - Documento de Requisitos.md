@@ -1,6 +1,6 @@
 # Ticketfy 02 - Documento de Requisitos
 
-Oct 7, 2026 · @Rodrigo
+Oct 7, 2026
 
 ## Nota sobre este documento
 

@@ -3,439 +3,99 @@
 [![CI](https://github.com/rodrigolutfydev/Ticketfy-API/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/rodrigolutfydev/Ticketfy-API/actions/workflows/ci.yml)
 [![Cobertura](https://rodrigolutfydev.github.io/Ticketfy-API/badges/coverage.svg)](https://rodrigolutfydev.github.io/Ticketfy-API/jacoco/)
 
-API REST de venda de ingressos para eventos, construída com Java e Spring Boot. O projeto simula o backend de uma plataforma : organizadores publicam eventos e lotes, compradores fazem pedidos e pagam, e cada ingresso recebe um código único validado na entrada.
+API de venda de ingressos que trata no banco de dados os problemas de verdade: a última vaga disputada, o clique duplo, o pagamento no instante da expiração e o mesmo ingresso lido por dois porteiros.
 
-O foco está nos problemas reais de um sistema de ingressos: duas pessoas comprando a última vaga ao mesmo tempo, clique duplo, reserva abandonada, pagamento no instante da expiração e o mesmo ingresso lido por dois porteiros. Cada caso tem uma garantia no banco de dados, e não só um `if` no Java.
+- **Site:** em breve
+- **API:** [ticketfy-api.onrender.com](https://ticketfy-api.onrender.com/actuator/health)
+- **Documentação:** [referência da API](docs/API.md) · [contrato OpenAPI](docs/openapi.json) · [arquitetura](docs/05%20-%20Documento%20de%20Arquitetura.md) · [roadmap](docs/ROADMAP.md)
 
-**Em produção:** API no Render, banco PostgreSQL no Neon, testes automatizados no GitHub Actions.
+## O que o sistema faz
 
----
+**Comprador**
+- Encontra eventos por nome, cidade e destaque, e compra ingressos de um ou mais lotes, com cupom de desconto.
+- Recebe ingressos com código único, transfere para outra pessoa e pede reembolso dentro do prazo.
+- Baixa os próprios dados e exclui a conta.
 
-## Tecnologias
+**Organizador**
+- Publica eventos, cria lotes e cupons, faz o check-in na entrada e cancela o evento com reembolso automático.
+- Acompanha vendas, check-in e cupons no painel.
+- Vê o saldo e o extrato, cadastra a chave Pix e pede saques.
 
-| Tecnologia | Detalhes |
+**Administrador**
+- Analisa, aprova ou recusa saques e bloqueia organizadores.
+- Destaca eventos na vitrine.
+- Consulta a auditoria das ações sensíveis.
+
+## Destaques técnicos
+
+- **Última vaga:** a reserva é um `UPDATE` condicional no estoque, coberto por teste com várias threads disputando o mesmo ingresso.
+- **Sessões:** access token de 10 minutos e refresh token rotativo em cookie `HttpOnly`; logout e troca de senha valem na hora.
+- **Dinheiro:** saldo derivado de um extrato imutável, com saque em análise e documento e chave Pix cifrados com AES-256-GCM.
+- **Concorrência:** transferência, check-in, reembolso, cancelamento e exclusão de conta se serializam por uma ordem fixa de travas no banco.
+- **Erros:** respostas no padrão RFC 7807 com `type` estável, e `X-Request-Id` em toda resposta e nos logs.
+- **Privacidade:** exportação dos próprios dados e exclusão de conta por anonimização, numa única transação.
+
+## Stack
+
+| Camada | Tecnologia |
 |---|---|
-| Linguagem | Java 17 |
-| Framework | Spring Boot 4.1 |
-| Persistência | Spring Data JPA + Hibernate 7 |
-| Banco de dados | PostgreSQL 16 |
-| Migrations | Flyway |
-| Validação | Jakarta Bean Validation |
-| Segurança | Spring Security + JWT (java-jwt) + BCrypt |
-| Agendamento | Spring Scheduling |
-| Observabilidade | Spring Boot Actuator (health check) |
-| Documentação | Springdoc OpenAPI (Swagger, perfil `dev`) |
-| Testes | JUnit 5 + Testcontainers |
-| Boilerplate | Lombok |
-| Build | Maven (wrapper incluído) |
-| Containerização | Docker (multi-stage) + Docker Compose |
-| CI | GitHub Actions |
-| Deploy | Render (API) + Neon (PostgreSQL) |
+| Linguagem e framework | Java 17, Spring Boot 4.1 |
+| Persistência | Spring Data JPA, Hibernate 7, PostgreSQL 16, Flyway |
+| Segurança | Spring Security, JWT (java-jwt), BCrypt |
+| Documentação | springdoc OpenAPI |
+| Testes | JUnit 5, Testcontainers, JaCoCo |
+| Entrega | Docker, GitHub Actions, Render, Neon |
 
----
+## Arquitetura
 
-## Estrutura do projeto
-
-```
-src/main/java/com/lutfy/ticketfy/
-├── infra/
-│   ├── config/         Segurança, CORS e agendamento
-│   ├── security/       Login, token JWT, filtro de autenticação, limite de tentativas
-│   └── exception/      Tratamento centralizado de erros
-├── user/               Cadastro, papéis e perfil
-├── event/              Eventos
-├── tickettype/         Lotes e controle de estoque
-├── order/              Pedidos, expiração e reembolso
-├── payment/            Pagamento simulado
-├── ticket/             Emissão de ingressos e check-in
-└── ApiApplication
-
-src/main/resources/
-├── application.properties          Configuração comum
-├── application-dev.properties      Perfil de desenvolvimento
-├── application-prod.properties     Perfil de produção
-└── db/migration/                   V1 a V6
-
-src/test/java/com/lutfy/ticketfy/
-├── IntegrationTestBase                 Container PostgreSQL compartilhado
-└── OrderConcurrencyIntegrationTest     Disputa pelo último ingresso
+```mermaid
+flowchart LR
+    browser["Navegador"] --> pages["Frontend React<br/>Cloudflare Pages"]
+    pages -- "/api/auth/** (proxy com cookie)" --> filters
+    pages -- "demais rotas com Bearer" --> filters
+    subgraph api["Ticketfy API · Render"]
+        filters["Filtros<br/>Request ID, Origin, limite de login, sessão"] --> controllers["Controllers"]
+        controllers --> services["Services<br/>regras e transações"]
+        jobs["Rotinas agendadas<br/>expiração, cancelamento, saques"] --> services
+        services --> repositories["Repositories<br/>JPA e JDBC"]
+    end
+    repositories --> db[("PostgreSQL<br/>Neon")]
 ```
 
-O código é organizado por domínio, e não por camada: cada pasta reúne entidade, repositório, serviço, controller e DTOs daquele conceito de negócio.
+O código é organizado por domínio (`event`, `order`, `ticket`, `payout` e outros), e cada pacote reúne controller, service, repository e DTOs. O raciocínio de cada decisão está no [documento de arquitetura](docs/05%20-%20Documento%20de%20Arquitetura.md).
 
----
+## Como rodar localmente
 
-## Decisões técnicas
+Pré-requisitos: Java 17 ou mais recente e Docker.
 
-| Problema | Solução |
-|---|---|
-| Venda simultânea do último ingresso | `UPDATE` condicional em `quantity_sold`, verificado por teste com 10 threads |
-| Clique duplo em "comprar" | Header `Idempotency-Key` com constraint única, vinculada ao dono |
-| Pagamento e expiração ao mesmo tempo | Lock otimista (`@Version`) no pedido |
-| Dois pagamentos aprovados | Índice único parcial em `payments` |
-| Check-in duplicado | `UPDATE ... WHERE status = 'VALID'` |
-| Reembolso com ingresso já usado | `UPDATE` condicional + contagem; diverge, desfaz tudo com `409` |
-| Excluir evento com vendas | Recusado com `409`, depois da checagem de dono |
-| Comprar lote de evento excluído | Busca do lote exige lote e evento ativos |
-| Dinheiro | `BigDecimal` e `NUMERIC(10,2)`; o valor cobrado vem do pedido |
-| Fuso horário | `Instant` e `TIMESTAMPTZ` |
-| Consultas N+1 | `@EntityGraph` no detalhe do pedido e na lista de ingressos |
+1. Crie um `.env` na raiz (não versionado) com as variáveis obrigatórias:
 
-O raciocínio completo de cada decisão está no documento de arquitetura do projeto.
+   ```
+   DB_PASSWORD=sua_senha
+   JWT_SECRET=gere_com_openssl_rand_base64_32
+   ```
 
----
+   O perfil `dev` usa uma chave de desenvolvimento para cifrar os dados de recebimento. O perfil `prod` também exige `PAYOUT_ENCRYPTION_KEY` e `PROXY_SHARED_SECRET`. A lista completa de variáveis está na seção Config do [documento de arquitetura](docs/05%20-%20Documento%20de%20Arquitetura.md#config).
 
-## Endpoints
+2. Suba o banco e a API:
 
-Rotas protegidas exigem o header `Authorization: Bearer <token>`. Datas trafegam em ISO 8601 UTC: `"2026-12-10T23:00:00Z"` é 20h em Brasília.
+   ```bash
+   git clone https://github.com/rodrigolutfydev/Ticketfy-API.git
+   cd Ticketfy-API
+   docker compose up -d
+   set -a; source .env; set +a
+   ./mvnw spring-boot:run
+   ```
 
-O access token vale 10 minutos. O refresh token nunca aparece no corpo: ele vai no cookie `__Host-ticketfy_rt` (`HttpOnly`, `Secure`, `SameSite=Strict`), vale 30 minutos sem uso e é trocado a cada renovação; reapresentar um refresh token já usado encerra a sessão. A sessão dura no máximo 12 horas. Todo `POST /auth/**` exige o header `Origin` igual a uma das origens de `CORS_ALLOWED_ORIGINS` e o header `X-Ticketfy-Auth: 1`; sem isso, a resposta é 403 `auth-request-rejected`.
+   A API sobe em `http://localhost:8080`, o Flyway cria as tabelas e o Swagger fica em `/swagger-ui/index.html`.
 
-### Usuários e autenticação
+3. Rode os testes (o Docker precisa estar rodando, porque os testes sobem um PostgreSQL descartável):
 
-| Método | Endpoint | Descrição | Acesso |
-|---|---|---|---|
-| POST | `/users` | Cadastra um usuário | Público |
-| POST | `/auth/login` | Autentica, cria uma sessão, devolve o access token e grava o cookie do refresh token | Público |
-| POST | `/auth/refresh` | Troca o refresh token do cookie por um novo e devolve outro access token; 401 `session-expired` se a sessão acabou | Público (cookie) |
-| POST | `/auth/logout` | Encerra a sessão do cookie e apaga o cookie; responde 204 mesmo sem cookie | Público (cookie) |
-| POST | `/auth/logout-all` | Encerra todas as sessões do usuário, em todos os dispositivos | Autenticado |
-| GET | `/users/me` | Dados e papel do usuário autenticado | Autenticado |
-| PATCH | `/users/me/password` | Troca a senha (exige a atual), encerra todas as sessões e abre uma nova para este dispositivo | Autenticado |
-| POST | `/users/me/organizer` | Torna o usuário organizador; responde 204 e o token atual continua valendo (o papel é lido do banco a cada requisição) | Autenticado |
+   ```bash
+   ./mvnw verify
+   ```
 
-### Privacidade (LGPD) — `/users/me`
-
-| Método | Endpoint | Descrição | Acesso |
-|---|---|---|---|
-| POST | `/users/me/data-export` | Corpo `{ "password" }`. Devolve um JSON para download (`ticketfy-meus-dados-AAAA-MM-DD.json`) com perfil, pedidos, ingressos, transferências e, para organizador, eventos, saldo, extrato, saques e dados de recebimento (documento e chave Pix completos). Não inclui dados de outras pessoas. Limite de 3 exportações a cada 24 h (429 `too-many-data-exports` com `Retry-After`); senha errada responde 403 `invalid-password` | Autenticado |
-| POST | `/users/me/deletion` | Corpo `{ "password", "confirmation": "EXCLUIR" }`. Anonimiza a conta (nome, e-mail, foto e senha), apaga os dados de recebimento, cancela pedidos pendentes, desativa os eventos do usuário e revoga todas as sessões; responde 204 e apaga o cookie. Recusa com 409: `admin-account-deletion`, `account-has-payout-block`, `account-has-payout-in-progress`, `account-has-balance`, `account-has-active-events`, `account-has-upcoming-tickets` | Autenticado |
-
-Pedidos, pagamentos, extrato, saques e auditoria continuam existindo, ligados à conta anonimizada, e o e-mail original pode ser usado num novo cadastro. Detalhes e pendências de revisão jurídica no `docs/05 - Documento de Arquitetura.md` (DA17 e L09).
-
-### Eventos — `/events`
-
-| Método | Endpoint | Descrição | Acesso |
-|---|---|---|---|
-| GET | `/events` | Lista eventos ativos, com `q`, `city` e paginação | Público |
-| GET | `/events/{id}` | Detalha um evento | Público |
-| GET | `/events/mine` | Lista os eventos do usuário | Autenticado |
-| POST | `/events` | Cria um evento | ORGANIZER ou ADMIN |
-| PUT | `/events/{id}` | Atualiza um evento (parcial) | Dono ou ADMIN |
-| DELETE | `/events/{id}` | Desativa um evento sem vendas | Dono ou ADMIN |
-
-### Lotes — `/events/{eventId}/ticket-types`
-
-| Método | Endpoint | Descrição | Acesso |
-|---|---|---|---|
-| GET | `/events/{eventId}/ticket-types` | Lista os lotes ativos (esgotado/restante, sem revelar volume de vendas) | Público |
-| POST | `/events/{eventId}/ticket-types` | Cria um lote | Dono do evento ou ADMIN |
-| GET | `/events/{eventId}/ticket-types/manage` | Lotes com dados internos (total, vendido, reservado) | Dono do evento ou ADMIN |
-
-### Cupons — `/events/{eventId}/coupons`
-
-| Método | Endpoint | Descrição | Acesso |
-|---|---|---|---|
-| GET | `/events/{eventId}/coupons` | Lista os cupons do evento com usos, pedidos pagos e desconto concedido | Dono do evento ou ADMIN |
-| POST | `/events/{eventId}/coupons` | Cria um cupom percentual ou de valor fixo | Dono do evento ou ADMIN |
-| PUT | `/events/{eventId}/coupons/{couponId}` | Altera tipo, valor, limite, validade e ativo; tipo e valor ficam fixos depois do primeiro uso | Dono do evento ou ADMIN |
-| DELETE | `/events/{eventId}/coupons/{couponId}` | Apaga um cupom nunca usado; usado responde 409 e deve ser desativado | Dono do evento ou ADMIN |
-| POST | `/events/{eventId}/coupons/preview` | Calcula subtotal, desconto e total sem consumir o cupom; 10 falhas em 15 min por usuário | Autenticado |
-
-### Dashboard do organizador
-
-| Método | Endpoint | Descrição | Acesso |
-|---|---|---|---|
-| GET | `/events/{id}/dashboard` | Resumo de vendas do evento: totais, pedidos por status, check-in, lotes e vendas por dia | Dono do evento ou ADMIN |
-| GET | `/events/{id}/orders` | Pedidos do evento, paginado, com filtros `status` e `q` (nome ou e-mail) | Dono do evento ou ADMIN |
-| GET | `/organizer/dashboard` | Vendas de todos os eventos ativos do organizador logado, paginado | ORGANIZER ou ADMIN |
-
-Receita considera só pedidos `PAID`, pelo preço congelado nos itens. Como um pedido pode ter lotes de eventos diferentes, os números de cada evento usam apenas os itens daquele evento. Vendas por dia agrupam pela data de aprovação do pagamento no fuso `ticketfy.dashboard.time-zone` (padrão `America/Sao_Paulo`).
-
-### Pedidos — `/orders`
-
-| Método | Endpoint | Descrição | Acesso |
-|---|---|---|---|
-| POST | `/orders` | Cria um pedido e reserva o estoque; aceita `couponCode`; pedido com total zero já sai `PAID` com os ingressos, sem pagamento | Autenticado |
-| GET | `/orders` | Lista os pedidos do usuário | Autenticado |
-| GET | `/orders/{id}` | Detalha um pedido, com os ingressos emitidos (ingresso transferido aparece com `transferred: true` e sem `code`) | Dono ou ADMIN |
-| DELETE | `/orders/{id}` | Cancela um pedido pendente | Dono ou ADMIN |
-| POST | `/orders/{id}/payment` | Paga (simulado) e emite os ingressos | Dono |
-| POST | `/orders/{id}/refund` | Reembolsa dentro do prazo; pedido com ingresso transferido responde 409 `order-has-transferred-tickets` | Dono |
-
-Pedido de outro usuário responde 404 `order-not-found` em todos os endpoints acima, sem revelar que o pedido existe.
-
-### Ingressos — `/tickets`
-
-| Método | Endpoint | Descrição | Acesso |
-|---|---|---|---|
-| GET | `/tickets/me` | Lista os ingressos de que o usuário é o dono atual, com `transferable` | Autenticado |
-| POST | `/tickets/{id}/transfer` | Transfere o ingresso para outro usuário cadastrado e gera um código novo | Dono atual |
-| POST | `/tickets/{code}/check-in` | Valida o ingresso na entrada | Organizador do evento ou ADMIN |
-
-A transferência recebe `{"recipientEmail": "...", "password": "..."}` e responde `{"ticketId", "transferredAt"}`, sem o código novo. Só vale para ingresso `VALID`, de evento não cancelado e que ainda não começou, até `ticketfy.ticket-transfer.max-per-ticket` vezes (padrão 3). Erros: 403 `invalid-password`, 404 `ticket-not-found` (ingresso de outra pessoa), 400 `self-transfer`, 409 `invalid-ticket-state`, `invalid-event-state`, `ticket-transfer-closed` ou `ticket-transfer-limit-reached`, 422 `transfer-recipient-unavailable` (e-mail não cadastrado, com mensagem genérica) e 429 `too-many-transfer-attempts` depois de cinco destinatários inexistentes em 15 minutos.
-
-### Saúde
-
-| Método | Endpoint | Descrição | Acesso |
-|---|---|---|---|
-| GET | `/actuator/health` | Estado da API e da conexão com o banco | Público |
-
-Listagens aceitam `page`, `size` (padrão 20, máximo 100) e `sort`.
-
----
-
-## Como rodar
-
-### Pré-requisitos
-
-- Java 17+
-- Docker e Docker Compose
-
-### Configuração
-
-Crie um `.env` na raiz (não versionado):
-
-```
-DB_PASSWORD=sua_senha
-JWT_SECRET=gere_com_openssl_rand_base64_32
-```
-
-A `JWT_SECRET` precisa de 32 ou mais caracteres e não tem valor padrão, para que nenhum segredo fique no repositório.
-
-### Rodar com Maven (banco no Docker)
-
-```bash
-git clone https://github.com/rodrigolutfydev/Ticketfy-API.git
-cd Ticketfy-API
-docker compose up -d
-set -a; source .env; set +a
-./mvnw spring-boot:run
-```
-
-A API sobe em `http://localhost:8080`, o Flyway cria as tabelas, e o Swagger fica em `/swagger-ui/index.html`.
-
-### Rodar tudo com Docker (perfil `prod`)
-
-```bash
-docker compose --profile app up -d --build
-```
-
-### Testes
-
-```bash
-./mvnw test
-```
-
-Os testes de integração sobem um PostgreSQL descartável com Testcontainers, então o Docker precisa estar rodando. Os mesmos testes rodam no GitHub Actions a cada push.
-
-### Variáveis de ambiente
-
-| Variável | Padrão | Descrição |
-|---|---|---|
-| `DB_URL` | `jdbc:postgresql://localhost:5432/ticketfy` | URL do banco |
-| `DB_USERNAME` | `ticketfy_user` | Usuário do banco |
-| `DB_PASSWORD` | — | Senha do banco (obrigatória) |
-| `JWT_SECRET` | — | Chave de assinatura dos tokens (obrigatória) |
-| `SPRING_PROFILES_ACTIVE` | `dev` | Perfil (`dev` ou `prod`) |
-| `CORS_ALLOWED_ORIGINS` | `http://localhost:3000,http://localhost:5173` | Origens autorizadas, separadas por vírgula |
-| `DASHBOARD_TIME_ZONE` | `America/Sao_Paulo` | Fuso usado para agrupar as vendas por dia no dashboard |
-| `ORDER_RESERVATION_MINUTES` | `15` | Duração da reserva de um pedido |
-| `REFUND_DEADLINE_HOURS` | `48` | Antecedência mínima para reembolso |
-| `LOGIN_MAX_ATTEMPTS` | `5` | Tentativas de login por janela |
-| `LOGIN_WINDOW_SECONDS` | `60` | Duração da janela de tentativas |
-| `DATA_EXPORT_MAX_PER_WINDOW` | `3` | Exportações de dados permitidas por usuário na janela |
-| `DATA_EXPORT_WINDOW_HOURS` | `24` | Duração da janela de exportações |
-
----
-
-## Exemplos de requisição
-
-**Cadastrar usuário**
-```json
-POST /users
-
-{
-  "name": "Ana Souza",
-  "email": "ana@email.com",
-  "password": "senhaForte123"
-}
-```
-
-**Login**
-```json
-POST /auth/login
-Origin: http://localhost:5173
-X-Ticketfy-Auth: 1
-
-{
-  "email": "ana@email.com",
-  "password": "senhaForte123"
-}
-```
-
-Resposta `200`, com o refresh token só no cookie:
-```json
-Set-Cookie: __Host-ticketfy_rt=<refresh token>; Path=/; Max-Age=1800; Secure; HttpOnly; SameSite=Strict
-
-{
-  "token": "<access token JWT>",
-  "expiresIn": 600
-}
-```
-
-**Renovar o access token**
-```json
-POST /auth/refresh
-Origin: http://localhost:5173
-X-Ticketfy-Auth: 1
-Cookie: __Host-ticketfy_rt=<refresh token>
-```
-
-A resposta tem o mesmo formato do login e grava um cookie novo. `POST /auth/logout` usa os mesmos headers e responde `204`. `POST /auth/logout-all` usa os mesmos headers e também o `Authorization: Bearer <token>`.
-
-**Trocar a senha**
-```json
-PATCH /users/me/password
-Authorization: Bearer <token>
-
-{
-  "currentPassword": "senhaForte123",
-  "newPassword": "outraSenhaForte456"
-}
-```
-
-Senha atual errada responde 403 `invalid-password`; cinco erros em 15 minutos, 429. Em caso de sucesso, a resposta tem o mesmo formato do login.
-
-**Criar evento** (depois de `POST /users/me/organizer`)
-```json
-POST /events
-
-{
-  "name": "Festival de Verão",
-  "description": "Três palcos e praça de alimentação",
-  "venueName": "Marina da Glória",
-  "address": "Av. Infante Dom Henrique, s/n",
-  "city": "Rio de Janeiro",
-  "state": "RJ",
-  "startsAt": "2026-12-10T23:00:00Z",
-  "endsAt": "2026-12-11T04:00:00Z"
-}
-```
-
-**Criar lote**
-```json
-POST /events/{eventId}/ticket-types
-
-{
-  "name": "Pista",
-  "description": "Primeiro lote",
-  "price": 80.00,
-  "quantityTotal": 500,
-  "maxPerOrder": 4
-}
-```
-
-**Listar lotes (público)**
-```json
-GET /events/{eventId}/ticket-types
-
-[
-  {
-    "id": "ffe5dc69-f145-484a-8b47-51700a8b5414",
-    "name": "Pista",
-    "description": "Primeiro lote",
-    "price": 80.00,
-    "maxPerOrder": 4,
-    "soldOut": false,
-    "remaining": 7
-  }
-]
-```
-`remaining` só é preenchido quando restam 10 ingressos ou menos; nos demais casos (inclusive esgotado) vem `null`. A quantidade total e a vendida não são expostas nesta rota.
-
-**Comprar**
-```json
-POST /orders
-Idempotency-Key: 9d4c1e77-2b1f-4c3a-9e0d-5a7b8c6d1e2f
-
-{
-  "items": [
-    { "ticketTypeId": "ffe5dc69-f145-484a-8b47-51700a8b5414", "quantity": 2 }
-  ]
-}
-```
-
-**Erro: estoque insuficiente**
-```json
-409 Conflict
-
-{
-  "message": "Not enough tickets available for this ticket type"
-}
-```
-
-**Erro de validação**
-```json
-400 Bad Request
-
-{
-  "message": "Validation failed",
-  "errors": [
-    { "field": "password", "message": "size must be between 8 and 72" }
-  ]
-}
-```
-
----
-
-## Roadmap
-
-### Nível 1 — Fundação (concluído)
-- [x] Cadastro com BCrypt, login JWT e filtro stateless
-- [x] Papéis USER, ORGANIZER e ADMIN, com auto-promoção a organizador
-- [x] Autorização por papel e por propriedade do recurso
-- [x] CRUD de eventos com busca, filtro por cidade, paginação e exclusão lógica
-- [x] Lotes com preço, quantidade e limite por pedido
-- [x] Tratamento centralizado de erros com corpo padronizado
-
-### Nível 2 — Regras de negócio (concluído)
-- [x] Pedidos com vários itens e preço congelado
-- [x] Reserva de estoque atômica por `UPDATE` condicional
-- [x] Idempotência contra pedido duplicado
-- [x] Expiração automática de reservas, com devolução de estoque
-- [x] Pagamento simulado e emissão de ingressos na mesma transação
-- [x] Check-in protegido contra leitura dupla
-- [x] Reembolso com prazo e bloqueio para ingresso usado
-- [x] Bloqueio de exclusão de evento com vendas e de compra em evento excluído
-
-### Nível 3 — Pronto para produção (concluído)
-- [x] Migrations com Flyway
-- [x] Perfis `dev` e `prod`, com segredos em variáveis de ambiente
-- [x] Imagem Docker multi-stage com usuário sem privilégios
-- [x] Teste de integração de concorrência com Testcontainers
-- [x] CI no GitHub Actions
-- [x] Limite de tentativas de login
-- [x] Datas com fuso horário (`Instant` e `TIMESTAMPTZ`)
-- [x] Health check e encerramento gracioso
-- [x] Deploy no Render com PostgreSQL no Neon
-
-### Nível 4 — Próximos passos
-- [ ] Frontend React publicado na Vercel
-- [ ] Envio do ingresso por e-mail com QR code
-- [ ] Recuperação de senha por e-mail
-- [ ] Pagamento via Pix com webhook (Mercado Pago, sandbox)
-- [ ] Padrão outbox para efeitos colaterais assíncronos
-- [ ] Mais testes: pagamento x expiração, check-in, reembolso e controllers
-
-### Futuro
-- [ ] Confirmação de e-mail no cadastro
-- [ ] Painel de vendas do organizador
-- [ ] Virada de lote por data, meia-entrada e cupons
-- [ ] Transferência de ingresso entre usuários
-- [ ] Erros no padrão RFC 9457 (`ProblemDetail`)
-
----
+   O `verify` também atualiza o [`docs/openapi.json`](docs/openapi.json). Se você mudou algum endpoint, commite o arquivo junto, porque o CI falha quando ele está desatualizado.
 
 ## Licença
 
