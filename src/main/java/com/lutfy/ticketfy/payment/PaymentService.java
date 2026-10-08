@@ -6,7 +6,7 @@ import com.lutfy.ticketfy.infra.exception.InvalidPaymentStateException;
 import com.lutfy.ticketfy.infra.exception.OrderNotFoundException;
 import com.lutfy.ticketfy.order.Order;
 import com.lutfy.ticketfy.order.OrderRepository;
-import com.lutfy.ticketfy.payout.LedgerService;
+import com.lutfy.ticketfy.payout.ledger.LedgerService;
 import com.lutfy.ticketfy.ticket.TicketService;
 import com.lutfy.ticketfy.user.User;
 import org.springframework.stereotype.Service;

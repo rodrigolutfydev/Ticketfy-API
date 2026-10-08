@@ -146,7 +146,7 @@ Autenticação e autorização com Spring Security. Intercepta a requisição an
 
 ### Config
 
-Classes de configuração transversais, como os beans do Spring e a configuração do Springdoc. O `SecurityConfig` está hoje no pacote `config`; a estrutura planejada prevê um pacote `security` próprio para as classes de autenticação.
+Classes de configuração transversais, como os beans do Spring (`ClockConfig`, `SchedulingConfig`). O `SecurityConfig` fica no pacote `infra/config`, e as classes de autenticação (login, tokens e filtros) ficam no pacote `infra/security`. O Springdoc é configurado apenas por propriedades.
 
 ## 3. Diagrama de arquitetura
 
@@ -370,43 +370,46 @@ O projeto segue a organização por domínio, e não a separação em pastas `co
 src/
 ├── main/
 │   ├── java/com/lutfy/ticketfy/
-│   │   ├── config/
-│   │   │   └── SecurityConfig
-│   │   ├── user/
-│   │   │   ├── Role
-│   │   │   ├── User
-│   │   │   ├── UserController
-│   │   │   ├── UserDetailsDTO
-│   │   │   ├── UserRegistrationDTO
-│   │   │   ├── UserRepository
-│   │   │   └── UserService
+│   │   ├── audit/            log de auditoria append-only e consulta administrativa
+│   │   ├── auth/             sessões revogáveis e refresh tokens rotativos
+│   │   ├── dashboard/        painéis do organizador
+│   │   ├── event/            eventos, destaque e cancelamento
+│   │   ├── infra/
+│   │   │   ├── config/       beans transversais (Clock, agendamento, SecurityConfig)
+│   │   │   ├── crypto/       SensitiveDataCipher e EncryptedStringConverter (AES-256-GCM)
+│   │   │   ├── exception/    exceções de negócio e respostas Problem Details (RFC 7807)
+│   │   │   ├── logging/      X-Request-Id e execução de rotinas (JobRun)
+│   │   │   └── security/     login, tokens, filtros e confirmação de senha
+│   │   ├── order/            pedidos, itens e expiração
+│   │   ├── payment/          pagamentos e gateway simulado
+│   │   ├── payout/
+│   │   │   ├── PayoutSettings  configuração de taxa, liberação e saque
+│   │   │   ├── account/      dados de recebimento, validação de documento e chave Pix, máscaras
+│   │   │   ├── admin/        análise de saques, bloqueio de organizador e DTOs de administração
+│   │   │   ├── ledger/       extrato, saldo e exportação CSV
+│   │   │   └── withdrawal/   solicitação, ciclo de vida, rotina e porta do gateway de saque
+│   │   ├── ticket/           ingressos, validação e transferência
+│   │   ├── tickettype/       tipos de ingresso e preços
+│   │   ├── user/             usuários e perfis
 │   │   └── ApiApplication
 │   └── resources/
-│       └── db/migration/
-│           └── V1__create_table_users.sql
+│       ├── application.properties, application-dev.properties, application-prod.properties
+│       └── db/migration/     V1 a V19 (não há V7)
 └── test/
+    └── java/com/lutfy/ticketfy/   mesma estrutura de pacotes do main
 docker-compose.yml
+Dockerfile
 pom.xml
 ```
 
 ### Estrutura planejada
 
-```text
-src/main/java/com/lutfy/ticketfy/
-├── config/       configurações gerais (beans, Springdoc)
-├── security/     login, TokenService, SecurityFilter, SecurityConfig
-├── exception/    @RestControllerAdvice e exceções de negócio
-├── user/         usuários e perfis
-├── venue/        locais
-├── event/        eventos
-├── tickettype/   tipos de ingresso e disponibilidade
-├── order/        pedidos e itens
-├── payment/      pagamentos
-├── ticket/       ingressos, cancelamento e validação
-└── ApiApplication
-```
+A estrutura planejada já está implementada e é a mostrada acima. Em relação ao plano original, há duas diferenças:
 
-Cada pacote de domínio segue o mesmo padrão interno do `user`: entidade, enums, DTOs, repository, service e controller. Os nomes exatos das classes dos domínios planejados serão definidos na implementação.
+- Os pacotes transversais `config`, `security` e `exception` ficam dentro de `infra/`, ao lado de `logging` e `crypto`, e não na raiz.
+- Não há pacote `venue`: o local é guardado nos próprios campos do evento (`venueName`, `address`, `city`, `state`).
+
+Cada pacote de domínio segue o mesmo padrão interno do `user`: entidade, enums, DTOs, repository, service e controller. Domínios maiores se dividem em subpacotes por assunto, como o `payout` (`account`, `ledger`, `withdrawal` e `admin`).
 
 ## 9. Decisões arquiteturais
 

@@ -1,5 +1,9 @@
 package com.lutfy.ticketfy.payout;
 
+import com.lutfy.ticketfy.payout.account.DocumentType;
+import com.lutfy.ticketfy.payout.account.PayoutAccountUpdateDTO;
+import com.lutfy.ticketfy.payout.account.PixKeyType;
+import com.lutfy.ticketfy.payout.withdrawal.PayoutRequestDTO;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;

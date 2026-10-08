@@ -1,10 +1,12 @@
 package com.lutfy.ticketfy.payout;
 
 import com.lutfy.ticketfy.IntegrationTestBase;
+import com.lutfy.ticketfy.infra.crypto.SensitiveDataCipher;
 import com.lutfy.ticketfy.order.OrderCreationDTO;
 import com.lutfy.ticketfy.order.OrderItemRequestDTO;
 import com.lutfy.ticketfy.order.OrderService;
 import com.lutfy.ticketfy.payment.PaymentService;
+import com.lutfy.ticketfy.payout.withdrawal.PayoutGateway;
 import com.lutfy.ticketfy.user.User;
 import com.lutfy.ticketfy.user.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -37,43 +39,43 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @AutoConfigureMockMvc
-abstract class PayoutTestBase extends IntegrationTestBase {
+public abstract class PayoutTestBase extends IntegrationTestBase {
 
-    static final String PASSWORD = "Senha-forte-123";
-    static final String CPF = "52998224725";
-    static final String OTHER_CPF = "11144477735";
-    static final String CNPJ = "11222333000181";
-    static final String ALPHANUMERIC_CNPJ = "12ABC34501DE35";
-    static final JsonMapper JSON = JsonMapper.builder().build();
-
-    @Autowired
-    MockMvc mockMvc;
+    protected static final String PASSWORD = "Senha-forte-123";
+    protected static final String CPF = "52998224725";
+    protected static final String OTHER_CPF = "11144477735";
+    protected static final String CNPJ = "11222333000181";
+    protected static final String ALPHANUMERIC_CNPJ = "12ABC34501DE35";
+    protected static final JsonMapper JSON = JsonMapper.builder().build();
 
     @Autowired
-    UserRepository userRepository;
+    protected MockMvc mockMvc;
+
+    @Autowired
+    protected UserRepository userRepository;
 
 
     @Autowired
-    PasswordEncoder passwordEncoder;
+    protected PasswordEncoder passwordEncoder;
 
     @Autowired
-    OrderService orderService;
+    protected OrderService orderService;
 
     @Autowired
-    PaymentService paymentService;
+    protected PaymentService paymentService;
 
     @Autowired
-    SensitiveDataCipher cipher;
+    protected SensitiveDataCipher cipher;
 
     @MockitoBean
-    Clock clock;
+    protected Clock clock;
 
     @MockitoSpyBean
-    PayoutGateway payoutGateway;
+    protected PayoutGateway payoutGateway;
 
-    final AtomicReference<Instant> now = new AtomicReference<>();
-    User organizer;
-    User buyer;
+    protected final AtomicReference<Instant> now = new AtomicReference<>();
+    protected User organizer;
+    protected User buyer;
 
     @BeforeEach
     void setUpPayoutBase() {
@@ -86,15 +88,15 @@ abstract class PayoutTestBase extends IntegrationTestBase {
         buyer = user("USER");
     }
 
-    void travelTo(Instant instant) {
+    protected void travelTo(Instant instant) {
         now.set(instant);
     }
 
-    void travel(Duration duration) {
+    protected void travel(Duration duration) {
         now.set(clock.instant().plus(duration));
     }
 
-    Instant releasedSales(User owner, String... prices) {
+    protected Instant releasedSales(User owner, String... prices) {
         var startsAt = Instant.now().plus(Duration.ofDays(1));
         var endsAt = startsAt.plus(Duration.ofHours(4));
         var eventId = insertEvent(owner.getId(), startsAt, endsAt);
@@ -109,8 +111,8 @@ abstract class PayoutTestBase extends IntegrationTestBase {
         return released;
     }
 
-    ResultActions saveAccount(User user, String documentType, String document, String pixKeyType, String pixKey,
-                              String password) throws Exception {
+    protected ResultActions saveAccount(User user, String documentType, String document, String pixKeyType,
+                                        String pixKey, String password) throws Exception {
         var body = JSON.writeValueAsString(Map.of(
                 "documentType", documentType,
                 "document", document,
@@ -124,11 +126,11 @@ abstract class PayoutTestBase extends IntegrationTestBase {
                 .content(body));
     }
 
-    void registerAccount(User user) throws Exception {
+    protected void registerAccount(User user) throws Exception {
         saveAccount(user, "CPF", CPF, "EMAIL", "maria.silva@example.com", PASSWORD).andExpect(status().isOk());
     }
 
-    void registerAccountWithPayoutHistory(User user) throws Exception {
+    protected void registerAccountWithPayoutHistory(User user) throws Exception {
         registerAccount(user);
         var past = Timestamp.from(clock.instant().minus(Duration.ofDays(60)));
         jdbc.update("""
@@ -139,7 +141,8 @@ abstract class PayoutTestBase extends IntegrationTestBase {
                 """, user.getId(), cipher.encrypt(CPF), cipher.encrypt("maria.silva@example.com"), past, past, past);
     }
 
-    ResultActions requestPayout(User user, String amount, String password, String idempotencyKey) throws Exception {
+    protected ResultActions requestPayout(User user, String amount, String password, String idempotencyKey)
+            throws Exception {
         var request = post("/organizer/payouts")
                 .header("Authorization", bearer(user))
                 .contentType(MediaType.APPLICATION_JSON)
@@ -150,31 +153,31 @@ abstract class PayoutTestBase extends IntegrationTestBase {
         return mockMvc.perform(request);
     }
 
-    JsonNode balance(User user) throws Exception {
+    protected JsonNode balance(User user) throws Exception {
         return JSON.readTree(mockMvc.perform(get("/organizer/balance").header("Authorization", bearer(user)))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString());
     }
 
-    BigDecimal available(User user) throws Exception {
+    protected BigDecimal available(User user) throws Exception {
         return balance(user).get("available").decimalValue();
     }
 
-    JsonNode body(ResultActions result) throws Exception {
+    protected JsonNode body(ResultActions result) throws Exception {
         return JSON.readTree(result.andReturn().getResponse().getContentAsString());
     }
 
-    User user(String role) {
+    protected User user(String role) {
         var id = insertUser(role);
         jdbc.update("UPDATE users SET password = ? WHERE id = ?", passwordEncoder.encode(PASSWORD), id);
         return userRepository.findById(id).orElseThrow();
     }
 
-    String bearer(User user) {
+    protected String bearer(User user) {
         return "Bearer " + accessToken(user);
     }
 
-    UUID insertEvent(UUID organizerId, Instant startsAt, Instant endsAt) {
+    protected UUID insertEvent(UUID organizerId, Instant startsAt, Instant endsAt) {
         var id = UUID.randomUUID();
         jdbc.update("""
                 INSERT INTO events (id, name, description, venue_name, address, city, state,
@@ -184,7 +187,7 @@ abstract class PayoutTestBase extends IntegrationTestBase {
         return id;
     }
 
-    UUID insertTicketType(UUID eventId, String price) {
+    protected UUID insertTicketType(UUID eventId, String price) {
         var id = UUID.randomUUID();
         jdbc.update("""
                 INSERT INTO ticket_types (id, event_id, name, description, price,
