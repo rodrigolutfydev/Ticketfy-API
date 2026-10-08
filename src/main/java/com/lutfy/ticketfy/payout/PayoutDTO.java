@@ -14,12 +14,13 @@ public record PayoutDTO(
         Instant requestedAt,
         Instant processingStartedAt,
         Instant finishedAt,
-        String failureReason
+        String failureReason,
+        String rejectionReason
 ) {
     public PayoutDTO(Payout payout) {
         this(payout.getId(), payout.getAmount(), payout.getStatus(), payout.getPixKeyType(),
                 Masking.pixKey(payout.getPixKeyType(), payout.getPixKey()), payout.getHolderName(),
                 payout.getRequestedAt(), payout.getProcessingStartedAt(), payout.getFinishedAt(),
-                payout.getFailureReason());
+                payout.getFailureReason(), payout.getRejectionReason());
     }
 }

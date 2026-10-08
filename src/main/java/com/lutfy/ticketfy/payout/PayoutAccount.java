@@ -50,11 +50,13 @@ public class PayoutAccount {
         apply(destination);
     }
 
-    public void update(PayoutDestination destination, Instant now) {
-        if (pixKeyType != destination.pixKeyType() || !pixKey.equals(destination.pixKey())) {
+    public boolean update(PayoutDestination destination, Instant now) {
+        boolean keyChanged = pixKeyType != destination.pixKeyType() || !pixKey.equals(destination.pixKey());
+        if (keyChanged) {
             this.keyChangedAt = now;
         }
         apply(destination);
+        return keyChanged;
     }
 
     public Instant payoutsBlockedUntil(Duration cooldown) {

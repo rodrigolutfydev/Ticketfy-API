@@ -1,5 +1,8 @@
 package com.lutfy.ticketfy.tickettype;
 
+import com.lutfy.ticketfy.audit.AuditAction;
+import com.lutfy.ticketfy.audit.AuditService;
+import com.lutfy.ticketfy.audit.AuditTargetType;
 import com.lutfy.ticketfy.event.Event;
 import com.lutfy.ticketfy.event.EventRepository;
 import com.lutfy.ticketfy.infra.exception.EventAccessDeniedException;
@@ -17,6 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -27,12 +31,14 @@ public class TicketTypeService {
     private final TicketTypeRepository ticketTypeRepository;
     private final EventRepository eventRepository;
     private final EntityManager entityManager;
+    private final AuditService auditService;
 
     public TicketTypeService(TicketTypeRepository ticketTypeRepository, EventRepository eventRepository,
-                             EntityManager entityManager) {
+                             EntityManager entityManager, AuditService auditService) {
         this.ticketTypeRepository = ticketTypeRepository;
         this.eventRepository = eventRepository;
         this.entityManager = entityManager;
+        this.auditService = auditService;
     }
 
     @Transactional
@@ -60,6 +66,7 @@ public class TicketTypeService {
                 .filter(found -> found.getEvent().getId().equals(eventId))
                 .orElseThrow(() -> new TicketTypeNotFoundException("Ticket type not found"));
 
+        var previousPrice = ticketType.getPrice();
         ticketType.updateFrom(dto);
         try {
             ticketTypeRepository.flush();
@@ -75,6 +82,10 @@ public class TicketTypeService {
         }
 
         entityManager.refresh(ticketType);
+        if (ticketType.getPrice().compareTo(previousPrice) != 0) {
+            auditService.record(AuditAction.TICKET_TYPE_PRICE_CHANGED, AuditTargetType.TICKET_TYPE, ticketTypeId,
+                    Map.of("eventId", eventId, "previousPrice", previousPrice, "newPrice", ticketType.getPrice()));
+        }
         return new TicketTypeDetailsDTO(ticketType);
     }
 

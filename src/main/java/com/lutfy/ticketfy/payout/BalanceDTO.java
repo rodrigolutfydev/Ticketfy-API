@@ -9,5 +9,6 @@ public record BalanceDTO(
         BigDecimal held,
         BigDecimal total,
         int releaseDelayDays,
-        BigDecimal minPayoutAmount
+        BigDecimal minPayoutAmount,
+        boolean payoutsBlocked
 ) {}

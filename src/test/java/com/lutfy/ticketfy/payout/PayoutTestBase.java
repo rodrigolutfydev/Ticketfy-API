@@ -65,6 +65,9 @@ abstract class PayoutTestBase extends IntegrationTestBase {
     @Autowired
     PaymentService paymentService;
 
+    @Autowired
+    SensitiveDataCipher cipher;
+
     @MockitoBean
     Clock clock;
 
@@ -126,6 +129,17 @@ abstract class PayoutTestBase extends IntegrationTestBase {
 
     void registerAccount(User user) throws Exception {
         saveAccount(user, "CPF", CPF, "EMAIL", "maria.silva@example.com", PASSWORD).andExpect(status().isOk());
+    }
+
+    void registerAccountWithPayoutHistory(User user) throws Exception {
+        registerAccount(user);
+        var past = Timestamp.from(clock.instant().minus(Duration.ofDays(60)));
+        jdbc.update("""
+                INSERT INTO payouts (organizer_id, amount, status, document_type, document, holder_name,
+                                     pix_key_type, pix_key, transfer_reference, requested_at,
+                                     processing_started_at, finished_at)
+                VALUES (?, 10.00, 'PAID', 'CPF', ?, 'Maria da Silva', 'EMAIL', ?, 'HISTORY', ?, ?, ?)
+                """, user.getId(), cipher.encrypt(CPF), cipher.encrypt("maria.silva@example.com"), past, past, past);
     }
 
     ResultActions requestPayout(User user, String amount, String password, String idempotencyKey) throws Exception {

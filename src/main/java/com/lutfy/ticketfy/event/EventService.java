@@ -1,5 +1,8 @@
 package com.lutfy.ticketfy.event;
 
+import com.lutfy.ticketfy.audit.AuditAction;
+import com.lutfy.ticketfy.audit.AuditService;
+import com.lutfy.ticketfy.audit.AuditTargetType;
 import com.lutfy.ticketfy.infra.exception.EventAccessDeniedException;
 import com.lutfy.ticketfy.infra.exception.EventHasSalesException;
 import com.lutfy.ticketfy.infra.exception.EventNotFoundException;
@@ -14,6 +17,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.Function;
@@ -24,10 +28,13 @@ public class EventService {
 
     private final EventRepository repository;
     private final TicketTypeRepository ticketTypeRepository;
+    private final AuditService auditService;
 
-    public EventService(EventRepository repository, TicketTypeRepository ticketTypeRepository) {
+    public EventService(EventRepository repository, TicketTypeRepository ticketTypeRepository,
+                        AuditService auditService) {
         this.repository = repository;
         this.ticketTypeRepository = ticketTypeRepository;
+        this.auditService = auditService;
     }
 
     private void validateDates(Instant startsAt, Instant endsAt) {
@@ -100,6 +107,10 @@ public class EventService {
         checkOwnership(event, requester);
         var now = Instant.now();
         if (repository.cancel(id, reason, now) == 1) {
+            var details = new HashMap<String, Object>();
+            details.put("organizerId", event.getOrganizer().getId());
+            details.put("reason", reason);
+            auditService.record(AuditAction.EVENT_CANCELLED, AuditTargetType.EVENT, id, details);
             return now;
         }
         var current = repository.findByIdAndActiveTrue(id)
@@ -127,7 +138,12 @@ public class EventService {
     public EventDetailsDTO changeFeatured(UUID id, boolean featured) {
         var event = repository.findByIdAndActiveTrue(id)
                 .orElseThrow(() -> new EventNotFoundException("Event not found"));
-        event.changeFeatured(featured);
+        if (event.isFeatured() != featured) {
+            event.changeFeatured(featured);
+            repository.flush();
+            auditService.record(featured ? AuditAction.EVENT_FEATURED : AuditAction.EVENT_UNFEATURED,
+                    AuditTargetType.EVENT, event.getId(), Map.of("organizerId", event.getOrganizer().getId()));
+        }
         return new EventDetailsDTO(event);
     }
 

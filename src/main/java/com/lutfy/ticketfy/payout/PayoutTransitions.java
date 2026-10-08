@@ -1,11 +1,15 @@
 package com.lutfy.ticketfy.payout;
 
+import com.lutfy.ticketfy.audit.AuditAction;
+import com.lutfy.ticketfy.audit.AuditService;
+import com.lutfy.ticketfy.audit.AuditTargetType;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -14,13 +18,18 @@ import java.util.UUID;
 public class PayoutTransitions {
 
     private final PayoutRepository repository;
+    private final PayoutBlockRepository blockRepository;
     private final LedgerService ledgerService;
+    private final AuditService auditService;
     private final PayoutSettings settings;
     private final Clock clock;
 
-    public PayoutTransitions(PayoutRepository repository, LedgerService ledgerService, PayoutSettings settings,
+    public PayoutTransitions(PayoutRepository repository, PayoutBlockRepository blockRepository,
+                             LedgerService ledgerService, AuditService auditService, PayoutSettings settings,
                              Clock clock) {
         this.repository = repository;
+        this.blockRepository = blockRepository;
+        this.auditService = auditService;
         this.ledgerService = ledgerService;
         this.settings = settings;
         this.clock = clock;
@@ -28,7 +37,7 @@ public class PayoutTransitions {
 
     @Transactional(readOnly = true)
     public List<UUID> requestedIds() {
-        return repository.findIdsByStatus(PayoutStatus.REQUESTED);
+        return repository.findProcessableIds();
     }
 
     @Transactional(readOnly = true)
@@ -39,7 +48,8 @@ public class PayoutTransitions {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public Optional<PayoutGateway.TransferRequest> start(UUID payoutId) {
         var payout = repository.findById(payoutId).orElse(null);
-        if (payout == null || payout.getStatus() != PayoutStatus.REQUESTED) {
+        if (payout == null || payout.getStatus() != PayoutStatus.REQUESTED
+                || blockRepository.existsById(payout.getOrganizerId())) {
             return Optional.empty();
         }
         payout.startProcessing(clock.instant());
@@ -64,17 +74,25 @@ public class PayoutTransitions {
         if (payout.getStatus() != PayoutStatus.PROCESSING) {
             return payout.getStatus();
         }
+        var details = new HashMap<String, Object>();
+        details.put("organizerId", payout.getOrganizerId());
+        details.put("amount", payout.getAmount());
         switch (result.status()) {
             case COMPLETED -> payout.markPaid(result.reference(), clock.instant());
-            case FAILED -> {
-                payout.markFailed(result.failureReason(), clock.instant());
-                ledgerService.recordPayoutReversal(payout);
-            }
+            case FAILED -> payout.markFailed(result.failureReason(), clock.instant());
             case PENDING -> {
                 return payout.getStatus();
             }
         }
         repository.saveAndFlush(payout);
+        if (payout.getStatus() == PayoutStatus.PAID) {
+            details.put("transferReference", payout.getTransferReference());
+            auditService.record(AuditAction.PAYOUT_PAID, AuditTargetType.PAYOUT, payout.getId(), details);
+        } else {
+            ledgerService.recordPayoutReversal(payout);
+            details.put("failureReason", payout.getFailureReason());
+            auditService.record(AuditAction.PAYOUT_FAILED, AuditTargetType.PAYOUT, payout.getId(), details);
+        }
         return payout.getStatus();
     }
 

@@ -50,7 +50,10 @@ public enum ProblemType {
     PAYOUT_BELOW_MINIMUM("payout-below-minimum", "Payout below minimum", HttpStatus.BAD_REQUEST),
     PAYOUT_EXCEEDS_AVAILABLE("payout-exceeds-available", "Payout exceeds available balance", HttpStatus.CONFLICT),
     PAYOUT_NOT_FOUND("payout-not-found", "Payout not found", HttpStatus.NOT_FOUND),
-    INVALID_PAYOUT_STATE("invalid-payout-state", "Invalid payout state", HttpStatus.CONFLICT);
+    INVALID_PAYOUT_STATE("invalid-payout-state", "Invalid payout state", HttpStatus.CONFLICT),
+    PAYOUTS_BLOCKED("payouts-blocked", "Payouts blocked", HttpStatus.CONFLICT),
+    INVALID_PAYOUT_BLOCK_STATE("invalid-payout-block-state", "Invalid payout block state", HttpStatus.CONFLICT),
+    ORGANIZER_NOT_FOUND("organizer-not-found", "Organizer not found", HttpStatus.NOT_FOUND);
 
     private final String slug;
     private final String title;

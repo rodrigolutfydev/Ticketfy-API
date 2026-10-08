@@ -46,6 +46,9 @@ public class Payout {
     private String pixKey;
     private String transferReference;
     private String failureReason;
+    private String rejectionReason;
+    private UUID reviewedBy;
+    private Instant reviewedAt;
     private Instant requestedAt;
     private Instant processingStartedAt;
     private Instant finishedAt;
@@ -55,7 +58,7 @@ public class Payout {
     private Long version;
 
     public Payout(UUID organizerId, BigDecimal amount, String idempotencyKey, PayoutDestination destination,
-                  Instant requestedAt) {
+                  PayoutStatus initialStatus, Instant requestedAt) {
         this.organizerId = organizerId;
         this.amount = amount;
         this.idempotencyKey = idempotencyKey;
@@ -64,13 +67,32 @@ public class Payout {
         this.holderName = destination.holderName();
         this.pixKeyType = destination.pixKeyType();
         this.pixKey = destination.pixKey();
-        this.status = PayoutStatus.REQUESTED;
+        this.status = initialStatus;
         this.requestedAt = requestedAt;
     }
 
     public void cancel(Instant now) {
-        require(PayoutStatus.REQUESTED, "Only requested payouts can be cancelled");
+        if (status != PayoutStatus.REQUESTED && status != PayoutStatus.UNDER_REVIEW) {
+            throw new ProblemException(ProblemType.INVALID_PAYOUT_STATE,
+                    "Only requested or under review payouts can be cancelled");
+        }
         this.status = PayoutStatus.CANCELLED;
+        this.finishedAt = now;
+    }
+
+    public void approve(UUID reviewer, Instant now) {
+        require(PayoutStatus.UNDER_REVIEW, "Only payouts under review can be approved");
+        this.status = PayoutStatus.REQUESTED;
+        this.reviewedBy = reviewer;
+        this.reviewedAt = now;
+    }
+
+    public void reject(UUID reviewer, String reason, Instant now) {
+        require(PayoutStatus.UNDER_REVIEW, "Only payouts under review can be rejected");
+        this.status = PayoutStatus.REJECTED;
+        this.rejectionReason = reason;
+        this.reviewedBy = reviewer;
+        this.reviewedAt = now;
         this.finishedAt = now;
     }
 

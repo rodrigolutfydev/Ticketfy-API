@@ -52,7 +52,7 @@ class PayoutRequestIntegrationTest extends PayoutTestBase {
     @Test
     void keyChangeBlocksPayoutsFor48Hours() throws Exception {
         var released = releasedSales(organizer, "100.00");
-        registerAccount(organizer);
+        registerAccountWithPayoutHistory(organizer);
         saveAccount(organizer, "CPF", CPF, "CPF", CPF, PASSWORD);
         var blockedUntil = released.plus(Duration.ofHours(48));
 
@@ -69,7 +69,7 @@ class PayoutRequestIntegrationTest extends PayoutTestBase {
     @Test
     void onlyOnePayoutInProgress() throws Exception {
         releasedSales(organizer, "100.00");
-        registerAccount(organizer);
+        registerAccountWithPayoutHistory(organizer);
         requestPayout(organizer, "20.00", PASSWORD, null).andExpect(status().isCreated());
 
         requestPayout(organizer, "20.00", PASSWORD, null)
@@ -80,7 +80,7 @@ class PayoutRequestIntegrationTest extends PayoutTestBase {
     @Test
     void negativeAvailableBalanceBlocksPayouts() throws Exception {
         releasedSales(organizer, "100.00");
-        registerAccount(organizer);
+        registerAccountWithPayoutHistory(organizer);
         var sale = jdbc.queryForMap("""
                 SELECT event_id, order_id FROM organizer_ledger_entries
                  WHERE organizer_id = ? AND type = 'SALE_CREDIT'
@@ -98,7 +98,7 @@ class PayoutRequestIntegrationTest extends PayoutTestBase {
     @Test
     void amountMustBeAtLeastTheMinimumAndAtMostTheAvailable() throws Exception {
         releasedSales(organizer, "100.00");
-        registerAccount(organizer);
+        registerAccountWithPayoutHistory(organizer);
 
         requestPayout(organizer, "19.99", PASSWORD, null)
                 .andExpect(status().isBadRequest())
@@ -124,7 +124,7 @@ class PayoutRequestIntegrationTest extends PayoutTestBase {
     void pendingSalesAreNotAvailable() throws Exception {
         var released = releasedSales(organizer, "100.00");
         travelTo(released.minus(Duration.ofMinutes(2)));
-        registerAccount(organizer);
+        registerAccountWithPayoutHistory(organizer);
 
         requestPayout(organizer, "20.00", PASSWORD, null)
                 .andExpect(status().isConflict())
@@ -176,7 +176,7 @@ class PayoutRequestIntegrationTest extends PayoutTestBase {
     @Test
     void cancellingReversesTheDebit() throws Exception {
         releasedSales(organizer, "100.00");
-        registerAccount(organizer);
+        registerAccountWithPayoutHistory(organizer);
         var payoutId = body(requestPayout(organizer, "60.00", PASSWORD, null)).get("id").asString();
 
         mockMvc.perform(post("/organizer/payouts/" + payoutId + "/cancel").header("Authorization", bearer(user("ORGANIZER"))))
@@ -200,7 +200,7 @@ class PayoutRequestIntegrationTest extends PayoutTestBase {
     @Test
     void jobPaysRequestedPayouts() throws Exception {
         releasedSales(organizer, "100.00");
-        registerAccount(organizer);
+        registerAccountWithPayoutHistory(organizer);
         var payoutId = body(requestPayout(organizer, "50.00", PASSWORD, null)).get("id").asString();
 
         assertThat(processing.processAll()).isPositive();
@@ -220,7 +220,7 @@ class PayoutRequestIntegrationTest extends PayoutTestBase {
     @Test
     void failedTransferIsReversed() throws Exception {
         releasedSales(organizer, "100.00");
-        registerAccount(organizer);
+        registerAccountWithPayoutHistory(organizer);
         var payoutId = body(requestPayout(organizer, "50.00", PASSWORD, null)).get("id").asString();
         doReturn(new PayoutGateway.TransferResult(PayoutGateway.TransferStatus.FAILED, null, "Pix key closed"))
                 .when(payoutGateway).transfer(any());
@@ -239,7 +239,7 @@ class PayoutRequestIntegrationTest extends PayoutTestBase {
     @Test
     void stuckPayoutIsResumedWithoutTransferringTwice() throws Exception {
         releasedSales(organizer, "100.00");
-        registerAccount(organizer);
+        registerAccountWithPayoutHistory(organizer);
         var payoutId = body(requestPayout(organizer, "50.00", PASSWORD, null)).get("id").asString();
         doAnswer(invocation -> {
             invocation.callRealMethod();
@@ -265,7 +265,7 @@ class PayoutRequestIntegrationTest extends PayoutTestBase {
     @Test
     void payoutStuckBeforeReachingTheProviderIsTransferredOnce() throws Exception {
         releasedSales(organizer, "100.00");
-        registerAccount(organizer);
+        registerAccountWithPayoutHistory(organizer);
         var payoutId = body(requestPayout(organizer, "50.00", PASSWORD, null)).get("id").asString();
         doThrow(new IllegalStateException("provider unavailable")).when(payoutGateway).transfer(any());
 
@@ -281,7 +281,7 @@ class PayoutRequestIntegrationTest extends PayoutTestBase {
     @Test
     void ledgerSumStillMatchesTheBalance() throws Exception {
         releasedSales(organizer, "100.00", "200.00");
-        registerAccount(organizer);
+        registerAccountWithPayoutHistory(organizer);
         requestPayout(organizer, "30.00", PASSWORD, null).andExpect(status().isCreated());
         processing.processAll();
         var cancelled = body(requestPayout(organizer, "20.00", PASSWORD, null)).get("id").asString();
@@ -319,7 +319,7 @@ class PayoutRequestIntegrationTest extends PayoutTestBase {
     @Test
     void historyListsNewestFirstWithMaskedKeys() throws Exception {
         releasedSales(organizer, "100.00");
-        registerAccount(organizer);
+        registerAccountWithPayoutHistory(organizer);
         var first = body(requestPayout(organizer, "20.00", PASSWORD, null)).get("id").asString();
         mockMvc.perform(post("/organizer/payouts/" + first + "/cancel").header("Authorization", bearer(organizer)));
         travel(Duration.ofMinutes(1));
@@ -329,7 +329,7 @@ class PayoutRequestIntegrationTest extends PayoutTestBase {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].id").value(second))
                 .andExpect(jsonPath("$.content[1].id").value(first))
-                .andExpect(jsonPath("$.page.totalElements").value(2))
+                .andExpect(jsonPath("$.page.totalElements").value(3))
                 .andReturn().getResponse().getContentAsString();
         assertThat(response).doesNotContain("maria.silva", CPF);
         mockMvc.perform(get("/organizer/payouts").header("Authorization", bearer(user("ORGANIZER"))))

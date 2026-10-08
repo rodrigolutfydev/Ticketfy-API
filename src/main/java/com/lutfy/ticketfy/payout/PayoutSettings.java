@@ -14,12 +14,14 @@ public class PayoutSettings {
     private final BigDecimal minAmount;
     private final Duration keyChangeCooldown;
     private final Duration stuckAfter;
+    private final BigDecimal reviewThreshold;
 
     public PayoutSettings(@Value("${ticketfy.payout.platform-fee-percent}") BigDecimal platformFeePercent,
                           @Value("${ticketfy.payout.release-delay-days}") int releaseDelayDays,
                           @Value("${ticketfy.payout.min-amount}") BigDecimal minAmount,
                           @Value("${ticketfy.payout.key-change-cooldown-hours}") long keyChangeCooldownHours,
-                          @Value("${ticketfy.payout.stuck-after-minutes}") long stuckAfterMinutes) {
+                          @Value("${ticketfy.payout.stuck-after-minutes}") long stuckAfterMinutes,
+                          @Value("${ticketfy.payout.review-threshold}") BigDecimal reviewThreshold) {
         if (platformFeePercent.signum() < 0 || platformFeePercent.compareTo(BigDecimal.valueOf(100)) > 0) {
             throw new IllegalStateException("ticketfy.payout.platform-fee-percent must be between 0 and 100");
         }
@@ -40,6 +42,14 @@ public class PayoutSettings {
         this.minAmount = minAmount.setScale(2);
         this.keyChangeCooldown = Duration.ofHours(keyChangeCooldownHours);
         this.stuckAfter = Duration.ofMinutes(stuckAfterMinutes);
+        if (reviewThreshold.signum() < 0) {
+            throw new IllegalStateException("ticketfy.payout.review-threshold must not be negative");
+        }
+        this.reviewThreshold = reviewThreshold.setScale(2);
+    }
+
+    public BigDecimal reviewThreshold() {
+        return reviewThreshold;
     }
 
     public BigDecimal minAmount() {

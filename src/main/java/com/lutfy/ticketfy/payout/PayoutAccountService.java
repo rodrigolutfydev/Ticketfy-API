@@ -1,5 +1,8 @@
 package com.lutfy.ticketfy.payout;
 
+import com.lutfy.ticketfy.audit.AuditAction;
+import com.lutfy.ticketfy.audit.AuditService;
+import com.lutfy.ticketfy.audit.AuditTargetType;
 import com.lutfy.ticketfy.infra.exception.ProblemException;
 import com.lutfy.ticketfy.infra.exception.ProblemType;
 import com.lutfy.ticketfy.infra.security.PasswordConfirmation;
@@ -8,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
+import java.util.Map;
 
 @Service
 public class PayoutAccountService {
@@ -16,14 +20,17 @@ public class PayoutAccountService {
     private final PayoutGateway gateway;
     private final PasswordConfirmation passwordConfirmation;
     private final PayoutSettings settings;
+    private final AuditService auditService;
     private final Clock clock;
 
     public PayoutAccountService(PayoutAccountRepository repository, PayoutGateway gateway,
-                                PasswordConfirmation passwordConfirmation, PayoutSettings settings, Clock clock) {
+                                PasswordConfirmation passwordConfirmation, PayoutSettings settings,
+                                AuditService auditService, Clock clock) {
         this.repository = repository;
         this.gateway = gateway;
         this.passwordConfirmation = passwordConfirmation;
         this.settings = settings;
+        this.auditService = auditService;
         this.clock = clock;
     }
 
@@ -46,13 +53,13 @@ public class PayoutAccountService {
             throw new ProblemException(ProblemType.PIX_KEY_HOLDER_MISMATCH,
                     "The pix key does not belong to the informed document");
         }
-        var account = repository.findForUpdate(organizer.getId())
-                .map(existing -> {
-                    existing.update(destination, clock.instant());
-                    return existing;
-                })
-                .orElseGet(() -> new PayoutAccount(organizer.getId(), destination));
-        return toDTO(repository.saveAndFlush(account));
+        var existing = repository.findForUpdate(organizer.getId());
+        boolean keyChanged = existing.map(account -> account.update(destination, clock.instant())).orElse(false);
+        var saved = repository.saveAndFlush(existing.orElseGet(() -> new PayoutAccount(organizer.getId(), destination)));
+        auditService.record(AuditAction.PAYOUT_ACCOUNT_SAVED, AuditTargetType.PAYOUT_ACCOUNT, organizer.getId(),
+                Map.of("created", existing.isEmpty(), "keyChanged", keyChanged,
+                        "documentType", destination.documentType(), "pixKeyType", destination.pixKeyType()));
+        return toDTO(saved);
     }
 
     private PayoutAccountDTO toDTO(PayoutAccount account) {

@@ -1,5 +1,8 @@
 package com.lutfy.ticketfy.payout;
 
+import com.lutfy.ticketfy.audit.AuditAction;
+import com.lutfy.ticketfy.audit.AuditService;
+import com.lutfy.ticketfy.audit.AuditTargetType;
 import com.lutfy.ticketfy.infra.exception.ProblemException;
 import com.lutfy.ticketfy.infra.exception.ProblemType;
 import com.lutfy.ticketfy.infra.security.PasswordConfirmation;
@@ -13,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -22,6 +26,8 @@ public class PayoutRequestService {
 
     private final PayoutRepository payoutRepository;
     private final PayoutAccountRepository accountRepository;
+    private final PayoutBlockRepository blockRepository;
+    private final AuditService auditService;
     private final PayoutQueryRepository queries;
     private final LedgerService ledgerService;
     private final PasswordConfirmation passwordConfirmation;
@@ -29,10 +35,13 @@ public class PayoutRequestService {
     private final Clock clock;
 
     public PayoutRequestService(PayoutRepository payoutRepository, PayoutAccountRepository accountRepository,
+                                PayoutBlockRepository blockRepository, AuditService auditService,
                                 PayoutQueryRepository queries, LedgerService ledgerService,
                                 PasswordConfirmation passwordConfirmation, PayoutSettings settings, Clock clock) {
         this.payoutRepository = payoutRepository;
         this.accountRepository = accountRepository;
+        this.blockRepository = blockRepository;
+        this.auditService = auditService;
         this.queries = queries;
         this.ledgerService = ledgerService;
         this.passwordConfirmation = passwordConfirmation;
@@ -57,6 +66,9 @@ public class PayoutRequestService {
             }
         }
 
+        if (blockRepository.existsById(organizer.getId())) {
+            throw new ProblemException(ProblemType.PAYOUTS_BLOCKED, "Payouts are blocked for this account");
+        }
         var now = clock.instant();
         var blockedUntil = account.payoutsBlockedUntil(settings.keyChangeCooldown());
         if (blockedUntil != null && now.isBefore(blockedUntil)) {
@@ -81,9 +93,25 @@ public class PayoutRequestService {
                     "Payout amount exceeds the available balance", Map.of("available", available));
         }
 
+        var reviewReasons = new ArrayList<String>();
+        if (!payoutRepository.existsByOrganizerIdAndStatus(organizer.getId(), PayoutStatus.PAID)) {
+            reviewReasons.add("FIRST_PAYOUT");
+        }
+        if (amount.compareTo(settings.reviewThreshold()) > 0) {
+            reviewReasons.add("ABOVE_THRESHOLD");
+        }
+        var status = reviewReasons.isEmpty() ? PayoutStatus.REQUESTED : PayoutStatus.UNDER_REVIEW;
+
         var payout = payoutRepository.saveAndFlush(
-                new Payout(organizer.getId(), amount, idempotencyKey, account.destination(), now));
+                new Payout(organizer.getId(), amount, idempotencyKey, account.destination(), status, now));
         ledgerService.recordPayoutDebit(payout);
+        auditService.record(AuditAction.PAYOUT_REQUESTED, AuditTargetType.PAYOUT, payout.getId(),
+                Map.of("organizerId", organizer.getId(), "amount", amount, "status", status));
+        if (status == PayoutStatus.UNDER_REVIEW) {
+            auditService.record(AuditAction.PAYOUT_SENT_TO_REVIEW, AuditTargetType.PAYOUT, payout.getId(),
+                    Map.of("organizerId", organizer.getId(), "amount", amount, "reasons", reviewReasons,
+                            "reviewThreshold", settings.reviewThreshold()));
+        }
         return new PayoutDTO(payout);
     }
 
@@ -109,6 +137,7 @@ public class PayoutRequestService {
     public PayoutDTO cancel(User organizer, UUID payoutId) {
         var payout = payoutRepository.findByIdAndOrganizerId(payoutId, organizer.getId())
                 .orElseThrow(() -> new ProblemException(ProblemType.PAYOUT_NOT_FOUND, "Payout not found"));
+        var previousStatus = payout.getStatus();
         payout.cancel(clock.instant());
         try {
             payoutRepository.saveAndFlush(payout);
@@ -116,6 +145,8 @@ public class PayoutRequestService {
             throw new ProblemException(ProblemType.INVALID_PAYOUT_STATE, "Payout is already being processed");
         }
         ledgerService.recordPayoutReversal(payout);
+        auditService.record(AuditAction.PAYOUT_CANCELLED, AuditTargetType.PAYOUT, payout.getId(),
+                Map.of("organizerId", organizer.getId(), "amount", payout.getAmount(), "previousStatus", previousStatus));
         return new PayoutDTO(payout);
     }
 
