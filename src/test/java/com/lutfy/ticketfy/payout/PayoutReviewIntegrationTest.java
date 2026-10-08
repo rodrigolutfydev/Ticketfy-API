@@ -7,8 +7,11 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.ResultActions;
+import tools.jackson.databind.JsonNode;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -144,7 +147,7 @@ class PayoutReviewIntegrationTest extends PayoutTestBase {
     }
 
     @Test
-    void approveRejectAndCancelRaceHasASingleWinner() throws Exception {
+    void approveRejectAndCancelRaceKeepsPayoutInvariants() throws Exception {
         var admin = user("ADMIN");
         for (int round = 0; round < 3; round++) {
             var owner = user("ORGANIZER");
@@ -157,14 +160,40 @@ class PayoutReviewIntegrationTest extends PayoutTestBase {
                     () -> adminService.reject(payoutId, "Suspeita de fraude", admin),
                     () -> requestService.cancel(owner, payoutId)));
 
-            var winners = outcomes.stream().filter(PayoutDTO.class::isInstance).map(PayoutDTO.class::cast).toList();
-            var losers = outcomes.stream().filter(ProblemException.class::isInstance).map(ProblemException.class::cast).toList();
-            assertThat(winners).hasSize(1);
-            assertThat(losers).hasSize(2)
-                    .allSatisfy(loser -> assertThat(loser.getType()).isEqualTo(ProblemType.INVALID_PAYOUT_STATE));
-            var winner = winners.get(0).status();
-            assertThat(payoutStatus(payoutId.toString())).isEqualTo(winner.name());
-            assertThat(reversals(payoutId.toString())).isEqualTo(winner == PayoutStatus.REQUESTED ? 0 : 1);
+            var expectedStatus = List.of(PayoutStatus.REQUESTED, PayoutStatus.REJECTED, PayoutStatus.CANCELLED);
+            var succeeded = EnumSet.noneOf(PayoutStatus.class);
+            for (int i = 0; i < outcomes.size(); i++) {
+                var outcome = outcomes.get(i);
+                if (outcome instanceof PayoutDTO dto) {
+                    assertThat(dto.status()).isEqualTo(expectedStatus.get(i));
+                    succeeded.add(expectedStatus.get(i));
+                } else {
+                    assertThat(outcome).isInstanceOfSatisfying(ProblemException.class,
+                            problem -> assertThat(problem.getType()).isEqualTo(ProblemType.INVALID_PAYOUT_STATE));
+                }
+            }
+
+            assertThat(succeeded).isIn(
+                    EnumSet.of(PayoutStatus.REQUESTED),
+                    EnumSet.of(PayoutStatus.REJECTED),
+                    EnumSet.of(PayoutStatus.CANCELLED),
+                    EnumSet.of(PayoutStatus.REQUESTED, PayoutStatus.CANCELLED));
+            var finalStatus = succeeded.contains(PayoutStatus.CANCELLED) ? PayoutStatus.CANCELLED
+                    : succeeded.contains(PayoutStatus.REJECTED) ? PayoutStatus.REJECTED : PayoutStatus.REQUESTED;
+            assertThat(payoutStatus(payoutId.toString())).isEqualTo(finalStatus.name());
+
+            var reversed = finalStatus == PayoutStatus.REJECTED || finalStatus == PayoutStatus.CANCELLED;
+            assertThat(reversals(payoutId.toString())).isEqualTo(reversed ? 1 : 0);
+
+            var balance = balance(owner);
+            var ledgerSum = BigDecimal.ZERO;
+            for (var entry : ledger(owner).get("content")) {
+                ledgerSum = ledgerSum.add(entry.get("amount").decimalValue());
+            }
+            assertThat(ledgerSum).isEqualByComparingTo(balance.get("total").decimalValue());
+            assertThat(balance.get("total").decimalValue()).isEqualByComparingTo(reversed ? "95.00" : "45.00");
+            assertThat(balance.get("available").decimalValue()).isEqualByComparingTo(reversed ? "95.00" : "45.00");
+            assertThat(balance.get("inPayout").decimalValue()).isEqualByComparingTo(reversed ? "0" : "50.00");
         }
     }
 
@@ -205,6 +234,11 @@ class PayoutReviewIntegrationTest extends PayoutTestBase {
 
     private ResultActions cancel(User owner, String payoutId) throws Exception {
         return mockMvc.perform(post("/organizer/payouts/" + payoutId + "/cancel").header("Authorization", bearer(owner)));
+    }
+
+    private JsonNode ledger(User owner) throws Exception {
+        return body(mockMvc.perform(get("/organizer/ledger").param("size", "100").header("Authorization", bearer(owner)))
+                .andExpect(status().isOk()));
     }
 
     private String payoutStatus(String payoutId) {
