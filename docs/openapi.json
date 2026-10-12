@@ -172,7 +172,7 @@
     },
     "/admin/payouts" : {
       "get" : {
-        "operationId" : "list_1",
+        "operationId" : "list_2",
         "parameters" : [ {
           "in" : "query",
           "name" : "status",
@@ -297,7 +297,7 @@
     },
     "/admin/users/{id}/suspension" : {
       "delete" : {
-        "operationId" : "reactivate",
+        "operationId" : "reactivate_1",
         "parameters" : [ {
           "in" : "path",
           "name" : "id",
@@ -704,6 +704,114 @@
         "tags" : [ "coupon-controller" ]
       }
     },
+    "/events/{eventId}/participants" : {
+      "get" : {
+        "operationId" : "list_1",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "eventId",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "in" : "query",
+          "name" : "ticketTypeId",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "in" : "query",
+          "name" : "status",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "enum" : [ "VALID", "USED", "CANCELLED" ]
+          }
+        }, {
+          "in" : "query",
+          "name" : "q",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "pageable",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Pageable"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PagedModelParticipantDTO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "participant-controller" ]
+      }
+    },
+    "/events/{eventId}/participants.csv" : {
+      "get" : {
+        "operationId" : "exportCsv",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "eventId",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "in" : "query",
+          "name" : "ticketTypeId",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "in" : "query",
+          "name" : "status",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "enum" : [ "VALID", "USED", "CANCELLED" ]
+          }
+        }, {
+          "in" : "query",
+          "name" : "q",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "string",
+                  "format" : "byte"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "participant-controller" ]
+      }
+    },
     "/events/{eventId}/ticket-types" : {
       "get" : {
         "operationId" : "listByEvent",
@@ -829,6 +937,76 @@
           },
           "required" : true
         },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/TicketTypeDetailsDTO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "ticket-type-controller" ]
+      }
+    },
+    "/events/{eventId}/ticket-types/{ticketTypeId}/deactivate" : {
+      "post" : {
+        "operationId" : "deactivate",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "eventId",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "in" : "path",
+          "name" : "ticketTypeId",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/TicketTypeDetailsDTO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "ticket-type-controller" ]
+      }
+    },
+    "/events/{eventId}/ticket-types/{ticketTypeId}/reactivate" : {
+      "post" : {
+        "operationId" : "reactivate",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "eventId",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "in" : "path",
+          "name" : "ticketTypeId",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
         "responses" : {
           "200" : {
             "content" : {
@@ -1872,7 +2050,7 @@
         "properties" : {
           "action" : {
             "type" : "string",
-            "enum" : [ "PAYOUT_ACCOUNT_SAVED", "PAYOUT_REQUESTED", "PAYOUT_SENT_TO_REVIEW", "PAYOUT_APPROVED", "PAYOUT_REJECTED", "PAYOUT_CANCELLED", "PAYOUT_PAID", "PAYOUT_FAILED", "PAYOUTS_BLOCKED", "PAYOUTS_UNBLOCKED", "EVENT_FEATURED", "EVENT_UNFEATURED", "TICKET_TYPE_PRICE_CHANGED", "EVENT_CANCELLED", "PASSWORD_CHANGED", "SESSION_REUSE_DETECTED", "TICKET_TRANSFERRED", "COUPON_CREATED", "COUPON_UPDATED", "COUPON_DEACTIVATED", "COUPON_REACTIVATED", "COUPON_DELETED", "DATA_EXPORTED", "ACCOUNT_DELETED", "ACCOUNT_SUSPENDED", "ACCOUNT_REACTIVATED" ]
+            "enum" : [ "PAYOUT_ACCOUNT_SAVED", "PAYOUT_REQUESTED", "PAYOUT_SENT_TO_REVIEW", "PAYOUT_APPROVED", "PAYOUT_REJECTED", "PAYOUT_CANCELLED", "PAYOUT_PAID", "PAYOUT_FAILED", "PAYOUTS_BLOCKED", "PAYOUTS_UNBLOCKED", "EVENT_FEATURED", "EVENT_UNFEATURED", "TICKET_TYPE_PRICE_CHANGED", "EVENT_CANCELLED", "PASSWORD_CHANGED", "SESSION_REUSE_DETECTED", "TICKET_TRANSFERRED", "COUPON_CREATED", "COUPON_UPDATED", "COUPON_DEACTIVATED", "COUPON_REACTIVATED", "COUPON_DELETED", "DATA_EXPORTED", "ACCOUNT_DELETED", "ACCOUNT_SUSPENDED", "ACCOUNT_REACTIVATED", "TICKET_TYPE_DEACTIVATED", "TICKET_TYPE_REACTIVATED", "PARTICIPANTS_EXPORTED" ]
           },
           "actorEmail" : {
             "type" : "string"
@@ -3302,6 +3480,20 @@
           }
         }
       },
+      "PagedModelParticipantDTO" : {
+        "type" : "object",
+        "properties" : {
+          "content" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ParticipantDTO"
+            }
+          },
+          "page" : {
+            "$ref" : "#/components/schemas/PageMetadata"
+          }
+        }
+      },
       "PagedModelPayoutDTO" : {
         "type" : "object",
         "properties" : {
@@ -3327,6 +3519,39 @@
           },
           "page" : {
             "$ref" : "#/components/schemas/PageMetadata"
+          }
+        }
+      },
+      "ParticipantDTO" : {
+        "type" : "object",
+        "properties" : {
+          "checkedInAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "codeSuffix" : {
+            "type" : "string"
+          },
+          "holderName" : {
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "string",
+            "enum" : [ "VALID", "USED", "CANCELLED" ]
+          },
+          "ticketId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "ticketTypeId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "ticketTypeName" : {
+            "type" : "string"
+          },
+          "transferred" : {
+            "type" : "boolean"
           }
         }
       },

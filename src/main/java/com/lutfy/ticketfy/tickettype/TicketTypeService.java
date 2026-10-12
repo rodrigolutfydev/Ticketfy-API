@@ -9,6 +9,8 @@ import com.lutfy.ticketfy.infra.exception.EventAccessDeniedException;
 import com.lutfy.ticketfy.infra.exception.EventNotFoundException;
 import com.lutfy.ticketfy.infra.exception.InvalidEventStateException;
 import com.lutfy.ticketfy.infra.exception.InvalidTicketTypeQuantityException;
+import com.lutfy.ticketfy.infra.exception.ProblemException;
+import com.lutfy.ticketfy.infra.exception.ProblemType;
 import com.lutfy.ticketfy.infra.exception.TicketTypeNameAlreadyExistsException;
 import com.lutfy.ticketfy.infra.exception.TicketTypeNotFoundException;
 import com.lutfy.ticketfy.user.Role;
@@ -19,6 +21,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -32,13 +35,15 @@ public class TicketTypeService {
     private final EventRepository eventRepository;
     private final EntityManager entityManager;
     private final AuditService auditService;
+    private final Clock clock;
 
     public TicketTypeService(TicketTypeRepository ticketTypeRepository, EventRepository eventRepository,
-                             EntityManager entityManager, AuditService auditService) {
+                             EntityManager entityManager, AuditService auditService, Clock clock) {
         this.ticketTypeRepository = ticketTypeRepository;
         this.eventRepository = eventRepository;
         this.entityManager = entityManager;
         this.auditService = auditService;
+        this.clock = clock;
     }
 
     @Transactional
@@ -62,9 +67,7 @@ public class TicketTypeService {
                 .orElseThrow(() -> new EventNotFoundException("Event not found"));
         checkEventOwnership(event, authenticated);
         checkNotCancelled(event);
-        var ticketType = ticketTypeRepository.findByIdAndActiveTrue(ticketTypeId)
-                .filter(found -> found.getEvent().getId().equals(eventId))
-                .orElseThrow(() -> new TicketTypeNotFoundException("Ticket type not found"));
+        var ticketType = findOfEvent(eventId, ticketTypeId);
 
         var previousPrice = ticketType.getPrice();
         ticketType.updateFrom(dto);
@@ -87,6 +90,42 @@ public class TicketTypeService {
                     Map.of("eventId", eventId, "previousPrice", previousPrice, "newPrice", ticketType.getPrice()));
         }
         return new TicketTypeDetailsDTO(ticketType);
+    }
+
+    @Transactional
+    public TicketTypeDetailsDTO deactivate(UUID eventId, UUID ticketTypeId, User authenticated) {
+        return changeActive(eventId, ticketTypeId, false, authenticated);
+    }
+
+    @Transactional
+    public TicketTypeDetailsDTO reactivate(UUID eventId, UUID ticketTypeId, User authenticated) {
+        return changeActive(eventId, ticketTypeId, true, authenticated);
+    }
+
+    private TicketTypeDetailsDTO changeActive(UUID eventId, UUID ticketTypeId, boolean active, User authenticated) {
+        var event = eventRepository.findByIdAndActiveTrue(eventId)
+                .orElseThrow(() -> new EventNotFoundException("Event not found"));
+        checkEventOwnership(event, authenticated);
+        checkNotCancelled(event);
+        var ticketType = findOfEvent(eventId, ticketTypeId);
+        var now = clock.instant();
+        if (active && !event.getStartsAt().isAfter(now)) {
+            throw new ProblemException(ProblemType.SALES_CLOSED,
+                    "Ticket sales for this event have ended, so the ticket type cannot be reactivated");
+        }
+        if (ticketTypeRepository.changeActive(ticketTypeId, active, now) == 0) {
+            throw new ProblemException(ProblemType.INVALID_TICKET_TYPE_STATE,
+                    active ? "Ticket type is already active" : "Ticket type is already inactive");
+        }
+        auditService.record(active ? AuditAction.TICKET_TYPE_REACTIVATED : AuditAction.TICKET_TYPE_DEACTIVATED,
+                AuditTargetType.TICKET_TYPE, ticketTypeId, Map.of("eventId", eventId, "name", ticketType.getName()));
+        return new TicketTypeDetailsDTO(findOfEvent(eventId, ticketTypeId));
+    }
+
+    private TicketType findOfEvent(UUID eventId, UUID ticketTypeId) {
+        return ticketTypeRepository.findById(ticketTypeId)
+                .filter(found -> found.getEvent().getId().equals(eventId))
+                .orElseThrow(() -> new TicketTypeNotFoundException("Ticket type not found"));
     }
 
     @Transactional(readOnly = true)

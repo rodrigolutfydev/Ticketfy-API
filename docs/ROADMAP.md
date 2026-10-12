@@ -26,6 +26,8 @@ O que já está pronto na API do Ticketfy e o que vem a seguir. Os detalhes de c
 
 ### Organizador e financeiro
 - [x] Painel de vendas do evento e do organizador
+- [x] Desativar e reativar lote, com a venda bloqueada no próprio `UPDATE` da reserva
+- [x] Lista de participantes por ingresso, com filtros, código mascarado e exportação em CSV auditada
 - [x] Taxa da plataforma e extrato imutável do organizador, com exportação CSV
 - [x] Dados de recebimento com documento e chave Pix cifrados
 - [x] Saques com análise, bloqueio por administrador e rotina de processamento
@@ -63,6 +65,4 @@ O que já está pronto na API do Ticketfy e o que vem a seguir. Os detalhes de c
 
 Lacunas encontradas na revisão dos documentos de engenharia contra o código. Ainda não têm prioridade definida.
 
-- [ ] Desativar um lote para novas vendas sem excluí-lo (a coluna `active` já existe em `ticket_types`, mas não há endpoint)
-- [ ] Lista de participantes por ingresso para o organizador, com o dono atual e a situação de cada ingresso
 - [ ] Distinguir campo ausente de campo `null` na edição parcial (`PATCH`) de lotes, para permitir remover limites como o `maxPerOrder`

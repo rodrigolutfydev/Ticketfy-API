@@ -87,6 +87,10 @@
   "status" : 400,
   "title" : "Invalid ticket type quantity"
 }, {
+  "slug" : "invalid-ticket-type-state",
+  "status" : 409,
+  "title" : "Invalid ticket type state"
+}, {
   "slug" : "ticket-type-name-already-exists",
   "status" : 409,
   "title" : "Ticket type name already exists"

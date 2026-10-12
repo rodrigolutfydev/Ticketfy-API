@@ -101,12 +101,13 @@ O limite de ingressos por pedido, previsto aqui na versão original, é definido
 
 ### RF09 — Gerenciamento de tipos de ingresso
 
-**Descrição:** O sistema deve permitir que o organizador crie, edite e desative tipos de ingresso (lotes) de um evento, cada um com nome, descrição, preço, quantidade total e limite de ingressos por pedido. **Atores:** Organizador, Administrador. **Prioridade:** Alta. **Situação:** Implementado com divergência: criação e edição existem (`POST` e `PATCH /events/{id}/ticket-types`); a desativação de um lote não está implementada, embora a coluna `active` exista. **Critérios de aceite:**
+**Descrição:** O sistema deve permitir que o organizador crie, edite e desative tipos de ingresso (lotes) de um evento, cada um com nome, descrição, preço, quantidade total e limite de ingressos por pedido. **Atores:** Organizador, Administrador. **Prioridade:** Alta. **Situação:** Implementado (`POST` e `PATCH /events/{id}/ticket-types`, e `POST …/{ticketTypeId}/deactivate` e `…/reactivate`). **Critérios de aceite:**
 
 - Um evento aceita mais de um tipo de ingresso, cada um com estoque próprio e nome único no evento.
 - Preço negativo ou quantidade menor que 1 são recusados (RN10).
 - A quantidade total não pode ser reduzida abaixo do número de ingressos já vendidos ou reservados (RN11).
 - Uma mudança de preço é registrada na auditoria e não altera pedidos existentes (RN14).
+- Um lote desativado não aceita novas reservas e some da lista pública, mas continua na gestão do organizador e nos pedidos e ingressos existentes; pedidos pendentes com ele podem ser pagos dentro do prazo da reserva. Lote desativado pode ser editado. A reativação é recusada depois do início do evento, e as duas ações ficam na auditoria.
 - O lote aceita um limite opcional de ingressos por comprador, pago ou gratuito. Pedidos expirados, cancelados ou reembolsados devolvem o limite; ingressos recebidos por transferência não contam. Diminuir o limite não cancela pedidos existentes.
 
 ### Sugestões
@@ -238,8 +239,8 @@ Foram encontradas 7 inconsistências na versão original, todas resolvidas. A re
 | I07 | O RF16 atribui a validação ao organizador, mas em eventos reais a conferência costuma ser feita por outra pessoa na portaria. | RF16, RN23 | Resolvida: a validação é feita pelo organizador do evento ou por um administrador. |
 | I08 | A RN09 recusa compras de eventos já realizados, mas o código só conferia se o evento estava ativo e não cancelado. | RN09, RF08, RF11 | Resolvida: a reserva de estoque confere `startsAt > agora` no próprio `UPDATE` condicional e responde 409 `sales-closed`; a busca deixa de listar eventos terminados, e os destaques, eventos já iniciados (DA18). |
 | I09 | A RN13 restringe a compra ao perfil de cliente, mas organizadores e administradores também compram. | RN13, RF11 | Divergência: confirmar se o comportamento é intencional e ajustar a regra ou o código. |
-| I10 | O RF09 prevê desativar tipos de ingresso, mas não há endpoint para isso. | RF09 | Não implementado; listado em "Possíveis melhorias" no roadmap. |
-| I11 | O RF17 prevê a lista de participantes por ingresso, mas o organizador só vê os pedidos e o painel de check-in. | RF17 | Não implementado; listado em "Possíveis melhorias" no roadmap. |
+| I10 | O RF09 prevê desativar tipos de ingresso, mas não havia endpoint para isso. | RF09 | Resolvida: desativação e reativação de lote (DA21). |
+| I11 | O RF17 prevê a lista de participantes por ingresso, mas o organizador só via os pedidos e o painel de check-in. | RF17 | Resolvida: lista de participantes por ingresso, com exportação em CSV (DA21). |
 | I12 | O RF18 e a RN06 preveem a suspensão de contas pelo administrador, mas ela não existia. | RF18, RN03, RN06 | Resolvida: suspensão e reativação pelo administrador (`/admin/users`), com sessões revogadas, pedidos pendentes cancelados e, para organizadores, vendas pausadas e saques retidos (DA19). |
 | I13 | O RF04 previa desativar organizadores. | RF04 | Resolvida pela I12: o organizador é suspenso como qualquer conta, o que pausa as vendas dos eventos dele e retém os saques. |
 
@@ -317,10 +318,12 @@ As perguntas Q01 a Q04 vêm do Documento de Visão; Q05 a Q08 surgiram nesta an�
 
 ### RF17 — Consulta de participantes
 
-**Descrição:** O sistema deve permitir que o organizador liste os participantes de seus eventos, com a situação de cada ingresso. **Atores:** Organizador. **Prioridade:** Média. **Situação:** Não implementado. O organizador vê os pedidos do evento com o comprador (`GET /events/{id}/orders`) e os totais de check-in no painel (RF21), mas não uma lista por ingresso, com o dono atual. Listado em "Possíveis melhorias" no roadmap. **Critérios de aceite:**
+**Descrição:** O sistema deve permitir que o organizador liste os participantes de seus eventos, com a situação de cada ingresso. **Atores:** Organizador, Administrador. **Prioridade:** Média. **Situação:** Implementado (`GET /events/{id}/participants` e `GET /events/{id}/participants.csv`). **Critérios de aceite:**
 
-- A lista contém apenas participantes de eventos do organizador autenticado (RN04).
-- Ingressos cancelados aparecem identificados ou excluídos da contagem de participantes.
+- A lista contém apenas participantes de eventos do organizador autenticado (RN04); qualquer outra pessoa recebe 404.
+- Cada ingresso mostra lote, situação, data do check-in, se foi transferido, o nome do dono atual e só os 4 últimos caracteres do código. Contas excluídas aparecem anonimizadas.
+- Ingressos cancelados aparecem identificados, e a lista filtra por lote, situação e nome.
+- A exportação em CSV protege contra fórmulas e fica na auditoria. Não há check-in a partir da lista.
 
 ### RF18 — Gerenciamento de usuários
 
