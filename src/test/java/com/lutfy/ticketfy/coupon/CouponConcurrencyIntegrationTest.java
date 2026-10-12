@@ -160,7 +160,7 @@ class CouponConcurrencyIntegrationTest extends CouponTestBase {
     }
 
     private CouponUpdateDTO settings(DiscountType type, String value, boolean active) {
-        return new CouponUpdateDTO(type, new BigDecimal(value), null, null, null, active);
+        return new CouponUpdateDTO(type, new BigDecimal(value), null, null, null, active, null);
     }
 
     private void waitUntilBlockedOnLock() {

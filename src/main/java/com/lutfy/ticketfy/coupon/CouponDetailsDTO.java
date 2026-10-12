@@ -18,12 +18,13 @@ public record CouponDetailsDTO(
         boolean used,
         long paidOrders,
         BigDecimal discountTotal,
-        Instant createdAt
+        Instant createdAt,
+        Integer maxUsesPerBuyer
 ) {
     public CouponDetailsDTO(Coupon coupon, long paidOrders, BigDecimal discountTotal) {
         this(coupon.getId(), coupon.getEvent().getId(), coupon.getCode(), coupon.getDiscountType(),
                 coupon.getDiscountValue(), coupon.getMaxUses(), coupon.getUsesCount(), coupon.getStartsAt(),
                 coupon.getEndsAt(), coupon.getActive(), coupon.isUsed(), paidOrders, discountTotal,
-                coupon.getCreatedAt());
+                coupon.getCreatedAt(), coupon.getMaxUsesPerBuyer());
     }
 }

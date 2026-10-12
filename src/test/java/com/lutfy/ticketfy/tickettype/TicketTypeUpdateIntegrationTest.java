@@ -250,7 +250,7 @@ class TicketTypeUpdateIntegrationTest extends IntegrationTestBase {
                 ticketTypeRepository.changeQuantityTotal(ticketTypeId, 150);
             });
 
-            ticketType.updateFrom(new TicketTypeUpdateDTO("Renomeado", null, null, null, null));
+            ticketType.updateFrom(new TicketTypeUpdateDTO("Renomeado", null, null, null, null, null));
         });
 
         var row = stored();

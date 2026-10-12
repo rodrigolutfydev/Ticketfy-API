@@ -107,6 +107,10 @@
   "status" : 400,
   "title" : "Max per order exceeded"
 }, {
+  "slug" : "max-per-buyer-exceeded",
+  "status" : 409,
+  "title" : "Max per buyer exceeded"
+}, {
   "slug" : "order-not-found",
   "status" : 404,
   "title" : "Order not found"
@@ -250,6 +254,10 @@
   "slug" : "invalid-coupon",
   "status" : 422,
   "title" : "Invalid coupon"
+}, {
+  "slug" : "coupon-buyer-limit-reached",
+  "status" : 422,
+  "title" : "Coupon buyer limit reached"
 }, {
   "slug" : "too-many-coupon-attempts",
   "status" : 429,

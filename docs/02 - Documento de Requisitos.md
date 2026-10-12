@@ -107,6 +107,7 @@ O limite de ingressos por pedido, previsto aqui na versão original, é definido
 - Preço negativo ou quantidade menor que 1 são recusados (RN10).
 - A quantidade total não pode ser reduzida abaixo do número de ingressos já vendidos ou reservados (RN11).
 - Uma mudança de preço é registrada na auditoria e não altera pedidos existentes (RN14).
+- O lote aceita um limite opcional de ingressos por comprador, pago ou gratuito. Pedidos expirados, cancelados ou reembolsados devolvem o limite; ingressos recebidos por transferência não contam. Diminuir o limite não cancela pedidos existentes.
 
 ### Sugestões
 
@@ -159,7 +160,7 @@ São 23 regras, agrupadas por tema. Regras não implementadas ou implementadas c
 | RN10 | Ingressos | Todo tipo de ingresso pertence a um evento, com nome único no evento, preço maior ou igual a zero e quantidade total maior que zero. |
 | RN11 | Ingressos | A quantidade total de um tipo de ingresso não pode ser reduzida abaixo da quantidade já vendida ou reservada. |
 | RN12 | Ingressos | Disponibilidade = quantidade total − quantidade vendida, e nunca pode ser negativa. A quantidade vendida inclui as unidades reservadas por pedidos pendentes. Ao criar o pedido, as unidades ficam reservadas por 15 minutos (`ORDER_RESERVATION_MINUTES`); sem pagamento nesse prazo, o pedido expira e as unidades voltam à disponibilidade. |
-| RN13 | Compras | A quantidade comprada de cada tipo não pode exceder a disponibilidade nem o limite por pedido definido pelo organizador naquele tipo de ingresso. Todos os itens de um pedido pertencem ao mesmo evento. Divergência: qualquer perfil autenticado compra; a restrição ao perfil de cliente prevista originalmente não está implementada. |
+| RN13 | Compras | A quantidade comprada de cada tipo não pode exceder a disponibilidade, o limite por pedido nem o limite por comprador definidos pelo organizador naquele tipo de ingresso; o limite por comprador soma os ingressos do lote em pedidos pendentes e pagos daquela conta. Todos os itens de um pedido pertencem ao mesmo evento. Divergência: qualquer perfil autenticado compra; a restrição ao perfil de cliente prevista originalmente não está implementada. |
 | RN14 | Compras | O preço de cada ingresso é registrado no pedido no momento da compra. Alterações posteriores de preço não afetam pedidos existentes. |
 | RN15 | Pagamentos | Cada pagamento está vinculado a um único pedido, e seu valor corresponde ao total do pedido depois do desconto. Um pedido tem no máximo um pagamento aprovado. Pedidos de valor zero não têm pagamento. |
 | RN16 | Pagamentos | Ingressos só são emitidos após a aprovação do pagamento ou, em pedidos de valor zero, na criação do pedido. |
@@ -340,6 +341,7 @@ As perguntas Q01 a Q04 vêm do Documento de Visão; Q05 a Q08 surgiram nesta an�
 - Um cupom inválido, expirado, inativo, esgotado ou de outro evento é recusado com a mesma resposta, e as falhas por usuário são limitadas.
 - Um cupom já usado não pode ter tipo e valor alterados nem ser excluído.
 - O pedido guarda subtotal, desconto e total; um pedido de valor zero é confirmado sem pagamento.
+- O cupom aceita um limite opcional de usos por comprador. Expiração e cancelamento devolvem o uso; reembolso não. O comprador que atinge o limite recebe uma resposta específica, que não conta como tentativa inválida.
 
 ### RF20 — Transferência de ingresso
 

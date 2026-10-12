@@ -10,14 +10,15 @@ public record TicketTypeSummaryDTO(
         BigDecimal price,
         Integer maxPerOrder,
         boolean soldOut,
-        Integer remaining
+        Integer remaining,
+        Integer maxPerBuyer
 ) {
     static final int LOW_STOCK_THRESHOLD = 10;
 
     public TicketTypeSummaryDTO(TicketType ticketType) {
         this(ticketType.getId(), ticketType.getName(), ticketType.getDescription(), ticketType.getPrice(),
                 ticketType.getMaxPerOrder(), ticketType.availableQuantity() <= 0,
-                lowStockRemaining(ticketType.availableQuantity()));
+                lowStockRemaining(ticketType.availableQuantity()), ticketType.getMaxPerBuyer());
     }
 
     private static Integer lowStockRemaining(int available) {

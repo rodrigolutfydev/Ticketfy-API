@@ -17,7 +17,9 @@ public record TicketTypeUpdateDTO(
         @Positive
         Integer quantityTotal,
         @Positive
-        Integer maxPerOrder
+        Integer maxPerOrder,
+        @PositiveOrZero
+        Integer maxPerBuyer
 ) {
     public TicketTypeUpdateDTO {
         if (description != null && description.isBlank()) description = "";

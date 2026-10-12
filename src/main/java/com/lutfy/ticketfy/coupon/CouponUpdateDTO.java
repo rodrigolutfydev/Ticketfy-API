@@ -17,9 +17,11 @@ public record CouponUpdateDTO(
         Instant startsAt,
         Instant endsAt,
         @NotNull
-        Boolean active
+        Boolean active,
+        @Positive
+        Integer maxUsesPerBuyer
 ) {
     public CouponSettings settings() {
-        return new CouponSettings(discountType, discountValue, maxUses, startsAt, endsAt, active);
+        return new CouponSettings(discountType, discountValue, maxUses, startsAt, endsAt, active, maxUsesPerBuyer);
     }
 }

@@ -22,6 +22,7 @@ O que já está pronto na API do Ticketfy e o que vem a seguir. Os detalhes de c
 - [x] Cancelamento de evento com reembolso em lote
 - [x] Transferência de ingresso entre usuários, com código novo e limite por ingresso
 - [x] Cupons de desconto por evento e pedidos de valor zero
+- [x] Limite por comprador em lotes e cupons, com consumo atômico e devolução na expiração, no cancelamento e (para lotes) no reembolso
 
 ### Organizador e financeiro
 - [x] Painel de vendas do evento e do organizador
@@ -64,3 +65,4 @@ Lacunas encontradas na revisão dos documentos de engenharia contra o código. A
 
 - [ ] Desativar um lote para novas vendas sem excluí-lo (a coluna `active` já existe em `ticket_types`, mas não há endpoint)
 - [ ] Lista de participantes por ingresso para o organizador, com o dono atual e a situação de cada ingresso
+- [ ] Distinguir campo ausente de campo `null` na edição parcial (`PATCH`) de lotes, para permitir remover limites como o `maxPerOrder`

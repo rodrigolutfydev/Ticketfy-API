@@ -8,6 +8,8 @@ import com.lutfy.ticketfy.payment.PaymentService;
 import com.lutfy.ticketfy.payout.PayoutSettings;
 import com.lutfy.ticketfy.payout.ledger.LedgerService;
 import com.lutfy.ticketfy.ticket.TicketService;
+import com.lutfy.ticketfy.tickettype.TicketType;
+import com.lutfy.ticketfy.tickettype.TicketTypeBuyerCounts;
 import com.lutfy.ticketfy.tickettype.TicketTypeRepository;
 import com.lutfy.ticketfy.user.Role;
 import com.lutfy.ticketfy.user.User;
@@ -22,6 +24,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -37,6 +40,7 @@ public class OrderService {
     private final PayoutSettings payoutSettings;
     private final CouponService couponService;
     private final UserLocks userLocks;
+    private final TicketTypeBuyerCounts buyerCounts;
     private final Clock clock;
     private final long reservationMinutes;
     private final long refundDeadlineHours;
@@ -50,6 +54,7 @@ public class OrderService {
                         PayoutSettings payoutSettings,
                         CouponService couponService,
                         UserLocks userLocks,
+                        TicketTypeBuyerCounts buyerCounts,
                         Clock clock,
                         @Value("${ticketfy.order.reservation-minutes}") long reservationMinutes,
                         @Value("${ticketfy.refund.deadline-hours}") long refundDeadlineHours) {
@@ -62,6 +67,7 @@ public class OrderService {
         this.payoutSettings = payoutSettings;
         this.couponService = couponService;
         this.userLocks = userLocks;
+        this.buyerCounts = buyerCounts;
         this.clock = clock;
         this.reservationMinutes = reservationMinutes;
         this.refundDeadlineHours = refundDeadlineHours;
@@ -109,6 +115,10 @@ public class OrderService {
                     throw new ProblemException(ProblemType.SALES_CLOSED, "Ticket sales for this event have ended");
                 }
                 throw new InsufficientStockException("Not enough tickets available for this ticket type");
+            }
+            if (!buyerCounts.consume(ticketType.getId(), authenticated.getId(), itemRequest.quantity(),
+                    ticketType.getMaxPerBuyer())) {
+                throw buyerLimitExceeded(ticketType, authenticated);
             }
             var item = new OrderItem(order, ticketType, itemRequest.quantity());
             order.addItem(item);
@@ -201,13 +211,22 @@ public class OrderService {
     private void releaseStock(Order order) {
         for (var item : order.getItems()) {
             ticketTypeRepository.releaseStock(item.getTicketType().getId(), item.getQuantity());
+            buyerCounts.release(item.getTicketType().getId(), order.getUser().getId(), item.getQuantity());
         }
     }
 
     private void releaseCoupon(Order order) {
         if (order.getCouponId() != null) {
-            couponService.releaseUse(order.getCouponId());
+            couponService.releaseUse(order.getCouponId(), order.getUser().getId());
         }
+    }
+
+    private ProblemException buyerLimitExceeded(TicketType ticketType, User buyer) {
+        var limit = ticketType.getMaxPerBuyer();
+        var remaining = Math.max(0, limit - buyerCounts.count(ticketType.getId(), buyer.getId()));
+        return new ProblemException(ProblemType.MAX_PER_BUYER_EXCEEDED,
+                "Maximum " + limit + " tickets per buyer for this ticket type",
+                Map.of("ticketTypeId", ticketType.getId(), "maxPerBuyer", limit, "remaining", remaining));
     }
 
     private OrderDetailsDTO details(Order order) {

@@ -18,7 +18,9 @@ public record TicketTypeCreationDTO(
         @NotNull @Positive
         Integer quantityTotal,
         @Positive
-        Integer maxPerOrder
+        Integer maxPerOrder,
+        @Positive
+        Integer maxPerBuyer
 ) {
 
 }

@@ -12,10 +12,12 @@ public record TicketTypeDetailsDTO(
         Integer quantitySold,
         Integer available,
         Integer maxPerOrder,
-        Boolean active
+        Boolean active,
+        Integer maxPerBuyer
 ) {
     public TicketTypeDetailsDTO(TicketType ticketType) {
         this(ticketType.getId(), ticketType.getName(), ticketType.getDescription(), ticketType.getPrice(),
-        ticketType.getQuantityTotal(), ticketType.getQuantitySold(), ticketType.availableQuantity(), ticketType.getMaxPerOrder(), ticketType.getActive());
+        ticketType.getQuantityTotal(), ticketType.getQuantitySold(), ticketType.availableQuantity(), ticketType.getMaxPerOrder(), ticketType.getActive(),
+        ticketType.getMaxPerBuyer());
     }
 }

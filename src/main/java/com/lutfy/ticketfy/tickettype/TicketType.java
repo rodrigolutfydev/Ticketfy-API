@@ -30,6 +30,7 @@ public class TicketType {
     @Column(updatable = false)
     private Integer quantitySold;
     private Integer maxPerOrder;
+    private Integer maxPerBuyer;
     private Boolean active;
     @CreationTimestamp
     private Instant createdAt;
@@ -43,6 +44,7 @@ public class TicketType {
         this.price = dto.price();
         this.quantityTotal = dto.quantityTotal();
         this.maxPerOrder = dto.maxPerOrder();
+        this.maxPerBuyer = dto.maxPerBuyer();
         this.quantitySold = 0;
         this.active = true;
     }
@@ -52,6 +54,7 @@ public class TicketType {
         if (dto.description() != null) this.description = dto.description().isBlank() ? null : dto.description();
         if (dto.price() != null) this.price = dto.price();
         if (dto.maxPerOrder() != null) this.maxPerOrder = dto.maxPerOrder();
+        if (dto.maxPerBuyer() != null) this.maxPerBuyer = dto.maxPerBuyer() == 0 ? null : dto.maxPerBuyer();
     }
 
     public Integer availableQuantity() {

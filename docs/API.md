@@ -187,6 +187,7 @@ Content-Type: application/problem+json
 | `invalid-ticket-type-quantity` | 400 | Quantidade total do lote abaixo do vendido e reservado |
 | `mixed-events-order` | 400 | Pedido com lotes de eventos diferentes |
 | `max-per-order-exceeded` | 400 | Quantidade acima do limite por pedido do lote |
+| `max-per-buyer-exceeded` | 409 | Compra passaria do limite por comprador do lote; traz `ticketTypeId`, `maxPerBuyer` e `remaining` |
 | `self-transfer` | 400 | Transferência para o próprio e-mail |
 | `invalid-coupon-settings` | 400 | Percentual acima de 100, fim antes do início ou limite abaixo dos usos |
 | `pix-key-not-found` | 400 | Chave Pix não encontrada no provedor |
@@ -246,6 +247,7 @@ Content-Type: application/problem+json
 | `unsupported-media-type` | 415 | `Content-Type` diferente de JSON |
 | `transfer-recipient-unavailable` | 422 | Destinatário da transferência não pode receber (mensagem genérica) |
 | `invalid-coupon` | 422 | Cupom inválido, expirado, inativo, esgotado ou de outro evento (mesma mensagem para todos) |
+| `coupon-buyer-limit-reached` | 422 | O comprador já usou o cupom o máximo de vezes permitido; traz `maxUsesPerBuyer` e não conta como tentativa inválida |
 | `too-many-login-attempts` | 429 | Limite de login por IP |
 | `too-many-password-attempts` | 429 | Limite de senha de confirmação errada |
 | `too-many-transfer-attempts` | 429 | Limite de destinatários inexistentes |
@@ -555,7 +557,7 @@ O corpo é opcional, e o motivo tem no máximo 500 caracteres. O cancelamento s�
 | GET | `/events/{eventId}/ticket-types` | Lotes ativos, com `soldOut` e `remaining`, sem revelar volume de vendas | Público |
 | GET | `/events/{eventId}/ticket-types/manage` | Todos os lotes com total, vendido e disponível | Dono do evento ou ADMIN |
 | POST | `/events/{eventId}/ticket-types` | Cria um lote | Dono do evento ou ADMIN |
-| PATCH | `/events/{eventId}/ticket-types/{ticketTypeId}` | Altera nome, descrição, preço, quantidade total e limite por pedido | Dono do evento ou ADMIN |
+| PATCH | `/events/{eventId}/ticket-types/{ticketTypeId}` | Altera nome, descrição, preço, quantidade total, limite por pedido e limite por comprador | Dono do evento ou ADMIN |
 
 **Criar lote**
 
@@ -569,7 +571,8 @@ Content-Type: application/json
   "description": "Primeiro lote",
   "price": 80.00,
   "quantityTotal": 500,
-  "maxPerOrder": 4
+  "maxPerOrder": 4,
+  "maxPerBuyer": 6
 }
 ```
 
@@ -588,7 +591,8 @@ GET /events/{eventId}/ticket-types
     "price": 80.00,
     "maxPerOrder": 4,
     "soldOut": false,
-    "remaining": 7
+    "remaining": 7,
+    "maxPerBuyer": 6
   }
 ]
 ```
@@ -601,6 +605,15 @@ Regras de edição:
 - Mudar o preço não altera pedidos já feitos.
 - Lotes de evento cancelado não podem ser editados (409 `invalid-event-state`).
 - Nome repetido no mesmo evento responde 409 `ticket-type-name-already-exists`.
+- No `PATCH`, campo ausente ou `null` não muda nada, então `maxPerOrder` não pode ser removido depois de definido. Para `maxPerBuyer`, `0` remove o limite.
+
+Limite por comprador (`maxPerBuyer`, opcional, vale para lote pago ou gratuito):
+
+- Contam os ingressos daquele lote em pedidos pendentes e pagos do comprador. Pedido expirado, cancelado ou reembolsado devolve.
+- Ingresso recebido por transferência não conta para quem recebe, e quem transfere não recupera o limite.
+- Uma compra que passaria do limite responde 409 `max-per-buyer-exceeded`, com `remaining` (quanto o comprador ainda pode comprar).
+- Diminuir o limite abaixo do que um comprador já comprou não cancela nada; só impede novas compras.
+- O limite é por conta: várias contas contornam.
 
 ### Cupons
 
@@ -608,7 +621,7 @@ Regras de edição:
 |---|---|---|---|
 | GET | `/events/{eventId}/coupons` | Cupons do evento com usos, pedidos pagos e desconto concedido | Dono do evento ou ADMIN |
 | POST | `/events/{eventId}/coupons` | Cria um cupom percentual (`PERCENT`) ou de valor fixo (`FIXED`) | Dono do evento ou ADMIN |
-| PUT | `/events/{eventId}/coupons/{couponId}` | Substitui tipo, valor, limite, validade e ativo | Dono do evento ou ADMIN |
+| PUT | `/events/{eventId}/coupons/{couponId}` | Substitui tipo, valor, limite, limite por comprador, validade e ativo | Dono do evento ou ADMIN |
 | DELETE | `/events/{eventId}/coupons/{couponId}` | Apaga um cupom nunca usado | Dono do evento ou ADMIN |
 | POST | `/events/{eventId}/coupons/preview` | Calcula subtotal, desconto e total sem consumir o cupom | Autenticado |
 
@@ -626,7 +639,8 @@ Content-Type: application/json
   "maxUses": 100,
   "startsAt": null,
   "endsAt": "2026-12-01T03:00:00Z",
-  "active": true
+  "active": true,
+  "maxUsesPerBuyer": 1
 }
 ```
 
@@ -634,6 +648,7 @@ Regras do cupom:
 
 - O código tem de 3 a 30 letras, números, `-` ou `_`. É gravado em maiúsculas, é único no evento e não muda depois de criado.
 - Depois do primeiro uso, tipo e valor ficam fixos e o cupom não pode ser apagado, só desativado (409 `coupon-already-used`).
+- `maxUsesPerBuyer` (opcional) limita os usos por comprador. Contam os pedidos pendentes, pagos e reembolsados com o cupom: expiração e cancelamento devolvem o uso, reembolso não, como no limite global (`maxUses`). Acima do limite, o pedido e a pré-visualização respondem 422 `coupon-buyer-limit-reached`. No `PUT`, `null` remove o limite.
 
 **Pré-visualizar**
 

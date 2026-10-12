@@ -31,6 +31,7 @@ public class Coupon {
     private DiscountType discountType;
     private BigDecimal discountValue;
     private Integer maxUses;
+    private Integer maxUsesPerBuyer;
     @Column(insertable = false, updatable = false)
     private Integer usesCount;
     private Instant startsAt;
@@ -57,6 +58,7 @@ public class Coupon {
         this.startsAt = settings.startsAt();
         this.endsAt = settings.endsAt();
         this.active = settings.active();
+        this.maxUsesPerBuyer = settings.maxUsesPerBuyer();
     }
 
     public boolean isUsed() {

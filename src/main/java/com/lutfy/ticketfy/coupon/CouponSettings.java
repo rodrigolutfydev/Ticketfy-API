@@ -9,6 +9,7 @@ public record CouponSettings(
         Integer maxUses,
         Instant startsAt,
         Instant endsAt,
-        boolean active
+        boolean active,
+        Integer maxUsesPerBuyer
 ) {
 }

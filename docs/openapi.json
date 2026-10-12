@@ -2008,6 +2008,11 @@
             "format" : "int32",
             "minimum" : 0
           },
+          "maxUsesPerBuyer" : {
+            "type" : "integer",
+            "format" : "int32",
+            "minimum" : 0
+          },
           "startsAt" : {
             "type" : "string",
             "format" : "date-time"
@@ -2051,6 +2056,10 @@
             "format" : "uuid"
           },
           "maxUses" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "maxUsesPerBuyer" : {
             "type" : "integer",
             "format" : "int32"
           },
@@ -2165,6 +2174,11 @@
             "format" : "date-time"
           },
           "maxUses" : {
+            "type" : "integer",
+            "format" : "int32",
+            "minimum" : 0
+          },
+          "maxUsesPerBuyer" : {
             "type" : "integer",
             "format" : "int32",
             "minimum" : 0
@@ -3796,6 +3810,11 @@
             "maxLength" : 500,
             "minLength" : 0
           },
+          "maxPerBuyer" : {
+            "type" : "integer",
+            "format" : "int32",
+            "minimum" : 0
+          },
           "maxPerOrder" : {
             "type" : "integer",
             "format" : "int32",
@@ -3834,6 +3853,10 @@
           "id" : {
             "type" : "string",
             "format" : "uuid"
+          },
+          "maxPerBuyer" : {
+            "type" : "integer",
+            "format" : "int32"
           },
           "maxPerOrder" : {
             "type" : "integer",
@@ -3935,6 +3958,10 @@
             "type" : "string",
             "format" : "uuid"
           },
+          "maxPerBuyer" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
           "maxPerOrder" : {
             "type" : "integer",
             "format" : "int32"
@@ -3961,6 +3988,11 @@
             "type" : "string",
             "maxLength" : 500,
             "minLength" : 0
+          },
+          "maxPerBuyer" : {
+            "type" : "integer",
+            "format" : "int32",
+            "minimum" : 0
           },
           "maxPerOrder" : {
             "type" : "integer",

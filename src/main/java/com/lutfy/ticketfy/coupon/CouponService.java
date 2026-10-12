@@ -169,6 +169,10 @@ public class CouponService {
         var coupon = Optional.ofNullable(code)
                 .flatMap(normalized -> redemptions.findAvailable(eventId, normalized, now))
                 .orElseThrow(() -> rejected(authenticated));
+        if (coupon.maxUsesPerBuyer() != null
+                && redemptions.buyerUses(coupon.couponId(), authenticated.getId()) >= coupon.maxUsesPerBuyer()) {
+            throw buyerLimitReached(coupon);
+        }
         var discount = coupon.discountFor(subtotal);
         return new CouponPreviewDTO(coupon.code(), coupon.discountType(), coupon.discountValue(),
                 subtotal, discount, subtotal.subtract(discount));
@@ -184,13 +188,24 @@ public class CouponService {
         if (code == null) {
             throw rejected(authenticated);
         }
-        return redemptions.redeem(eventId, code, clock.instant())
+        var redemption = redemptions.redeem(eventId, code, clock.instant())
                 .orElseThrow(() -> rejected(authenticated));
+        if (!redemptions.consumeBuyerUse(redemption.couponId(), authenticated.getId(), redemption.maxUsesPerBuyer())) {
+            throw buyerLimitReached(redemption);
+        }
+        return redemption;
     }
 
     @Transactional(propagation = Propagation.MANDATORY)
-    public void releaseUse(UUID couponId) {
+    public void releaseUse(UUID couponId, UUID userId) {
         couponRepository.releaseUse(couponId);
+        redemptions.releaseBuyerUse(couponId, userId);
+    }
+
+    private static ProblemException buyerLimitReached(CouponRedemption coupon) {
+        return new ProblemException(ProblemType.COUPON_BUYER_LIMIT_REACHED,
+                "You have already used this coupon the maximum number of times",
+                Map.of("maxUsesPerBuyer", coupon.maxUsesPerBuyer()));
     }
 
     private ProblemException rejected(User authenticated) {
@@ -211,7 +226,7 @@ public class CouponService {
 
     private static CouponSettings current(Coupon coupon) {
         return new CouponSettings(coupon.getDiscountType(), coupon.getDiscountValue(), coupon.getMaxUses(),
-                coupon.getStartsAt(), coupon.getEndsAt(), coupon.getActive());
+                coupon.getStartsAt(), coupon.getEndsAt(), coupon.getActive(), coupon.getMaxUsesPerBuyer());
     }
 
     private static Map<String, Object> describe(CouponSettings settings) {
@@ -222,6 +237,7 @@ public class CouponService {
         values.put("startsAt", settings.startsAt());
         values.put("endsAt", settings.endsAt());
         values.put("active", settings.active());
+        values.put("maxUsesPerBuyer", settings.maxUsesPerBuyer());
         return values;
     }
 
