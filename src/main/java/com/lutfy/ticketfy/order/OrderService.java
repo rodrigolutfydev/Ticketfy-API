@@ -104,7 +104,8 @@ public class OrderService {
                 if (eventRepository.existsByIdAndCancelledAtIsNotNull(itemEventId)) {
                     throw new InvalidEventStateException("Event was cancelled");
                 }
-                if (eventRepository.existsByIdAndStartsAtLessThanEqual(itemEventId, now)) {
+                if (eventRepository.existsByIdAndStartsAtLessThanEqual(itemEventId, now)
+                        || eventRepository.existsByIdAndOrganizerSuspendedAtIsNotNull(itemEventId)) {
                     throw new ProblemException(ProblemType.SALES_CLOSED, "Ticket sales for this event have ended");
                 }
                 throw new InsufficientStockException("Not enough tickets available for this ticket type");

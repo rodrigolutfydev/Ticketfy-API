@@ -89,6 +89,9 @@ public class AccountDeletionService {
         var user = userRepository.findForUpdate(principal.getId())
                 .filter(found -> !found.isDeleted())
                 .orElseThrow(UserLocks::accountDeleted);
+        if (user.isSuspended()) {
+            throw UserLocks.accountSuspended();
+        }
         var pendingOrderIds = queries.lockPendingOrders(user.getId());
         var account = payoutAccountRepository.findForUpdate(user.getId());
         queries.lockTicketTypesOfOrganizer(user.getId());

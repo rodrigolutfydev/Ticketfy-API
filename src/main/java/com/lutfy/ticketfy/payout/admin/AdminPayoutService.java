@@ -65,7 +65,8 @@ public class AdminPayoutService {
                     organizer == null ? null : organizer.getName(), organizer == null ? null : organizer.getEmail(),
                     payout.getAmount(), payout.getStatus(), payout.getPixKeyType(),
                     Masking.pixKey(payout.getPixKeyType(), payout.getPixKey()), payout.getHolderName(),
-                    payout.getRequestedAt(), blocked.contains(payout.getOrganizerId()));
+                    payout.getRequestedAt(),
+                    blocked.contains(payout.getOrganizerId()) || (organizer != null && organizer.isSuspended()));
         });
     }
 

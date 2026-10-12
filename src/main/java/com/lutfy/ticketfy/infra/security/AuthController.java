@@ -4,6 +4,7 @@ import com.lutfy.ticketfy.auth.AuthSessionService;
 import com.lutfy.ticketfy.auth.RefreshTokenCookie;
 import com.lutfy.ticketfy.auth.RevocationReason;
 import com.lutfy.ticketfy.infra.exception.ProblemDetailFactory;
+import com.lutfy.ticketfy.infra.exception.ProblemException;
 import com.lutfy.ticketfy.infra.exception.ProblemType;
 import com.lutfy.ticketfy.user.User;
 import jakarta.servlet.http.HttpServletRequest;
@@ -50,21 +51,29 @@ public class AuthController {
 
     @PostMapping("/refresh")
     public ResponseEntity<?> refresh(HttpServletRequest request) {
-        return cookie.read(request)
-                .flatMap(authSessions::refresh)
-                .<ResponseEntity<?>>map(session -> ResponseEntity.ok()
-                        .cacheControl(CacheControl.noStore())
-                        .header(HttpHeaders.SET_COOKIE, cookie.issue(session))
-                        .body(new LoginResponseDTO(session)))
-                .orElseGet(() -> {
-                    var problem = problems.create(ProblemType.SESSION_EXPIRED, "Session expired. Sign in again.",
-                            request.getRequestURI());
-                    return ResponseEntity.status(problem.getStatus())
-                            .contentType(MediaType.APPLICATION_PROBLEM_JSON)
+        try {
+            return cookie.read(request)
+                    .flatMap(authSessions::refresh)
+                    .<ResponseEntity<?>>map(session -> ResponseEntity.ok()
                             .cacheControl(CacheControl.noStore())
-                            .header(HttpHeaders.SET_COOKIE, cookie.clear())
-                            .body(problem);
-                });
+                            .header(HttpHeaders.SET_COOKIE, cookie.issue(session))
+                            .body(new LoginResponseDTO(session)))
+                    .orElseGet(() -> refused(ProblemType.SESSION_EXPIRED, "Session expired. Sign in again.", request));
+        } catch (ProblemException ex) {
+            if (ex.getType() != ProblemType.ACCOUNT_SUSPENDED) {
+                throw ex;
+            }
+            return refused(ProblemType.ACCOUNT_SUSPENDED, ex.getMessage(), request);
+        }
+    }
+
+    private ResponseEntity<?> refused(ProblemType type, String detail, HttpServletRequest request) {
+        var problem = problems.create(type, detail, request.getRequestURI());
+        return ResponseEntity.status(problem.getStatus())
+                .contentType(MediaType.APPLICATION_PROBLEM_JSON)
+                .cacheControl(CacheControl.noStore())
+                .header(HttpHeaders.SET_COOKIE, cookie.clear())
+                .body(problem);
     }
 
     @PostMapping("/logout")

@@ -5,6 +5,7 @@ import com.lutfy.ticketfy.audit.AuditService;
 import com.lutfy.ticketfy.audit.AuditTargetType;
 import com.lutfy.ticketfy.payout.PayoutSettings;
 import com.lutfy.ticketfy.payout.admin.PayoutBlockRepository;
+import com.lutfy.ticketfy.user.UserLocks;
 import com.lutfy.ticketfy.payout.ledger.LedgerService;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Component;
@@ -22,16 +23,18 @@ public class PayoutTransitions {
 
     private final PayoutRepository repository;
     private final PayoutBlockRepository blockRepository;
+    private final UserLocks userLocks;
     private final LedgerService ledgerService;
     private final AuditService auditService;
     private final PayoutSettings settings;
     private final Clock clock;
 
-    public PayoutTransitions(PayoutRepository repository, PayoutBlockRepository blockRepository,
+    public PayoutTransitions(PayoutRepository repository, PayoutBlockRepository blockRepository, UserLocks userLocks,
                              LedgerService ledgerService, AuditService auditService, PayoutSettings settings,
                              Clock clock) {
         this.repository = repository;
         this.blockRepository = blockRepository;
+        this.userLocks = userLocks;
         this.auditService = auditService;
         this.ledgerService = ledgerService;
         this.settings = settings;
@@ -50,6 +53,10 @@ public class PayoutTransitions {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public Optional<PayoutGateway.TransferRequest> start(UUID payoutId) {
+        var organizerId = repository.findOrganizerIdById(payoutId).orElse(null);
+        if (organizerId == null || userLocks.lock(organizerId) != UserLocks.AccountState.ACTIVE) {
+            return Optional.empty();
+        }
         var payout = repository.findById(payoutId).orElse(null);
         if (payout == null || payout.getStatus() != PayoutStatus.REQUESTED
                 || blockRepository.existsById(payout.getOrganizerId())) {

@@ -44,6 +44,10 @@ final class EventSpecifications {
         return (root, query, cb) -> cb.greaterThan(root.<Instant>get("startsAt"), bound(cb, now));
     }
 
+    static Specification<Event> organizerNotSuspended() {
+        return (root, query, cb) -> cb.isNull(root.get("organizer").get("suspendedAt"));
+    }
+
     static Specification<Event> isFeatured(boolean featured) {
         return (root, query, cb) -> cb.equal(root.get("featured"), featured);
     }

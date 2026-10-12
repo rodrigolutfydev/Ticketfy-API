@@ -17,6 +17,14 @@ import java.util.UUID;
 
 public interface OrderRepository extends JpaRepository<Order, UUID> {
 
+    @Query(value = """
+        SELECT id FROM orders
+         WHERE user_id = :userId AND status = 'PENDING'
+         ORDER BY id
+           FOR UPDATE
+        """, nativeQuery = true)
+    List<UUID> lockPendingIdsByUserId(@Param("userId") UUID userId);
+
     Optional<Order> findByIdempotencyKey(String idempotencyKey);
 
     Page<Order> findByUserId(UUID userId, Pageable pageable);

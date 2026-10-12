@@ -24,6 +24,8 @@ public interface EventRepository extends JpaRepository<Event, UUID>, JpaSpecific
 
     boolean existsByIdAndStartsAtLessThanEqual(UUID id, Instant now);
 
+    boolean existsByIdAndOrganizerSuspendedAtIsNotNull(UUID id);
+
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("""
         UPDATE Event e

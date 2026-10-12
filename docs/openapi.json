@@ -269,6 +269,94 @@
         "tags" : [ "admin-payout-controller" ]
       }
     },
+    "/admin/users" : {
+      "get" : {
+        "operationId" : "findByEmail",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "email",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AdminUserDTO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "admin-user-controller" ]
+      }
+    },
+    "/admin/users/{id}/suspension" : {
+      "delete" : {
+        "operationId" : "reactivate",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AdminUserDTO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "admin-user-controller" ]
+      },
+      "post" : {
+        "operationId" : "suspend",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/SuspensionDTO"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AdminUserDTO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "admin-user-controller" ]
+      }
+    },
     "/auth/login" : {
       "post" : {
         "operationId" : "login",
@@ -1732,12 +1820,59 @@
           }
         }
       },
+      "AdminUserDTO" : {
+        "type" : "object",
+        "properties" : {
+          "createdAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "email" : {
+            "type" : "string"
+          },
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "payoutBlockReason" : {
+            "type" : "string"
+          },
+          "payoutBlockedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "payoutsBlocked" : {
+            "type" : "boolean"
+          },
+          "role" : {
+            "type" : "string",
+            "enum" : [ "USER", "ORGANIZER", "ADMIN" ]
+          },
+          "suspended" : {
+            "type" : "boolean"
+          },
+          "suspendedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "suspendedBy" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "suspensionReason" : {
+            "type" : "string"
+          }
+        }
+      },
       "AuditEntryDTO" : {
         "type" : "object",
         "properties" : {
           "action" : {
             "type" : "string",
-            "enum" : [ "PAYOUT_ACCOUNT_SAVED", "PAYOUT_REQUESTED", "PAYOUT_SENT_TO_REVIEW", "PAYOUT_APPROVED", "PAYOUT_REJECTED", "PAYOUT_CANCELLED", "PAYOUT_PAID", "PAYOUT_FAILED", "PAYOUTS_BLOCKED", "PAYOUTS_UNBLOCKED", "EVENT_FEATURED", "EVENT_UNFEATURED", "TICKET_TYPE_PRICE_CHANGED", "EVENT_CANCELLED", "PASSWORD_CHANGED", "SESSION_REUSE_DETECTED", "TICKET_TRANSFERRED", "COUPON_CREATED", "COUPON_UPDATED", "COUPON_DEACTIVATED", "COUPON_REACTIVATED", "COUPON_DELETED", "DATA_EXPORTED", "ACCOUNT_DELETED" ]
+            "enum" : [ "PAYOUT_ACCOUNT_SAVED", "PAYOUT_REQUESTED", "PAYOUT_SENT_TO_REVIEW", "PAYOUT_APPROVED", "PAYOUT_REJECTED", "PAYOUT_CANCELLED", "PAYOUT_PAID", "PAYOUT_FAILED", "PAYOUTS_BLOCKED", "PAYOUTS_UNBLOCKED", "EVENT_FEATURED", "EVENT_UNFEATURED", "TICKET_TYPE_PRICE_CHANGED", "EVENT_CANCELLED", "PASSWORD_CHANGED", "SESSION_REUSE_DETECTED", "TICKET_TRANSFERRED", "COUPON_CREATED", "COUPON_UPDATED", "COUPON_DEACTIVATED", "COUPON_REACTIVATED", "COUPON_DELETED", "DATA_EXPORTED", "ACCOUNT_DELETED", "ACCOUNT_SUSPENDED", "ACCOUNT_REACTIVATED" ]
           },
           "actorEmail" : {
             "type" : "string"
@@ -3541,6 +3676,17 @@
             "format" : "int64"
           }
         }
+      },
+      "SuspensionDTO" : {
+        "type" : "object",
+        "properties" : {
+          "reason" : {
+            "type" : "string",
+            "maxLength" : 500,
+            "minLength" : 0
+          }
+        },
+        "required" : [ "reason" ]
       },
       "TicketDetailsDTO" : {
         "type" : "object",

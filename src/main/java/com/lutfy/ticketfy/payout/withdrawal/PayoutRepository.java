@@ -28,10 +28,14 @@ public interface PayoutRepository extends JpaRepository<Payout, UUID> {
 
     Page<Payout> findByStatus(PayoutStatus status, Pageable pageable);
 
+    @Query("SELECT p.organizerId FROM Payout p WHERE p.id = :id")
+    Optional<UUID> findOrganizerIdById(@Param("id") UUID id);
+
     @Query("""
         SELECT p.id FROM Payout p
          WHERE p.status = com.lutfy.ticketfy.payout.withdrawal.PayoutStatus.REQUESTED
            AND NOT EXISTS (SELECT b FROM PayoutBlock b WHERE b.organizerId = p.organizerId)
+           AND NOT EXISTS (SELECT u FROM User u WHERE u.id = p.organizerId AND u.suspendedAt IS NOT NULL)
          ORDER BY p.requestedAt, p.id
         """)
     List<UUID> findProcessableIds();

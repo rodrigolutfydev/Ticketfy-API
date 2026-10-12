@@ -61,7 +61,7 @@ São 25 requisitos funcionais. RF01 a RF18 vêm da versão original: 13 de prior
 
 ### RF04 — Gerenciamento de organizadores
 
-**Descrição:** O sistema deve permitir que um usuário passe a ser organizador. **Atores:** Organizador, Administrador. **Prioridade:** Média. **Situação:** Implementado com divergência: o próprio usuário se promove por `POST /users/me/organizer`, sem aprovação (Q02). A desativação de organizadores não está implementada; o administrador só bloqueia os saques de um organizador (RF22). **Critérios de aceite:**
+**Descrição:** O sistema deve permitir que um usuário passe a ser organizador. **Atores:** Organizador, Administrador. **Prioridade:** Média. **Situação:** Implementado com divergência: o próprio usuário se promove por `POST /users/me/organizer`, sem aprovação (Q02). O administrador pode suspender um organizador como qualquer conta (RF18), o que pausa as vendas dos eventos dele e retém os saques, ou só bloquear os saques (RF22). **Critérios de aceite:**
 
 - Um usuário promovido a organizador consegue criar eventos.
 - Um organizador ou administrador não pode ser promovido de novo.
@@ -149,10 +149,10 @@ São 23 regras, agrupadas por tema. Regras não implementadas ou implementadas c
 | --- | --- | --- |
 | RN01 | Usuários | O e-mail é único no sistema: não pode haver duas contas com o mesmo e-mail. |
 | RN02 | Usuários | Cada usuário possui um único perfil: `USER`, `ORGANIZER` ou `ADMIN`. |
-| RN03 | Usuários | Apenas contas não excluídas podem se autenticar. A exclusão anonimiza a conta e não apaga o histórico. A suspensão de uma conta pelo administrador não está implementada. |
+| RN03 | Usuários | Apenas contas não excluídas e não suspensas podem se autenticar. A exclusão anonimiza a conta e não apaga o histórico. A suspensão revoga todas as sessões na hora e é desfeita pela reativação; a conta suspensa não pode ser excluída pelo próprio usuário. |
 | RN04 | Permissões | O organizador só pode gerenciar, consultar vendas e validar ingressos dos eventos que criou. O administrador pode agir sobre qualquer evento. |
 | RN05 | Permissões | O cliente só pode consultar, cancelar e reembolsar os próprios pedidos, e consultar e transferir os ingressos que possui. |
-| RN06 | Permissões | Apenas o administrador pode suspender e reativar contas. Não implementado: hoje o administrador só bloqueia e desbloqueia os saques de um organizador. |
+| RN06 | Permissões | Apenas o administrador pode suspender e reativar contas, sempre com motivo, e nunca a própria conta nem a de outro administrador. O administrador também bloqueia e desbloqueia os saques de um organizador. |
 | RN07 | Eventos | As datas de início e de término do evento devem ser futuras no cadastro e na edição, e a data de término deve ser posterior à de início. |
 | RN08 | Eventos | Todo evento pertence a um único organizador e informa o local (nome, endereço, cidade e estado). |
 | RN09 | Eventos | Eventos cancelados, excluídos ou já iniciados não aceitam novas compras: as vendas encerram no início do evento. Um pedido criado antes do início pode ser pago dentro do prazo da reserva. |
@@ -239,8 +239,8 @@ Foram encontradas 7 inconsistências na versão original, todas resolvidas. A re
 | I09 | A RN13 restringe a compra ao perfil de cliente, mas organizadores e administradores também compram. | RN13, RF11 | Divergência: confirmar se o comportamento é intencional e ajustar a regra ou o código. |
 | I10 | O RF09 prevê desativar tipos de ingresso, mas não há endpoint para isso. | RF09 | Não implementado; listado em "Possíveis melhorias" no roadmap. |
 | I11 | O RF17 prevê a lista de participantes por ingresso, mas o organizador só vê os pedidos e o painel de check-in. | RF17 | Não implementado; listado em "Possíveis melhorias" no roadmap. |
-| I12 | O RF18 e a RN06 preveem a suspensão de contas pelo administrador, mas ela não existe. | RF18, RN03, RN06 | Não implementado; listado em "Possíveis melhorias" no roadmap. |
-| I13 | O RF04 previa desativar organizadores. | RF04 | O administrador só bloqueia os saques; a suspensão da conta depende da I12. |
+| I12 | O RF18 e a RN06 preveem a suspensão de contas pelo administrador, mas ela não existia. | RF18, RN03, RN06 | Resolvida: suspensão e reativação pelo administrador (`/admin/users`), com sessões revogadas, pedidos pendentes cancelados e, para organizadores, vendas pausadas e saques retidos (DA19). |
+| I13 | O RF04 previa desativar organizadores. | RF04 | Resolvida pela I12: o organizador é suspenso como qualquer conta, o que pausa as vendas dos eventos dele e retém os saques. |
 
 ## 7. Perguntas em aberto
 
@@ -323,11 +323,14 @@ As perguntas Q01 a Q04 vêm do Documento de Visão; Q05 a Q08 surgiram nesta an�
 
 ### RF18 — Gerenciamento de usuários
 
-**Descrição:** O sistema deve permitir que o administrador consulte, suspenda e reative contas de usuários. **Atores:** Administrador. **Prioridade:** Média. **Situação:** Não implementado. O administrador só consulta um organizador por e-mail para bloquear ou desbloquear os saques (RF22). Listado em "Possíveis melhorias" no roadmap. **Critérios de aceite:**
+**Descrição:** O sistema deve permitir que o administrador consulte, suspenda e reative contas de usuários. **Atores:** Administrador. **Prioridade:** Média. **Situação:** Implementado (`GET /admin/users?email=`, `POST` e `DELETE /admin/users/{id}/suspension`). A suspensão não tem data de término: dura até a reativação. **Critérios de aceite:**
 
-- Um usuário suspenso não consegue se autenticar, e suas sessões são revogadas (RN03).
+- O administrador encontra qualquer conta não excluída pelo e-mail.
+- Um usuário suspenso não consegue se autenticar nem renovar a sessão, e suas sessões são revogadas na hora (RN03). Ele vê uma mensagem de conta suspensa, sem o motivo registrado pelo administrador.
+- Os pedidos pendentes do usuário suspenso são cancelados, com estoque e uso de cupom devolvidos; ingressos pagos continuam válidos.
+- Organizador suspenso: as vendas dos eventos dele ficam pausadas e os saques solicitados não são processados até a reativação.
 - A suspensão é lógica: os dados e o histórico de compras são preservados.
-- Apenas administradores executam essas operações (RN06).
+- Apenas administradores executam essas operações, sem suspender a si mesmos nem outro administrador (RN06). Suspensão e reativação ficam na auditoria, com o motivo.
 
 ### RF19 — Cupons de desconto
 

@@ -1,6 +1,8 @@
 package com.lutfy.ticketfy.user;
 
 import com.lutfy.ticketfy.infra.exception.InvalidRoleChangeException;
+import com.lutfy.ticketfy.infra.exception.ProblemException;
+import com.lutfy.ticketfy.infra.exception.ProblemType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -54,6 +56,12 @@ public class User implements UserDetails {
 
     private Instant deletedAt;
 
+    private Instant suspendedAt;
+
+    private String suspensionReason;
+
+    private UUID suspendedBy;
+
     public User(UserRegistrationDTO data, Role role, String encodedPassword) {
         this.role = role;
         this.name = data.name();
@@ -86,6 +94,28 @@ public class User implements UserDetails {
 
     public boolean isDeleted() {
         return deletedAt != null;
+    }
+
+    public boolean isSuspended() {
+        return suspendedAt != null;
+    }
+
+    public void suspend(String reason, UUID admin, Instant now) {
+        if (isSuspended()) {
+            throw new ProblemException(ProblemType.INVALID_SUSPENSION_STATE, "Account is already suspended");
+        }
+        this.suspendedAt = now;
+        this.suspensionReason = reason;
+        this.suspendedBy = admin;
+    }
+
+    public void reactivate() {
+        if (!isSuspended()) {
+            throw new ProblemException(ProblemType.INVALID_SUSPENSION_STATE, "Account is not suspended");
+        }
+        this.suspendedAt = null;
+        this.suspensionReason = null;
+        this.suspendedBy = null;
     }
 
     @Override

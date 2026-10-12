@@ -29,6 +29,7 @@ O que já está pronto na API do Ticketfy e o que vem a seguir. Os detalhes de c
 - [x] Dados de recebimento com documento e chave Pix cifrados
 - [x] Saques com análise, bloqueio por administrador e rotina de processamento
 - [x] Auditoria append-only das ações sensíveis
+- [x] Suspensão e reativação de contas pelo administrador, com sessões revogadas, pedidos pendentes cancelados e vendas e saques do organizador pausados
 
 ### Segurança, privacidade e operação
 - [x] Sessões revogáveis com access token curto e refresh token rotativo em cookie
@@ -63,4 +64,3 @@ Lacunas encontradas na revisão dos documentos de engenharia contra o código. A
 
 - [ ] Desativar um lote para novas vendas sem excluí-lo (a coluna `active` já existe em `ticket_types`, mas não há endpoint)
 - [ ] Lista de participantes por ingresso para o organizador, com o dono atual e a situação de cada ingresso
-- [ ] Suspensão e reativação de contas pelo administrador, com revogação das sessões

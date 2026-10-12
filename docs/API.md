@@ -63,8 +63,8 @@ O refresh token nunca aparece no corpo da resposta. Ele vai no cookie `__Host-ti
 
 | Rota | O que faz |
 |---|---|
-| `POST /auth/login` | Confere e-mail e senha, abre uma sessão, devolve o access token e grava o cookie |
-| `POST /auth/refresh` | Troca o cookie por um novo e devolve outro access token; sem sessão válida, 401 `session-expired` e o cookie é apagado |
+| `POST /auth/login` | Confere e-mail e senha, abre uma sessão, devolve o access token e grava o cookie; conta suspensa responde 403 `account-suspended`, só depois de a senha conferir |
+| `POST /auth/refresh` | Troca o cookie por um novo e devolve outro access token; sem sessão válida, 401 `session-expired` e o cookie é apagado; conta suspensa, 403 `account-suspended` e o cookie é apagado |
 | `POST /auth/logout` | Encerra a sessão do cookie e apaga o cookie; responde 204 mesmo sem cookie |
 | `POST /auth/logout-all` | Encerra todas as sessões do usuário; exige também `Authorization` |
 
@@ -235,6 +235,9 @@ Content-Type: application/problem+json
 | `coupon-code-already-exists` | 409 | Código de cupom repetido no evento |
 | `coupon-already-used` | 409 | Mudar tipo ou valor, ou excluir, cupom já usado |
 | `admin-account-deletion` | 409 | Exclusão de conta ADMIN |
+| `account-suspended` | 403 | Login, renovação ou exclusão de conta suspensa; a mensagem não traz o motivo da suspensão |
+| `admin-account-suspension` | 409 | Suspensão de conta ADMIN, inclusive a própria |
+| `invalid-suspension-state` | 409 | Suspender conta já suspensa, ou reativar conta que não está suspensa |
 | `account-has-payout-block` | 409 | Exclusão com saques bloqueados |
 | `account-has-payout-in-progress` | 409 | Exclusão com saque em andamento |
 | `account-has-balance` | 409 | Exclusão com saldo diferente de zero; traz `pending`, `available` e `held` |
@@ -419,7 +422,7 @@ Responde 204 e apaga o cookie. Numa única transação, a exclusão:
 
 Pedidos, pagamentos, extrato, saques e auditoria continuam existindo, ligados à conta anonimizada, e o e-mail original pode ser usado num novo cadastro.
 
-Sem `confirmation: "EXCLUIR"`, a resposta é 400 `validation-failed`. A exclusão é recusada com 409 nos casos abaixo, verificados nesta ordem:
+Sem `confirmation: "EXCLUIR"`, a resposta é 400 `validation-failed`. Conta suspensa responde 403 `account-suspended`. A exclusão é recusada com 409 nos casos abaixo, verificados nesta ordem:
 
 | Tipo | Motivo |
 |---|---|
@@ -981,11 +984,50 @@ Regras do saque:
 | GET | `/admin/payouts` | Saques por status (padrão `UNDER_REVIEW`), paginado | ADMIN |
 | POST | `/admin/payouts/{id}/approve` | Aprova um saque em análise | ADMIN |
 | POST | `/admin/payouts/{id}/reject` | Recusa um saque em análise (`{"reason": "..."}`) e estorna o valor | ADMIN |
+| GET | `/admin/users?email=...` | Encontra qualquer conta não excluída, com suspensão e bloqueio de saques | ADMIN |
+| POST | `/admin/users/{id}/suspension` | Suspende a conta (`{"reason": "..."}`) | ADMIN |
+| DELETE | `/admin/users/{id}/suspension` | Reativa a conta | ADMIN |
 | GET | `/admin/organizers?email=...` | Situação de saques de um organizador | ADMIN |
 | POST | `/admin/organizers/{id}/payout-block` | Bloqueia os saques do organizador (`{"reason": "..."}`) | ADMIN |
 | DELETE | `/admin/organizers/{id}/payout-block` | Desbloqueia os saques | ADMIN |
 | GET | `/admin/audit` | Auditoria paginada; filtros `targetType`, `targetId`, `actorId`, `from`, `to` | ADMIN |
 | PATCH | `/events/{id}/featured` | Destaque de evento (ver [Eventos](#eventos)) | ADMIN |
+
+**Suspensão de conta**
+
+```http
+POST /admin/users/{id}/suspension
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{ "reason": "Chargebacks em análise" }
+```
+
+```json
+{
+  "id": "5a1e…",
+  "name": "Bruno Lima",
+  "email": "bruno@email.com",
+  "role": "ORGANIZER",
+  "createdAt": "2026-09-01T12:00:00Z",
+  "suspended": true,
+  "suspendedAt": "2026-10-12T15:00:00Z",
+  "suspensionReason": "Chargebacks em análise",
+  "suspendedBy": "9c2d…",
+  "payoutsBlocked": false,
+  "payoutBlockReason": null,
+  "payoutBlockedAt": null
+}
+```
+
+Regras da suspensão:
+
+- O motivo é obrigatório, com até 500 caracteres, e fica só para o ADMIN e a auditoria; o usuário suspenso vê apenas que a conta está suspensa.
+- A suspensão vale na hora: todas as sessões são revogadas, e login e renovação respondem 403 `account-suspended`. Não há data de término; a conta fica suspensa até a reativação.
+- Pedidos pendentes do usuário são cancelados, com estoque e uso de cupom devolvidos. Ingressos pagos continuam válidos.
+- Organizador suspenso: as vendas dos eventos dele ficam pausadas (`POST /orders` e prévia de cupom respondem 409 `sales-closed`, e os eventos saem da busca e dos destaques, com `salesClosed: true` no detalhe), e os saques solicitados não são processados até a reativação. `payoutsBlocked` continua indicando só o bloqueio manual.
+- Conta ADMIN não é suspensa (409 `admin-account-suspension`). Suspender duas vezes, ou reativar quem não está suspenso, responde 409 `invalid-suspension-state`. Conta inexistente ou excluída responde 404 `user-not-found`.
+- Suspensão e reativação ficam na auditoria (`ACCOUNT_SUSPENDED` e `ACCOUNT_REACTIVATED`), com o motivo.
 
 **Auditoria**
 

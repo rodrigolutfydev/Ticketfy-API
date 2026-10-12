@@ -27,6 +27,6 @@ public record EventDetailsDTO(
                 event.getAddress(), event.getCity(), event.getState(), event.getStartsAt(),
                 event.getEndsAt(), event.getOrganizer().getName(), event.getOrganizer().getId(), event.getCreatedAt(),
                 event.isFeatured(), event.getCancelledAt(), event.getCancellationReason(),
-                event.isCancelled() || !event.getStartsAt().isAfter(now));
+                event.isCancelled() || !event.getStartsAt().isAfter(now) || event.getOrganizer().isSuspended());
     }
 }

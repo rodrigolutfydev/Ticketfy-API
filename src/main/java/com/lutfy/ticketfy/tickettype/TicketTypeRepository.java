@@ -40,7 +40,8 @@ public interface TicketTypeRepository extends JpaRepository<TicketType, UUID> {
                 WHERE e.id = t.event.id
                   AND e.active = true
                   AND e.cancelledAt IS NULL
-                  AND e.startsAt > :now)
+                  AND e.startsAt > :now
+                  AND e.organizer.suspendedAt IS NULL)
         """)
     int reserveStock(@Param("id") UUID id, @Param("quantity") int quantity, @Param("now") Instant now);
 

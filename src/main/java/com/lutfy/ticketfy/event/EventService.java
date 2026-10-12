@@ -70,7 +70,8 @@ public class EventService {
         var now = clock.instant();
         var spec = EventSpecifications.isActive()
                 .and(EventSpecifications.isNotCancelled())
-                .and(EventSpecifications.hasNotEnded(now));
+                .and(EventSpecifications.hasNotEnded(now))
+                .and(EventSpecifications.organizerNotSuspended());
         var name = normalize(q);
         if (name != null) spec = spec.and(EventSpecifications.nameContains(name));
         var cityFilter = normalize(city);

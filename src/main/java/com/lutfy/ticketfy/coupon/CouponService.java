@@ -160,7 +160,7 @@ public class CouponService {
                     .findByIdAndActiveTrueAndEventActiveTrueAndEventCancelledAtIsNull(item.ticketTypeId())
                     .filter(found -> found.getEvent().getId().equals(eventId))
                     .orElseThrow(() -> new TicketTypeNotFoundException("Ticket type not found"));
-            if (!ticketType.getEvent().getStartsAt().isAfter(now)) {
+            if (!ticketType.getEvent().getStartsAt().isAfter(now) || ticketType.getEvent().getOrganizer().isSuspended()) {
                 throw new ProblemException(ProblemType.SALES_CLOSED, "Ticket sales for this event have ended");
             }
             subtotal = subtotal.add(ticketType.getPrice().multiply(BigDecimal.valueOf(item.quantity())));

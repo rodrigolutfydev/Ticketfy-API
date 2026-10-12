@@ -5,6 +5,7 @@ import com.lutfy.ticketfy.audit.AuditService;
 import com.lutfy.ticketfy.audit.AuditTargetType;
 import com.lutfy.ticketfy.infra.security.TokenService;
 import com.lutfy.ticketfy.user.User;
+import com.lutfy.ticketfy.user.UserLocks;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,23 +32,31 @@ public class AuthSessionService {
     private final RefreshTokenRepository refreshTokens;
     private final TokenService tokenService;
     private final AuditService auditService;
+    private final UserLocks userLocks;
     private final AuthSettings settings;
     private final Clock clock;
     private final SecureRandom random = new SecureRandom();
 
     public AuthSessionService(AuthSessionRepository sessions, RefreshTokenRepository refreshTokens,
-                              TokenService tokenService, AuditService auditService,
+                              TokenService tokenService, AuditService auditService, UserLocks userLocks,
                               AuthSettings settings, Clock clock) {
         this.sessions = sessions;
         this.refreshTokens = refreshTokens;
         this.tokenService = tokenService;
         this.auditService = auditService;
+        this.userLocks = userLocks;
         this.settings = settings;
         this.clock = clock;
     }
 
     @Transactional
     public IssuedSession start(User user) {
+        switch (userLocks.lock(user.getId())) {
+            case SUSPENDED -> throw UserLocks.accountSuspended();
+            case MISSING -> throw UserLocks.accountDeleted();
+            case ACTIVE -> {
+            }
+        }
         var now = clock.instant();
         var session = sessions.save(new AuthSession(user, now, now.plus(settings.sessionMaxAge())));
         var refreshToken = newRefreshToken(session, now);
@@ -65,6 +74,14 @@ public class AuthSessionService {
             return Optional.empty();
         }
         var session = current.getSession();
+        switch (userLocks.lock(session.getUser().getId())) {
+            case SUSPENDED -> throw UserLocks.accountSuspended();
+            case MISSING -> {
+                return Optional.empty();
+            }
+            case ACTIVE -> {
+            }
+        }
         if (current.isUsed()) {
             if (session.revoke(RevocationReason.REUSE_DETECTED, now)) {
                 auditService.record(AuditAction.SESSION_REUSE_DETECTED, AuditTargetType.USER,

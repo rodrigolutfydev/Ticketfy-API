@@ -77,7 +77,7 @@ public class UserService {
     private User lockActive(UUID userId) {
         var user = repository.findForUpdate(userId)
                 .orElseThrow(() -> new UserNotFoundException("User not found"));
-        if (user.isDeleted()) {
+        if (user.isDeleted() || user.isSuspended()) {
             throw UserLocks.accountDeleted();
         }
         return user;
