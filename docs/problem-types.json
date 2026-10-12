@@ -1,0 +1,301 @@
+[ {
+  "slug" : "email-already-exists",
+  "status" : 409,
+  "title" : "Email already exists"
+}, {
+  "slug" : "validation-failed",
+  "status" : 400,
+  "title" : "Validation failed"
+}, {
+  "slug" : "malformed-request-body",
+  "status" : 400,
+  "title" : "Malformed request body"
+}, {
+  "slug" : "missing-parameter",
+  "status" : 400,
+  "title" : "Missing parameter"
+}, {
+  "slug" : "missing-header",
+  "status" : 400,
+  "title" : "Missing header"
+}, {
+  "slug" : "bad-request",
+  "status" : 400,
+  "title" : "Bad request"
+}, {
+  "slug" : "unsupported-media-type",
+  "status" : 415,
+  "title" : "Unsupported media type"
+}, {
+  "slug" : "invalid-credentials",
+  "status" : 401,
+  "title" : "Invalid credentials"
+}, {
+  "slug" : "authentication-required",
+  "status" : 401,
+  "title" : "Authentication required"
+}, {
+  "slug" : "session-expired",
+  "status" : 401,
+  "title" : "Session expired"
+}, {
+  "slug" : "auth-request-rejected",
+  "status" : 403,
+  "title" : "Auth request rejected"
+}, {
+  "slug" : "access-denied",
+  "status" : 403,
+  "title" : "Access denied"
+}, {
+  "slug" : "too-many-login-attempts",
+  "status" : 429,
+  "title" : "Too many login attempts"
+}, {
+  "slug" : "internal-error",
+  "status" : 500,
+  "title" : "Internal server error"
+}, {
+  "slug" : "invalid-role-change",
+  "status" : 409,
+  "title" : "Invalid role change"
+}, {
+  "slug" : "user-not-found",
+  "status" : 404,
+  "title" : "User not found"
+}, {
+  "slug" : "event-not-found",
+  "status" : 404,
+  "title" : "Event not found"
+}, {
+  "slug" : "event-access-denied",
+  "status" : 403,
+  "title" : "Event access denied"
+}, {
+  "slug" : "invalid-event-dates",
+  "status" : 400,
+  "title" : "Invalid event dates"
+}, {
+  "slug" : "invalid-parameter",
+  "status" : 400,
+  "title" : "Invalid parameter"
+}, {
+  "slug" : "ticket-type-not-found",
+  "status" : 404,
+  "title" : "Ticket type not found"
+}, {
+  "slug" : "invalid-ticket-type-quantity",
+  "status" : 400,
+  "title" : "Invalid ticket type quantity"
+}, {
+  "slug" : "ticket-type-name-already-exists",
+  "status" : 409,
+  "title" : "Ticket type name already exists"
+}, {
+  "slug" : "invalid-order-state",
+  "status" : 409,
+  "title" : "Invalid order state"
+}, {
+  "slug" : "insufficient-stock",
+  "status" : 409,
+  "title" : "Insufficient stock"
+}, {
+  "slug" : "mixed-events-order",
+  "status" : 400,
+  "title" : "Mixed events order"
+}, {
+  "slug" : "max-per-order-exceeded",
+  "status" : 400,
+  "title" : "Max per order exceeded"
+}, {
+  "slug" : "order-not-found",
+  "status" : 404,
+  "title" : "Order not found"
+}, {
+  "slug" : "order-has-transferred-tickets",
+  "status" : 409,
+  "title" : "Order has transferred tickets"
+}, {
+  "slug" : "invalid-payment-state",
+  "status" : 409,
+  "title" : "Invalid payment state"
+}, {
+  "slug" : "invalid-ticket-state",
+  "status" : 409,
+  "title" : "Invalid ticket state"
+}, {
+  "slug" : "ticket-not-found",
+  "status" : 404,
+  "title" : "Ticket not found"
+}, {
+  "slug" : "ticket-transfer-closed",
+  "status" : 409,
+  "title" : "Ticket transfer closed"
+}, {
+  "slug" : "ticket-transfer-limit-reached",
+  "status" : 409,
+  "title" : "Ticket transfer limit reached"
+}, {
+  "slug" : "self-transfer",
+  "status" : 400,
+  "title" : "Self transfer"
+}, {
+  "slug" : "transfer-recipient-unavailable",
+  "status" : 422,
+  "title" : "Transfer recipient unavailable"
+}, {
+  "slug" : "too-many-transfer-attempts",
+  "status" : 429,
+  "title" : "Too many transfer attempts"
+}, {
+  "slug" : "resource-not-found",
+  "status" : 404,
+  "title" : "Resource not found"
+}, {
+  "slug" : "method-not-allowed",
+  "status" : 405,
+  "title" : "Method not allowed"
+}, {
+  "slug" : "invalid-event-state",
+  "status" : 409,
+  "title" : "Invalid event state"
+}, {
+  "slug" : "event-has-sales",
+  "status" : 409,
+  "title" : "Event has sales"
+}, {
+  "slug" : "sales-closed",
+  "status" : 409,
+  "title" : "Sales closed"
+}, {
+  "slug" : "invalid-password",
+  "status" : 403,
+  "title" : "Invalid password"
+}, {
+  "slug" : "too-many-password-attempts",
+  "status" : 429,
+  "title" : "Too many password attempts"
+}, {
+  "slug" : "payout-account-not-found",
+  "status" : 404,
+  "title" : "Payout account not found"
+}, {
+  "slug" : "payout-account-required",
+  "status" : 409,
+  "title" : "Payout account required"
+}, {
+  "slug" : "payout-account-cooldown",
+  "status" : 409,
+  "title" : "Payout account cooldown"
+}, {
+  "slug" : "pix-key-not-found",
+  "status" : 400,
+  "title" : "Pix key not found"
+}, {
+  "slug" : "pix-key-holder-mismatch",
+  "status" : 400,
+  "title" : "Pix key holder mismatch"
+}, {
+  "slug" : "payout-in-progress",
+  "status" : 409,
+  "title" : "Payout in progress"
+}, {
+  "slug" : "negative-available-balance",
+  "status" : 409,
+  "title" : "Negative available balance"
+}, {
+  "slug" : "payout-below-minimum",
+  "status" : 400,
+  "title" : "Payout below minimum"
+}, {
+  "slug" : "payout-exceeds-available",
+  "status" : 409,
+  "title" : "Payout exceeds available balance"
+}, {
+  "slug" : "payout-not-found",
+  "status" : 404,
+  "title" : "Payout not found"
+}, {
+  "slug" : "invalid-payout-state",
+  "status" : 409,
+  "title" : "Invalid payout state"
+}, {
+  "slug" : "payouts-blocked",
+  "status" : 409,
+  "title" : "Payouts blocked"
+}, {
+  "slug" : "invalid-payout-block-state",
+  "status" : 409,
+  "title" : "Invalid payout block state"
+}, {
+  "slug" : "organizer-not-found",
+  "status" : 404,
+  "title" : "Organizer not found"
+}, {
+  "slug" : "coupon-not-found",
+  "status" : 404,
+  "title" : "Coupon not found"
+}, {
+  "slug" : "coupon-code-already-exists",
+  "status" : 409,
+  "title" : "Coupon code already exists"
+}, {
+  "slug" : "coupon-already-used",
+  "status" : 409,
+  "title" : "Coupon already used"
+}, {
+  "slug" : "invalid-coupon-settings",
+  "status" : 400,
+  "title" : "Invalid coupon settings"
+}, {
+  "slug" : "invalid-coupon",
+  "status" : 422,
+  "title" : "Invalid coupon"
+}, {
+  "slug" : "too-many-coupon-attempts",
+  "status" : 429,
+  "title" : "Too many coupon attempts"
+}, {
+  "slug" : "email-not-allowed",
+  "status" : 400,
+  "title" : "Email not allowed"
+}, {
+  "slug" : "too-many-data-exports",
+  "status" : 429,
+  "title" : "Too many data exports"
+}, {
+  "slug" : "admin-account-deletion",
+  "status" : 409,
+  "title" : "Admin account deletion"
+}, {
+  "slug" : "account-suspended",
+  "status" : 403,
+  "title" : "Account suspended"
+}, {
+  "slug" : "admin-account-suspension",
+  "status" : 409,
+  "title" : "Admin account suspension"
+}, {
+  "slug" : "invalid-suspension-state",
+  "status" : 409,
+  "title" : "Invalid suspension state"
+}, {
+  "slug" : "account-has-payout-block",
+  "status" : 409,
+  "title" : "Account has payout block"
+}, {
+  "slug" : "account-has-payout-in-progress",
+  "status" : 409,
+  "title" : "Account has payout in progress"
+}, {
+  "slug" : "account-has-balance",
+  "status" : 409,
+  "title" : "Account has balance"
+}, {
+  "slug" : "account-has-active-events",
+  "status" : 409,
+  "title" : "Account has active events"
+}, {
+  "slug" : "account-has-upcoming-tickets",
+  "status" : 409,
+  "title" : "Account has upcoming tickets"
+} ]

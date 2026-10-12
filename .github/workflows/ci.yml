@@ -36,11 +36,16 @@ jobs:
       - name: Rodar testes e cobertura
         run: ./mvnw -B verify
 
-      - name: Conferir se o docs/openapi.json está atualizado
+      - name: Conferir se os arquivos gerados em docs/ estão atualizados
         run: |
-          if [ -n "$(git status --porcelain -- docs/openapi.json)" ]; then
-            echo "::error file=docs/openapi.json::docs/openapi.json desatualizado: rode ./mvnw verify e commite o arquivo."
-            git --no-pager diff --stat -- docs/openapi.json
+          generated="docs/openapi.json docs/problem-types.json"
+          if [ -n "$(git status --porcelain -- $generated)" ]; then
+            for file in $generated; do
+              if [ -n "$(git status --porcelain -- "$file")" ]; then
+                echo "::error file=$file::$file desatualizado: rode ./mvnw verify e commite o arquivo."
+              fi
+            done
+            git --no-pager diff --stat -- $generated
             exit 1
           fi
 
