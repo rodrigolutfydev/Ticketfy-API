@@ -153,7 +153,7 @@ class EventCancellationIntegrationTest extends IntegrationTestBase {
         var buyer = user("USER");
         assertThatThrownBy(() -> orderService.create(order(1), null, buyer))
                 .isInstanceOf(TicketTypeNotFoundException.class);
-        Integer reserved = transactionTemplate.execute(tx -> ticketTypeRepository.reserveStock(ticketTypeId, 1));
+        Integer reserved = transactionTemplate.execute(tx -> ticketTypeRepository.reserveStock(ticketTypeId, 1, Instant.now()));
         assertThat(reserved).isZero();
         assertThat(jdbc.queryForObject("SELECT quantity_sold FROM ticket_types WHERE id = ?", Integer.class, ticketTypeId))
                 .isZero();

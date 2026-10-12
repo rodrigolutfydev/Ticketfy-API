@@ -116,7 +116,7 @@ class AccountDeletionIntegrationTest extends PrivacyTestBase {
         var organizer = person("ORGANIZER", "Fabio");
         var holder = person("USER", "Gabi");
         paidOrder(holder, insertTicketType(upcomingEvent(organizer), "30.00"), 2);
-        paidOrder(holder, insertTicketType(pastEvent(organizer), "30.00"), 1);
+        paidOrderBeforeStart(holder, insertTicketType(pastEvent(organizer), "30.00"), 1);
 
         expectRefusal(deleteAccount(holder, PASSWORD, "EXCLUIR"), "account-has-upcoming-tickets")
                 .andExpect(jsonPath("$.ticketCount").value(2));
@@ -129,7 +129,7 @@ class AccountDeletionIntegrationTest extends PrivacyTestBase {
         var deleted = person("USER", "Iris");
         var pastLot = insertTicketType(pastEvent(organizer), "60.00");
         var upcomingLot = insertTicketType(upcomingEvent(organizer), "25.00");
-        var paidOrderId = paidOrder(deleted, pastLot, 2);
+        var paidOrderId = paidOrderBeforeStart(deleted, pastLot, 2);
         var pendingOrderId = pendingOrder(deleted, upcomingLot, 3);
         var originalName = deleted.getName();
         var originalEmail = deleted.getEmail();
@@ -203,7 +203,7 @@ class AccountDeletionIntegrationTest extends PrivacyTestBase {
     void anonymizesOrganizerAndKeepsPayoutDestination() throws Exception {
         var organizer = person("ORGANIZER", "Joana");
         var admin = person("ADMIN", "Kleber");
-        var buyerOrder = paidOrder(buyer, insertTicketType(pastEvent(organizer), "100.00"), 1);
+        var buyerOrder = paidOrderBeforeStart(buyer, insertTicketType(pastEvent(organizer), "100.00"), 1);
         var emptyUpcoming = upcomingEvent(organizer);
         insertTicketType(emptyUpcoming, "15.00");
         var cancelledEvent = upcomingEvent(organizer);

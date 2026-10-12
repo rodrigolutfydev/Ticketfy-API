@@ -13,6 +13,7 @@ import com.lutfy.ticketfy.user.UserLocks;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.util.UUID;
 
 @Service
@@ -24,19 +25,22 @@ public class PaymentService {
     private final PaymentGateway paymentGateway;
     private final LedgerService ledgerService;
     private final UserLocks userLocks;
+    private final Clock clock;
 
     public PaymentService(PaymentRepository paymentRepository,
                           OrderRepository orderRepository,
                           TicketService ticketService,
                           PaymentGateway paymentGateway,
                           LedgerService ledgerService,
-                          UserLocks userLocks) {
+                          UserLocks userLocks,
+                          Clock clock) {
         this.paymentRepository = paymentRepository;
         this.orderRepository = orderRepository;
         this.ticketService = ticketService;
         this.paymentGateway = paymentGateway;
         this.ledgerService = ledgerService;
         this.userLocks = userLocks;
+        this.clock = clock;
     }
 
     @Transactional
@@ -54,7 +58,7 @@ public class PaymentService {
         if (paymentRepository.existsByOrderIdAndStatus(orderId, PaymentStatus.APPROVED)) {
             throw new InvalidPaymentStateException("This order has already been paid");
         }
-        if (order.isExpired()) {
+        if (order.isExpired(clock.instant())) {
             throw new InvalidOrderStateException("This order has expired");
         }
 

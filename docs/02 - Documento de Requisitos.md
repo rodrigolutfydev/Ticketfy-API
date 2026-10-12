@@ -93,9 +93,10 @@ O limite de ingressos por pedido, previsto aqui na versão original, é definido
 
 ### RF08 — Consulta de eventos
 
-**Descrição:** O sistema deve listar os eventos disponíveis e exibir os detalhes de cada um, incluindo local e tipos de ingresso. **Atores:** Cliente, Organizador, Administrador e visitantes sem conta. **Prioridade:** Alta. **Situação:** Implementado com divergência (`GET /events`, `GET /events/{id}` e `GET /events/{id}/ticket-types`, públicos). A busca filtra por nome, cidade, destaque e esgotado, com paginação. **Critérios de aceite:**
+**Descrição:** O sistema deve listar os eventos disponíveis e exibir os detalhes de cada um, incluindo local e tipos de ingresso. **Atores:** Cliente, Organizador, Administrador e visitantes sem conta. **Prioridade:** Alta. **Situação:** Implementado (`GET /events`, `GET /events/{id}` e `GET /events/{id}/ticket-types`, públicos). A busca filtra por nome, cidade, destaque e esgotado, com paginação. **Critérios de aceite:**
 
-- A listagem exibe apenas eventos ativos e não cancelados. Divergência: eventos que já começaram ou terminaram continuam na listagem (ver RN09).
+- A listagem exibe apenas eventos ativos, não cancelados e que ainda não terminaram; eventos em andamento continuam na busca. Os destaques (`featured=true`) mostram só eventos que ainda não começaram.
+- O detalhe de um evento já iniciado ou terminado continua acessível e informa `salesClosed: true`.
 - O detalhe do evento informa os tipos de ingresso com preço e disponibilidade.
 
 ### RF09 — Gerenciamento de tipos de ingresso
@@ -154,7 +155,7 @@ São 23 regras, agrupadas por tema. Regras não implementadas ou implementadas c
 | RN06 | Permissões | Apenas o administrador pode suspender e reativar contas. Não implementado: hoje o administrador só bloqueia e desbloqueia os saques de um organizador. |
 | RN07 | Eventos | As datas de início e de término do evento devem ser futuras no cadastro e na edição, e a data de término deve ser posterior à de início. |
 | RN08 | Eventos | Todo evento pertence a um único organizador e informa o local (nome, endereço, cidade e estado). |
-| RN09 | Eventos | Eventos cancelados ou excluídos não aceitam novas compras. Não implementado para eventos já iniciados ou realizados: a compra não confere a data do evento. |
+| RN09 | Eventos | Eventos cancelados, excluídos ou já iniciados não aceitam novas compras: as vendas encerram no início do evento. Um pedido criado antes do início pode ser pago dentro do prazo da reserva. |
 | RN10 | Ingressos | Todo tipo de ingresso pertence a um evento, com nome único no evento, preço maior ou igual a zero e quantidade total maior que zero. |
 | RN11 | Ingressos | A quantidade total de um tipo de ingresso não pode ser reduzida abaixo da quantidade já vendida ou reservada. |
 | RN12 | Ingressos | Disponibilidade = quantidade total − quantidade vendida, e nunca pode ser negativa. A quantidade vendida inclui as unidades reservadas por pedidos pendentes. Ao criar o pedido, as unidades ficam reservadas por 15 minutos (`ORDER_RESERVATION_MINUTES`); sem pagamento nesse prazo, o pedido expira e as unidades voltam à disponibilidade. |
@@ -223,7 +224,7 @@ O sistema é considerado aceito quando todos os critérios abaixo forem atendido
 
 ## 6. Análise de inconsistências
 
-Foram encontradas 7 inconsistências na versão original, todas resolvidas. A revisão contra o código encontrou 6 divergências novas (I08 a I13), entre o que os requisitos pedem e o que o código faz.
+Foram encontradas 7 inconsistências na versão original, todas resolvidas. A revisão contra o código encontrou 6 divergências novas (I08 a I13), entre o que os requisitos pedem e o que o código faz; a I08 já foi resolvida.
 
 | ID | Inconsistência | Onde aparece | Recomendação |
 | --- | --- | --- | --- |
@@ -234,7 +235,7 @@ Foram encontradas 7 inconsistências na versão original, todas resolvidas. A re
 | I05 | Não havia regra para o cancelamento de um evento com ingressos já vendidos. | RF07, RN09 | Resolvida: o cancelamento reembolsa os pedidos pagos e cancela os pendentes (Q07). |
 | I06 | A RN12 dependia da existência de reserva temporária. | RN12, SUG03, UC01 | Resolvida: há reserva de 15 minutos (RN12). |
 | I07 | O RF16 atribui a validação ao organizador, mas em eventos reais a conferência costuma ser feita por outra pessoa na portaria. | RF16, RN23 | Resolvida: a validação é feita pelo organizador do evento ou por um administrador. |
-| I08 | A RN09 recusa compras de eventos já realizados, mas o código só confere se o evento está ativo e não cancelado. | RN09, RF08, RF11 | Não implementado: conferir a data do evento na reserva de estoque. |
+| I08 | A RN09 recusa compras de eventos já realizados, mas o código só conferia se o evento estava ativo e não cancelado. | RN09, RF08, RF11 | Resolvida: a reserva de estoque confere `startsAt > agora` no próprio `UPDATE` condicional e responde 409 `sales-closed`; a busca deixa de listar eventos terminados, e os destaques, eventos já iniciados (DA18). |
 | I09 | A RN13 restringe a compra ao perfil de cliente, mas organizadores e administradores também compram. | RN13, RF11 | Divergência: confirmar se o comportamento é intencional e ajustar a regra ou o código. |
 | I10 | O RF09 prevê desativar tipos de ingresso, mas não há endpoint para isso. | RF09 | Não implementado; listado em "Possíveis melhorias" no roadmap. |
 | I11 | O RF17 prevê a lista de participantes por ingresso, mas o organizador só vê os pedidos e o painel de check-in. | RF17 | Não implementado; listado em "Possíveis melhorias" no roadmap. |
@@ -267,11 +268,11 @@ As perguntas Q01 a Q04 vêm do Documento de Visão; Q05 a Q08 surgiram nesta an�
 
 ### RF11 — Compra de ingressos
 
-**Descrição:** O sistema deve permitir que o cliente compre um ou mais ingressos de um ou mais tipos de um mesmo evento, gerando um pedido, com cupom de desconto opcional. **Atores:** Cliente (ver RN13). **Prioridade:** Alta. **Situação:** Implementado com divergência (`POST /orders`; ver I08 e I09). **Critérios de aceite:**
+**Descrição:** O sistema deve permitir que o cliente compre um ou mais ingressos de um ou mais tipos de um mesmo evento, gerando um pedido, com cupom de desconto opcional. **Atores:** Cliente (ver RN13). **Prioridade:** Alta. **Situação:** Implementado com divergência (`POST /orders`; ver I09). **Critérios de aceite:**
 
 - Uma compra válida gera um pedido vinculado ao cliente, com o preço de cada ingresso registrado (RN14).
 - Uma compra acima da quantidade disponível é recusada (RN13).
-- Não é possível comprar ingressos de evento cancelado ou excluído (RN09).
+- Não é possível comprar ingressos de evento cancelado, excluído ou já iniciado (RN09).
 - Uma compra acima do limite por pedido definido pelo organizador no tipo de ingresso é recusada (RN13).
 - Repetir a requisição com o mesmo header `Idempotency-Key` devolve o pedido já criado, sem reservar de novo.
 
@@ -281,6 +282,7 @@ As perguntas Q01 a Q04 vêm do Documento de Visão; Q05 a Q08 surgiram nesta an�
 
 - Cada pagamento fica vinculado a exatamente um pedido, com o valor total do pedido (RN15).
 - Um pedido expirado, cancelado, de evento cancelado ou já pago não aceita pagamento.
+- Um pedido criado antes do início do evento pode ser pago depois do início, dentro do prazo da reserva (RN09).
 - Pedidos de valor zero são confirmados na criação, sem pagamento (RN16).
 
 ### RF13 — Emissão de ingresso

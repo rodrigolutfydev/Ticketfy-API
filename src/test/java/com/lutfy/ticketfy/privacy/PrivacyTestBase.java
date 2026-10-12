@@ -7,6 +7,7 @@ import com.lutfy.ticketfy.user.User;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.ResultActions;
 
+import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -69,6 +70,19 @@ abstract class PrivacyTestBase extends PayoutTestBase {
         var orderId = pendingOrder(buyer, ticketTypeId, quantity);
         paymentService.paySimulated(orderId, buyer);
         return orderId;
+    }
+
+    protected UUID paidOrderBeforeStart(User buyer, UUID ticketTypeId, int quantity) {
+        var startsAt = jdbc.queryForObject("""
+                SELECT e.starts_at FROM ticket_types t JOIN events e ON e.id = t.event_id WHERE t.id = ?
+                """, Timestamp.class, ticketTypeId).toInstant();
+        var previous = now.get();
+        travelTo(startsAt.minus(Duration.ofHours(1)));
+        try {
+            return paidOrder(buyer, ticketTypeId, quantity);
+        } finally {
+            now.set(previous);
+        }
     }
 
     protected List<String> columnsContaining(String... values) {

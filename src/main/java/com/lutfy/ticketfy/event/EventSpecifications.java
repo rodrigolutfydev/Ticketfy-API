@@ -9,6 +9,8 @@ import jakarta.persistence.criteria.Root;
 import org.hibernate.query.criteria.HibernateCriteriaBuilder;
 import org.springframework.data.jpa.domain.Specification;
 
+import java.time.Instant;
+
 final class EventSpecifications {
 
     private static final char ESCAPE = '\\';
@@ -31,6 +33,15 @@ final class EventSpecifications {
 
     static Specification<Event> cityEquals(String city) {
         return (root, query, cb) -> cb.equal(cb.upper(root.get("city")), cb.upper(bound(cb, city)));
+    }
+
+    static Specification<Event> hasNotEnded(Instant now) {
+        return (root, query, cb) -> cb.greaterThan(
+                cb.coalesce(root.<Instant>get("endsAt"), root.<Instant>get("startsAt")), bound(cb, now));
+    }
+
+    static Specification<Event> hasNotStarted(Instant now) {
+        return (root, query, cb) -> cb.greaterThan(root.<Instant>get("startsAt"), bound(cb, now));
     }
 
     static Specification<Event> isFeatured(boolean featured) {
@@ -59,7 +70,7 @@ final class EventSpecifications {
         return cb.exists(subquery);
     }
 
-    private static Expression<String> bound(CriteriaBuilder cb, String value) {
+    private static <T> Expression<T> bound(CriteriaBuilder cb, T value) {
         return ((HibernateCriteriaBuilder) cb).value(value);
     }
 

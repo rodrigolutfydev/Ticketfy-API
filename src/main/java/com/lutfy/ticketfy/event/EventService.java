@@ -17,6 +17,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
@@ -31,13 +32,15 @@ public class EventService {
     private final TicketTypeRepository ticketTypeRepository;
     private final AuditService auditService;
     private final UserLocks userLocks;
+    private final Clock clock;
 
     public EventService(EventRepository repository, TicketTypeRepository ticketTypeRepository,
-                        AuditService auditService, UserLocks userLocks) {
+                        AuditService auditService, UserLocks userLocks, Clock clock) {
         this.repository = repository;
         this.ticketTypeRepository = ticketTypeRepository;
         this.auditService = auditService;
         this.userLocks = userLocks;
+        this.clock = clock;
     }
 
     private void validateDates(Instant startsAt, Instant endsAt) {
@@ -52,24 +55,28 @@ public class EventService {
         validateDates(dto.startsAt(), dto.endsAt());
         var event = new Event(dto, organizer);
         var saved = repository.saveAndFlush(event);
-        return new EventDetailsDTO(saved);
+        return new EventDetailsDTO(saved, clock.instant());
     }
 
     @Transactional(readOnly = true)
     public EventDetailsDTO findById(UUID id) {
         return repository.findByIdAndActiveTrue(id)
-                .map(EventDetailsDTO::new)
+                .map(event -> new EventDetailsDTO(event, clock.instant()))
                 .orElseThrow(() -> new EventNotFoundException("Event not found"));
     }
 
     @Transactional(readOnly = true)
     public Page<EventSummaryDTO> search(String q, String city, Boolean featured, Boolean soldOut, Pageable pageable) {
-        var spec = EventSpecifications.isActive().and(EventSpecifications.isNotCancelled());
+        var now = clock.instant();
+        var spec = EventSpecifications.isActive()
+                .and(EventSpecifications.isNotCancelled())
+                .and(EventSpecifications.hasNotEnded(now));
         var name = normalize(q);
         if (name != null) spec = spec.and(EventSpecifications.nameContains(name));
         var cityFilter = normalize(city);
         if (cityFilter != null) spec = spec.and(EventSpecifications.cityEquals(cityFilter));
         if (featured != null) spec = spec.and(EventSpecifications.isFeatured(featured));
+        if (Boolean.TRUE.equals(featured)) spec = spec.and(EventSpecifications.hasNotStarted(now));
         if (soldOut != null) spec = spec.and(EventSpecifications.isSoldOut(soldOut));
         return toSummaries(repository.findAll(spec, pageable));
     }
@@ -101,7 +108,7 @@ public class EventService {
         var newEnd = dto.endsAt() != null ? dto.endsAt() : event.getEndsAt();
         validateDates(newStart, newEnd);
         event.updateFrom(dto);
-        return new EventDetailsDTO(event);
+        return new EventDetailsDTO(event, clock.instant());
     }
 
     @Transactional
@@ -148,7 +155,7 @@ public class EventService {
             auditService.record(featured ? AuditAction.EVENT_FEATURED : AuditAction.EVENT_UNFEATURED,
                     AuditTargetType.EVENT, event.getId(), Map.of("organizerId", event.getOrganizer().getId()));
         }
-        return new EventDetailsDTO(event);
+        return new EventDetailsDTO(event, clock.instant());
     }
 
     @Transactional(readOnly = true)

@@ -102,11 +102,11 @@ public class Order {
         this.status = OrderStatus.PAID;
     }
 
-    public void expire() {
+    public void expire(Instant now) {
         if (status != OrderStatus.PENDING) {
             throw new InvalidOrderStateException("Only pending orders can expire");
         }
-        if (!isExpired()) {
+        if (!isExpired(now)) {
             throw new InvalidOrderStateException("Order has not reached its expiration time");
         }
         this.status = OrderStatus.EXPIRED;
@@ -130,8 +130,8 @@ public class Order {
         return items.stream().anyMatch(item -> item.getTicketType().getEvent().isCancelled());
     }
 
-    public boolean isExpired() {
-        return expiresAt.isBefore(Instant.now());
+    public boolean isExpired(Instant now) {
+        return expiresAt.isBefore(now);
     }
 
     public void addItem(OrderItem item) {

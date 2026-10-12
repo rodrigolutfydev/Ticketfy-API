@@ -45,6 +45,7 @@ public enum ProblemType {
     METHOD_NOT_ALLOWED("method-not-allowed", "Method not allowed", HttpStatus.METHOD_NOT_ALLOWED),
     INVALID_EVENT_STATE("invalid-event-state", "Invalid event state", HttpStatus.CONFLICT),
     EVENT_HAS_SALES("event-has-sales", "Event has sales", HttpStatus.CONFLICT),
+    SALES_CLOSED("sales-closed", "Sales closed", HttpStatus.CONFLICT),
     INVALID_PASSWORD("invalid-password", "Invalid password", HttpStatus.FORBIDDEN),
     TOO_MANY_PASSWORD_ATTEMPTS("too-many-password-attempts", "Too many password attempts", HttpStatus.TOO_MANY_REQUESTS),
     PAYOUT_ACCOUNT_NOT_FOUND("payout-account-not-found", "Payout account not found", HttpStatus.NOT_FOUND),

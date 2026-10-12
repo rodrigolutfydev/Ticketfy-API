@@ -222,6 +222,7 @@ Content-Type: application/problem+json
 | `ticket-transfer-closed` | 409 | Transferência depois do início do evento |
 | `ticket-transfer-limit-reached` | 409 | Ingresso chegou ao limite de transferências |
 | `invalid-event-state` | 409 | Evento cancelado ou já encerrado |
+| `sales-closed` | 409 | Compra ou prévia de cupom depois do início do evento |
 | `event-has-sales` | 409 | Exclusão de evento com ingressos vendidos ou reservados |
 | `payout-account-required` | 409 | Saque sem dados de recebimento cadastrados |
 | `payout-account-cooldown` | 409 | Saque nas 48 h depois de trocar a chave Pix; traz `blockedUntil` |
@@ -433,8 +434,8 @@ Sem `confirmation: "EXCLUIR"`, a resposta é 400 `validation-failed`. A exclusã
 
 | Método | Endpoint | Descrição | Acesso |
 |---|---|---|---|
-| GET | `/events` | Lista eventos ativos e não cancelados. Filtros `q` (nome), `city`, `featured`, `soldOut`; ordem padrão `startsAt` | Público |
-| GET | `/events/{id}` | Detalha um evento ativo | Público |
+| GET | `/events` | Lista eventos ativos, não cancelados e que ainda não terminaram. Filtros `q` (nome), `city`, `featured` (com `true`, só eventos que ainda não começaram), `soldOut`; ordem padrão `startsAt` | Público |
+| GET | `/events/{id}` | Detalha um evento ativo, inclusive já realizado; `salesClosed` indica se ainda é possível comprar | Público |
 | GET | `/events/mine` | Eventos ativos do usuário; ordem padrão `startsAt` | Autenticado |
 | POST | `/events` | Cria um evento | ORGANIZER ou ADMIN |
 | PUT | `/events/{id}` | Atualiza um evento; campos ausentes ficam como estão | Dono ou ADMIN |
@@ -481,7 +482,8 @@ HTTP/1.1 201 Created
   "createdAt": "2026-10-08T17:00:00Z",
   "featured": false,
   "cancelledAt": null,
-  "cancellationReason": null
+  "cancellationReason": null,
+  "salesClosed": false
 }
 ```
 
@@ -490,6 +492,7 @@ Regras de imagem e datas:
 - `imageUrl` precisa começar com `https://`.
 - No `PUT`, `imageUrl` ausente ou `null` mantém a imagem, e `""` remove.
 - `startsAt` e `endsAt` precisam estar no futuro, e o fim depois do início.
+- As vendas encerram no início do evento: a partir de `startsAt`, `salesClosed` passa a `true`, e `POST /orders` e a prévia de cupom respondem 409 `sales-closed`. Um evento sem `endsAt` sai da busca no início.
 
 **Listar eventos**
 
@@ -653,7 +656,7 @@ Content-Type: application/json
 }
 ```
 
-Cupom inválido, expirado, inativo, esgotado ou de outro evento responde 422 `invalid-coupon`, sempre com a mesma mensagem.
+Cupom inválido, expirado, inativo, esgotado ou de outro evento responde 422 `invalid-coupon`, sempre com a mesma mensagem. Depois do início do evento, a prévia responde 409 `sales-closed`.
 
 ### Pedidos e pagamento
 
@@ -713,7 +716,9 @@ Regras do pedido:
 - Todos os itens precisam ser do mesmo evento.
 - O preço de cada item fica congelado no pedido.
 - Pedido com total zero (lote gratuito ou desconto integral) já sai `PAID`, com os ingressos emitidos e sem pagamento.
+- As vendas encerram no início do evento: a partir de `startsAt`, a criação do pedido responde 409 `sales-closed`.
 - O pedido pendente expira sozinho depois de 15 minutos e devolve estoque e uso do cupom.
+- Um pedido criado antes do início pode ser pago depois dele, enquanto a reserva não expirar.
 
 **Pagar**
 

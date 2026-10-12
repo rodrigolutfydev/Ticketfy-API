@@ -2322,6 +2322,9 @@
           "organizerName" : {
             "type" : "string"
           },
+          "salesClosed" : {
+            "type" : "boolean"
+          },
           "startsAt" : {
             "type" : "string",
             "format" : "date-time"

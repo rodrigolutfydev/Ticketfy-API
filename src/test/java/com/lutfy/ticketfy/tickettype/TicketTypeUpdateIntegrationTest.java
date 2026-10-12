@@ -15,6 +15,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
 
@@ -245,7 +246,7 @@ class TicketTypeUpdateIntegrationTest extends IntegrationTestBase {
             assertThat(ticketType.getQuantitySold()).isZero();
 
             concurrent.executeWithoutResult(inner -> {
-                ticketTypeRepository.reserveStock(ticketTypeId, 5);
+                ticketTypeRepository.reserveStock(ticketTypeId, 5, Instant.now());
                 ticketTypeRepository.changeQuantityTotal(ticketTypeId, 150);
             });
 

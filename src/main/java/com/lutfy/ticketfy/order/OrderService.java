@@ -18,6 +18,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -36,6 +37,7 @@ public class OrderService {
     private final PayoutSettings payoutSettings;
     private final CouponService couponService;
     private final UserLocks userLocks;
+    private final Clock clock;
     private final long reservationMinutes;
     private final long refundDeadlineHours;
 
@@ -48,6 +50,7 @@ public class OrderService {
                         PayoutSettings payoutSettings,
                         CouponService couponService,
                         UserLocks userLocks,
+                        Clock clock,
                         @Value("${ticketfy.order.reservation-minutes}") long reservationMinutes,
                         @Value("${ticketfy.refund.deadline-hours}") long refundDeadlineHours) {
         this.orderRepository = orderRepository;
@@ -59,6 +62,7 @@ public class OrderService {
         this.payoutSettings = payoutSettings;
         this.couponService = couponService;
         this.userLocks = userLocks;
+        this.clock = clock;
         this.reservationMinutes = reservationMinutes;
         this.refundDeadlineHours = refundDeadlineHours;
     }
@@ -77,7 +81,8 @@ public class OrderService {
         if (couponCode != null) {
             couponService.checkAttemptsAllowed(authenticated);
         }
-        var expiresAt = Instant.now().plus(Duration.ofMinutes(reservationMinutes));
+        var now = clock.instant();
+        var expiresAt = now.plus(Duration.ofMinutes(reservationMinutes));
         var order = new Order(authenticated, expiresAt, idempotencyKey);
         UUID eventId = null;
         for (var itemRequest : dto.items()) {
@@ -94,10 +99,13 @@ public class OrderService {
                 throw new MaxPerOrderExceededException(
                         "Maximum " + ticketType.getMaxPerOrder() + " tickets per order for this ticket type");
             }
-            int affectedRows = ticketTypeRepository.reserveStock(ticketType.getId(), itemRequest.quantity());
+            int affectedRows = ticketTypeRepository.reserveStock(ticketType.getId(), itemRequest.quantity(), now);
             if (affectedRows == 0) {
-                if (eventRepository.existsByIdAndCancelledAtIsNotNull(ticketType.getEvent().getId())) {
+                if (eventRepository.existsByIdAndCancelledAtIsNotNull(itemEventId)) {
                     throw new InvalidEventStateException("Event was cancelled");
+                }
+                if (eventRepository.existsByIdAndStartsAtLessThanEqual(itemEventId, now)) {
+                    throw new ProblemException(ProblemType.SALES_CLOSED, "Ticket sales for this event have ended");
                 }
                 throw new InsufficientStockException("Not enough tickets available for this ticket type");
             }
@@ -214,7 +222,7 @@ public class OrderService {
 
     @Transactional(readOnly = true)
     public List<UUID> findOverdueOrderIds() {
-        return orderRepository.findByStatusAndExpiresAtBefore(OrderStatus.PENDING, Instant.now())
+        return orderRepository.findByStatusAndExpiresAtBefore(OrderStatus.PENDING, clock.instant())
                 .stream()
                 .map(Order::getId)
                 .toList();
@@ -226,7 +234,7 @@ public class OrderService {
         if (order == null || order.getStatus() != OrderStatus.PENDING) {
             return false;
         }
-        order.expire();
+        order.expire(clock.instant());
         releaseStock(order);
         releaseCoupon(order);
         return true;

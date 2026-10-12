@@ -25,7 +25,6 @@ O caso de uso escolhido é **Realizar compra de ingresso**, porque é o fluxo qu
 
 ### Pontos em aberto que afetam este caso de uso
 
-- **I08:** a compra não confere se o evento já começou ou terminou; só se está ativo e não cancelado.
 - **Q08:** o que fazer com um pagamento aprovado depois que a reserva expirou. Não ocorre com o pagamento simulado e volta a valer com o Asaas.
 
 ### Fora deste caso de uso
@@ -44,7 +43,7 @@ O caso de uso escolhido é **Realizar compra de ingresso**, porque é o fluxo qu
 | Descrição | O cliente escolhe os tipos e as quantidades de ingresso de um evento e, se quiser, informa um cupom. O sistema reserva as unidades por 15 minutos e cria o pedido. O cliente paga, o pagamento simulado é aprovado na hora, e o sistema emite um ingresso com código único para cada unidade. Pedidos de valor zero são confirmados na criação. |
 | Prioridade | Alta |
 | Requisitos principais | RF11, RF12 e RF13 |
-| Versão | 3.0 (revisada contra o código) |
+| Versão | 3.1 (vendas encerram no início do evento) |
 | Status | Revisado |
 
 **Histórico de versões**
@@ -53,6 +52,7 @@ O caso de uso escolhido é **Realizar compra de ingresso**, porque é o fluxo qu
 | --- | --- |
 | 2.0 | Alinhada aos demais documentos: provedor de pagamento real com cartão e Pix, reserva de 15 minutos e limite por pedido definido pelo organizador. Status: em revisão. |
 | 3.0 | Revisada contra o código: pagamento simulado, limite por tipo de ingresso, cupom, pedido de valor zero, idempotência, endpoints e erros reais. |
+| 3.1 | Vendas encerram no início do evento (I08 resolvida): pré-condição 3, passos 10 e 13, FE16, critérios CA15 e CA16 e cenários CT20 e CT21. |
 
 ## 2. Atores
 
@@ -67,7 +67,7 @@ O caso de uso escolhido é **Realizar compra de ingresso**, porque é o fluxo qu
 
 1. O cliente possui conta não excluída (RN03).
 2. O cliente está autenticado, com access token válido de uma sessão ativa (RF02).
-3. O evento está ativo e não foi cancelado (RN09).
+3. O evento está ativo, não foi cancelado e ainda não começou (RN09).
 4. Existe ao menos um tipo de ingresso ativo com disponibilidade maior que zero (RN12).
 
 ## 4. Pós-condições
@@ -105,10 +105,10 @@ O fluxo descreve uma compra com total maior que zero, sem cupom; o cupom está e
 | 7 | Sistema | O `SecurityFilter` valida o token e a sessão; o service confere que a conta não foi excluída (RF02, RF03). | — |
 | 8 | Sistema | Valida os dados de entrada: lista de itens não vazia e quantidade positiva (RNF03). Se a chave de idempotência já foi usada, segue FA03. | — |
 | 9 | Sistema | Para cada item, confere se o tipo de ingresso está ativo e se o evento está ativo e não cancelado (RN09), se todos os itens são do mesmo evento e se a quantidade respeita o limite por pedido do tipo (RN13). | — |
-| 10 | Sistema | Reserva as unidades de cada tipo com um `UPDATE` condicional, que só soma à quantidade vendida se couber no total e se o evento continuar ativo e não cancelado (RN12, RNF07). | — |
+| 10 | Sistema | Reserva as unidades de cada tipo com um `UPDATE` condicional, que só soma à quantidade vendida se couber no total e se o evento continuar ativo, não cancelado e ainda não iniciado no relógio do servidor (RN09, RN12, RNF07). | — |
 | 11 | Sistema | Registra o preço unitário de cada item (RN14), calcula o subtotal, congela o percentual e o valor da taxa da plataforma e grava o pedido como `PENDING`, com fim da reserva 15 minutos depois (RN12). | 201 Created, com o pedido (status, subtotal, desconto, total, `expiresAt` e itens) |
 | 12 | Cliente | Confirma o pagamento. | `POST /orders/{orderId}/payment`, sem corpo |
-| 13 | Sistema | Trava o pedido (`SELECT … FOR UPDATE`) e confere se ele pertence ao cliente (RN05), se o evento não foi cancelado, se o pedido ainda não foi pago e se a reserva não expirou (RN12). | — |
+| 13 | Sistema | Trava o pedido (`SELECT … FOR UPDATE`) e confere se ele pertence ao cliente (RN05), se o evento não foi cancelado, se o pedido ainda não foi pago e se a reserva não expirou (RN12). O início do evento não impede o pagamento: a venda foi decidida na reserva (RN09). | — |
 | 14 | Sistema | Em uma única transação (RNF05), registra o pagamento `SIMULATED` como `APPROVED`, com o valor total do pedido (RN15); marca o pedido como `PAID`; grava o crédito no extrato do organizador; e emite um ingresso `VALID` com código único para cada unidade (RN16, RN17). | 201 Created, com o pagamento |
 | 15 | Cliente | Consulta o pedido e os ingressos emitidos (RF14). O caso de uso termina. | `GET /orders/{orderId}` → 200, situação `PAID`, com os ingressos |
 
@@ -116,7 +116,7 @@ O fluxo descreve uma compra com total maior que zero, sem cupom; o cupom está e
 
 **FA01 – Compra com cupom de desconto** (desvia nos passos 5 e 11)
 
-1. O cliente informa um código de cupom. O frontend pode pré-visualizar o desconto com `POST /events/{eventId}/coupons/preview`, enviando o código e os itens; a resposta traz subtotal, desconto e total, sem consumir o cupom.
+1. O cliente informa um código de cupom. O frontend pode pré-visualizar o desconto com `POST /events/{eventId}/coupons/preview`, enviando o código e os itens; a resposta traz subtotal, desconto e total, sem consumir o cupom. Depois do início do evento, a prévia responde 409 `sales-closed`.
 2. O cliente confirma, e o frontend envia `couponCode` no `POST /orders`.
 3. Depois da reserva (passo 10), o sistema consome um uso do cupom com um `UPDATE … RETURNING` condicional (ativo, dentro da validade, abaixo do limite de usos) e calcula o desconto com os valores devolvidos. O desconto fixo é limitado ao subtotal.
 4. O pedido guarda o cupom, o código, o desconto e o total (`total = subtotal − desconto`). A taxa da plataforma é calculada sobre o total.
@@ -173,6 +173,7 @@ As respostas de erro seguem a RFC 7807 (`application/problem+json`), com `type` 
 | FE13 | Pedido já pago | Passo 13 | 409 `invalid-payment-state` | Nenhum pagamento novo é registrado. |
 | FE14 | Evento cancelado depois da criação do pedido | Passo 13 | 409 `invalid-event-state` | O pagamento é recusado; o pedido pendente é cancelado pelo cancelamento do evento. |
 | FE15 | Erro interno inesperado | Qualquer passo | 500 `internal-error` | Desfaz a transação, preservando o estoque (RNF05), e mantém a aplicação em funcionamento (RNF10). A resposta traz o `requestId`. |
+| FE16 | Evento já começou | Passo 10 e FA01 | 409 `sales-closed` | A reserva não passa e nada é gravado (RN09). A prévia de cupom também é recusada. |
 
 ## 9. Regras de Negócio
 
@@ -182,7 +183,7 @@ As regras são as do Documento de Requisitos. Aplicam-se a este caso de uso:
 | --- | --- | --- |
 | RN03 | Apenas contas não excluídas se autenticam. | Pré-condição 1, FE10 |
 | RN05 | O cliente só acessa os próprios pedidos e ingressos. | Passos 13 e 15, FE11 |
-| RN09 | Eventos cancelados ou excluídos não aceitam compras. | Passos 9 e 10, FE02, FE06 |
+| RN09 | Eventos cancelados, excluídos ou já iniciados não aceitam compras; um pedido criado antes do início pode ser pago no prazo da reserva. | Passos 9, 10 e 13, FE02, FE06, FE16 |
 | RN12 | Disponibilidade = total − vendidos (os reservados contam como vendidos); reserva de 15 minutos a partir da criação do pedido. | Passos 10, 11 e 13, FE05, FE12 |
 | RN13 | Compra dentro da disponibilidade e do limite por pedido de cada tipo, com itens de um único evento. | Passo 9, FE03, FE04 |
 | RN14 | O preço é registrado no pedido no momento da compra. | Passo 11 |
@@ -305,6 +306,10 @@ O pagamento real (Pix com Asaas) está planejado. Quando for integrado, o UC04 v
 
 **CA14 – Último uso do cupom:** dado um cupom com um único uso restante, quando dois clientes compram com ele ao mesmo tempo, então apenas um pedido recebe o desconto e o outro recebe 422.
 
+**CA15 – Vendas encerradas no início:** dado um evento que começa às 20:00, quando o cliente tenta comprar às 20:00 ou depois, então o sistema responde 409 `sales-closed` e nada é reservado; às 19:59, o pedido é criado.
+
+**CA16 – Pagamento depois do início:** dado um pedido criado às 19:59 para um evento que começa às 20:00, quando o cliente paga às 20:05, então o pagamento é aprovado e os ingressos são emitidos; às 20:15, a reserva já expirou e o pagamento recebe 409.
+
 ## 15. Cenários de teste
 
 | ID | Tipo | Cenário | Entrada | Resultado esperado | Referência |
@@ -328,6 +333,8 @@ O pagamento real (Pix com Asaas) está planejado. Quando for integrado, o UC04 v
 | CT17 | Exceção | Concorrência no último uso do cupom | Dois pedidos simultâneos com o mesmo cupom | 1 pedido com desconto; o outro recebe 422 | FE07, CA14 |
 | CT18 | Exceção | Expiração da reserva | Pedido sem pagamento por 15 minutos | Pedido `EXPIRED`; unidades e cupom devolvidos; pagamento posterior recebe 409 | FE12, CA03, CA05 |
 | CT19 | Exceção | Falha durante a emissão | Erro simulado na emissão | Nada é gravado pela metade; pedido segue `PENDING` | FE15, RNF05 |
+| CT20 | Negativo | Compra no início do evento | Relógio no horário de início | 409 `sales-closed`; nada reservado | FE16, CA15 |
+| CT21 | Positivo | Pagamento depois do início | Pedido criado 1 minuto antes, pago 5 minutos depois do início | Pedido `PAID`; ingressos emitidos | Passo 13, CA16 |
 
 CT16, CT17 e CT19 devem ser testes de integração com PostgreSQL real (Testcontainers), porque dependem do comportamento de bloqueio e de transação do banco.
 
@@ -344,6 +351,6 @@ CT16, CT17 e CT19 devem ser testes de integração com PostgreSQL real (Testcont
 | Pontos críticos | Reserva por 15 minutos sem venda acima do estoque, cupom sem uso acima do limite, pedido único por chave de idempotência e emissão somente após a aprovação |
 | Inclui | UC02 Autenticar usuário, UC03 Reservar ingressos, UC04 Processar pagamento, UC05 Emitir ingressos |
 | Estende | UC06 Aplicar cupom |
-| Pendências | I08 (compra de evento já iniciado), Q08 (pagamento após expiração, com o provedor real) |
+| Pendências | Q08 (pagamento após expiração, com o provedor real) |
 
 O cliente escolhe os ingressos de um evento ativo, o Ticketfy reserva as unidades por 15 minutos e cria o pedido, aplicando o cupom se houver. O pagamento simulado é aprovado na hora e os ingressos são emitidos na mesma transação; pedidos de valor zero são confirmados na criação. Se o pedido não for pago no prazo, a reserva expira e as unidades e o cupom voltam à disponibilidade.

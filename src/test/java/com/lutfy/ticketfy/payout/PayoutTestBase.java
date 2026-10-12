@@ -97,7 +97,7 @@ public abstract class PayoutTestBase extends IntegrationTestBase {
     }
 
     protected Instant releasedSales(User owner, String... prices) {
-        var startsAt = Instant.now().plus(Duration.ofDays(1));
+        var startsAt = clock.instant().plus(Duration.ofDays(1));
         var endsAt = startsAt.plus(Duration.ofHours(4));
         var eventId = insertEvent(owner.getId(), startsAt, endsAt);
         for (var price : prices) {

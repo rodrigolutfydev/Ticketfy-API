@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -38,9 +39,10 @@ public interface TicketTypeRepository extends JpaRepository<TicketType, UUID> {
                SELECT 1 FROM Event e
                 WHERE e.id = t.event.id
                   AND e.active = true
-                  AND e.cancelledAt IS NULL)
+                  AND e.cancelledAt IS NULL
+                  AND e.startsAt > :now)
         """)
-    int reserveStock(@Param("id") UUID id, @Param("quantity") int quantity);
+    int reserveStock(@Param("id") UUID id, @Param("quantity") int quantity, @Param("now") Instant now);
 
     @Modifying(flushAutomatically = true)
     @Query("""

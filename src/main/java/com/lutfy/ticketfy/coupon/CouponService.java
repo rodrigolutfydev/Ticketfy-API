@@ -153,17 +153,21 @@ public class CouponService {
     @Transactional(readOnly = true)
     public CouponPreviewDTO preview(UUID eventId, CouponPreviewRequestDTO dto, User authenticated) {
         limiter.checkAllowed(authenticated.getId());
+        var now = clock.instant();
         var subtotal = BigDecimal.ZERO;
         for (var item : dto.items()) {
             var ticketType = ticketTypeRepository
                     .findByIdAndActiveTrueAndEventActiveTrueAndEventCancelledAtIsNull(item.ticketTypeId())
                     .filter(found -> found.getEvent().getId().equals(eventId))
                     .orElseThrow(() -> new TicketTypeNotFoundException("Ticket type not found"));
+            if (!ticketType.getEvent().getStartsAt().isAfter(now)) {
+                throw new ProblemException(ProblemType.SALES_CLOSED, "Ticket sales for this event have ended");
+            }
             subtotal = subtotal.add(ticketType.getPrice().multiply(BigDecimal.valueOf(item.quantity())));
         }
         var code = CouponCodes.normalize(dto.code());
         var coupon = Optional.ofNullable(code)
-                .flatMap(normalized -> redemptions.findAvailable(eventId, normalized, clock.instant()))
+                .flatMap(normalized -> redemptions.findAvailable(eventId, normalized, now))
                 .orElseThrow(() -> rejected(authenticated));
         var discount = coupon.discountFor(subtotal);
         return new CouponPreviewDTO(coupon.code(), coupon.discountType(), coupon.discountValue(),
