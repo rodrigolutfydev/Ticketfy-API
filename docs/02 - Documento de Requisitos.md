@@ -139,7 +139,7 @@ Os requisitos foram dimensionados para um projeto acadêmico. A aplicação roda
 | RNF11 | Usabilidade | A API deve seguir convenções REST: recursos nomeados por substantivos, métodos HTTP adequados e mensagens de erro compreensíveis para quem consome a API. | Revisão dos endpoints e das mensagens. |
 | RNF12 | Manutenibilidade | O código deve ser organizado em pacotes por domínio e escrito em inglês (classes, pacotes e variáveis). | Revisão da estrutura do projeto. |
 | RNF13 | Manutenibilidade | Toda alteração no esquema do banco deve ser feita por migration Flyway versionada. | O banco é recriado do zero apenas com as migrations. |
-| RNF14 | Manutenibilidade | As regras de negócio devem ter testes automatizados, com integração em PostgreSQL real (Testcontainers). O `./mvnw verify` roda o `jacoco:check`, que exige no projeto inteiro pelo menos 89% de linhas cobertas (`LINE` 0,89) e 75% de branches cobertos (`BRANCH` 0,75); o CI falha abaixo disso. | Build `./mvnw verify` no GitHub Actions e relatório JaCoCo. |
+| RNF14 | Manutenibilidade | As regras de negócio devem ter testes automatizados, com integração em PostgreSQL real (Testcontainers). O `./mvnw verify` roda o `jacoco:check`, que exige no projeto inteiro pelo menos 92% de linhas cobertas (`LINE` 0,92) e 78% de branches cobertos (`BRANCH` 0,78); o CI falha abaixo disso. | Build `./mvnw verify` no GitHub Actions e relatório JaCoCo. |
 | RNF15 | Proteção de dados | A remoção de usuários deve preservar o histórico de pedidos, ingressos e lançamentos financeiros. A exclusão da conta anonimiza nome, e-mail, foto e senha e grava `deleted_at`, mantendo o mesmo id. | Conta excluída continua no banco, anonimizada, com o histórico ligado a ela. |
 
 ## 3. Regras de Negócio
