@@ -1,12 +1,10 @@
 package com.lutfy.ticketfy.privacy;
 
 import com.lutfy.ticketfy.audit.AuditAction;
-import com.lutfy.ticketfy.audit.AuditService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -16,9 +14,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 class AccountDeletionAtomicityIntegrationTest extends PrivacyTestBase {
-
-    @MockitoSpyBean
-    private AuditService auditService;
 
     @Autowired
     private PlatformTransactionManager transactionManager;

@@ -1,24 +1,18 @@
 package com.lutfy.ticketfy.payout.ledger;
 
-import com.lutfy.ticketfy.IntegrationTestBase;
+import com.lutfy.ticketfy.ClockedIntegrationTestBase;
 import com.lutfy.ticketfy.order.OrderCreationDTO;
 import com.lutfy.ticketfy.order.OrderItemRequestDTO;
 import com.lutfy.ticketfy.order.OrderRepository;
 import com.lutfy.ticketfy.order.OrderService;
 import com.lutfy.ticketfy.payment.PaymentService;
-import com.lutfy.ticketfy.payout.PayoutSettings;
 import com.lutfy.ticketfy.user.User;
-import com.lutfy.ticketfy.user.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
-import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.JsonNode;
@@ -26,7 +20,6 @@ import tools.jackson.databind.json.JsonMapper;
 
 import java.math.BigDecimal;
 import java.sql.Timestamp;
-import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -42,17 +35,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@AutoConfigureMockMvc
-class PayoutIntegrationTest extends IntegrationTestBase {
+class PayoutIntegrationTest extends ClockedIntegrationTestBase {
 
     private static final JsonMapper JSON = JsonMapper.builder().build();
-
-    @Autowired
-    private MockMvc mockMvc;
-
-    @Autowired
-    private UserRepository userRepository;
-
 
     @Autowired
     private OrderService orderService;
@@ -69,12 +54,6 @@ class PayoutIntegrationTest extends IntegrationTestBase {
     @Autowired
     private TransactionTemplate transactionTemplate;
 
-    @MockitoSpyBean
-    private PayoutSettings payoutSettings;
-
-    @MockitoBean
-    private Clock clock;
-
     private User organizer;
     private User buyer;
     private Instant eventEnd;
@@ -82,7 +61,6 @@ class PayoutIntegrationTest extends IntegrationTestBase {
 
     @BeforeEach
     void setUp() {
-        when(clock.instant()).thenAnswer(invocation -> Instant.now());
         organizer = user("ORGANIZER");
         buyer = user("USER");
         var startsAt = Instant.now().plus(Duration.ofDays(30));
@@ -375,14 +353,6 @@ class PayoutIntegrationTest extends IntegrationTestBase {
                  WHERE order_id = ?
                  ORDER BY CASE type WHEN 'SALE_CREDIT' THEN 0 ELSE 1 END
                 """, (rs, i) -> Map.entry(rs.getString("type"), rs.getBigDecimal("amount")), orderId);
-    }
-
-    private User user(String role) {
-        return userRepository.findById(insertUser(role)).orElseThrow();
-    }
-
-    private String bearer(User user) {
-        return "Bearer " + accessToken(user);
     }
 
     private UUID insertEvent(UUID organizerId, Instant startsAt, Instant endsAt) {

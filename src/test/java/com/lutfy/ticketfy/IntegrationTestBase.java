@@ -23,7 +23,8 @@ public abstract class IntegrationTestBase {
     protected static final String PROXY_SECRET = "test-proxy-secret-with-at-least-32-chars";
     protected static final String FRONTEND_ORIGIN = "http://localhost:5173";
 
-    static final PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:16-alpine");
+    static final PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:16-alpine")
+            .withCommand("postgres", "-c", "fsync=off", "-c", "max_connections=200");
 
     static {
         postgres.start();
@@ -34,6 +35,8 @@ public abstract class IntegrationTestBase {
         registry.add("spring.datasource.url", postgres::getJdbcUrl);
         registry.add("spring.datasource.username", postgres::getUsername);
         registry.add("spring.datasource.password", postgres::getPassword);
+        registry.add("spring.datasource.hikari.maximum-pool-size", () -> "8");
+        registry.add("spring.datasource.hikari.minimum-idle", () -> "1");
         registry.add("api.security.token.secret", () -> "test-secret-with-at-least-32-characters");
         registry.add("ticketfy.payout.job.enabled", () -> "false");
         registry.add("ticketfy.auth.cleanup.enabled", () -> "false");

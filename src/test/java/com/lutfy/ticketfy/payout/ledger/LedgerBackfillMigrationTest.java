@@ -3,6 +3,7 @@ package com.lutfy.ticketfy.payout.ledger;
 import com.lutfy.ticketfy.IntegrationTestBase;
 import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.FlywayException;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Value;
@@ -33,6 +34,7 @@ class LedgerBackfillMigrationTest extends IntegrationTestBase {
     @Value("${spring.datasource.password}")
     private String password;
 
+    private String database;
     private DriverManagerDataSource dataSource;
     private JdbcTemplate legacy;
     private UUID organizerId;
@@ -40,7 +42,7 @@ class LedgerBackfillMigrationTest extends IntegrationTestBase {
 
     @BeforeEach
     void createDatabaseAtV14() {
-        var database = "backfill_" + UUID.randomUUID().toString().replace("-", "");
+        database = "backfill_" + UUID.randomUUID().toString().replace("-", "");
         jdbc.execute("CREATE DATABASE " + database);
         dataSource = new DriverManagerDataSource(url.replaceFirst("/[^/?]+(\\?|$)", "/" + database + "$1"),
                 username, password);
@@ -48,6 +50,13 @@ class LedgerBackfillMigrationTest extends IntegrationTestBase {
         legacy = new JdbcTemplate(dataSource);
         organizerId = insertLegacyUser("ORGANIZER");
         buyerId = insertLegacyUser("USER");
+    }
+
+    @AfterEach
+    void dropDatabase() {
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM pg_stat_activity WHERE datname = ?",
+                Integer.class, database)).isZero();
+        jdbc.execute("DROP DATABASE IF EXISTS " + database + " WITH (FORCE)");
     }
 
     @Test

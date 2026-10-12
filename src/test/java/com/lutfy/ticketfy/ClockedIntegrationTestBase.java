@@ -1,11 +1,15 @@
 package com.lutfy.ticketfy;
 
+import com.lutfy.ticketfy.audit.AuditService;
+import com.lutfy.ticketfy.payout.PayoutSettings;
+import com.lutfy.ticketfy.payout.withdrawal.PayoutGateway;
 import com.lutfy.ticketfy.user.User;
 import com.lutfy.ticketfy.user.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
@@ -31,7 +35,16 @@ public abstract class ClockedIntegrationTestBase extends IntegrationTestBase {
     @MockitoBean
     protected Clock clock;
 
-    private final AtomicReference<Instant> now = new AtomicReference<>();
+    @MockitoSpyBean
+    protected PayoutGateway payoutGateway;
+
+    @MockitoSpyBean
+    protected PayoutSettings payoutSettings;
+
+    @MockitoSpyBean
+    protected AuditService auditService;
+
+    protected final AtomicReference<Instant> now = new AtomicReference<>();
 
     @BeforeEach
     void setUpClock() {

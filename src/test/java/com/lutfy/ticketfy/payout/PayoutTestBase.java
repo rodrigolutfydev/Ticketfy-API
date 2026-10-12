@@ -1,45 +1,35 @@
 package com.lutfy.ticketfy.payout;
 
-import com.lutfy.ticketfy.IntegrationTestBase;
+import com.lutfy.ticketfy.ClockedIntegrationTestBase;
 import com.lutfy.ticketfy.infra.crypto.SensitiveDataCipher;
 import com.lutfy.ticketfy.order.OrderCreationDTO;
 import com.lutfy.ticketfy.order.OrderItemRequestDTO;
 import com.lutfy.ticketfy.order.OrderService;
 import com.lutfy.ticketfy.payment.PaymentService;
-import com.lutfy.ticketfy.payout.withdrawal.PayoutGateway;
 import com.lutfy.ticketfy.user.User;
-import com.lutfy.ticketfy.user.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
-import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.math.BigDecimal;
 import java.sql.Timestamp;
-import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicReference;
 
-import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@AutoConfigureMockMvc
-public abstract class PayoutTestBase extends IntegrationTestBase {
+public abstract class PayoutTestBase extends ClockedIntegrationTestBase {
 
     protected static final String PASSWORD = "Senha-forte-123";
     protected static final String CPF = "52998224725";
@@ -47,12 +37,6 @@ public abstract class PayoutTestBase extends IntegrationTestBase {
     protected static final String CNPJ = "11222333000181";
     protected static final String ALPHANUMERIC_CNPJ = "12ABC34501DE35";
     protected static final JsonMapper JSON = JsonMapper.builder().build();
-
-    @Autowired
-    protected MockMvc mockMvc;
-
-    @Autowired
-    protected UserRepository userRepository;
 
 
     @Autowired
@@ -67,29 +51,13 @@ public abstract class PayoutTestBase extends IntegrationTestBase {
     @Autowired
     protected SensitiveDataCipher cipher;
 
-    @MockitoBean
-    protected Clock clock;
-
-    @MockitoSpyBean
-    protected PayoutGateway payoutGateway;
-
-    protected final AtomicReference<Instant> now = new AtomicReference<>();
     protected User organizer;
     protected User buyer;
 
     @BeforeEach
     void setUpPayoutBase() {
-        now.set(null);
-        when(clock.instant()).thenAnswer(invocation -> {
-            var fixed = now.get();
-            return fixed == null ? Instant.now() : fixed;
-        });
         organizer = user("ORGANIZER");
         buyer = user("USER");
-    }
-
-    protected void travelTo(Instant instant) {
-        now.set(instant);
     }
 
     protected void travel(Duration duration) {
@@ -171,10 +139,6 @@ public abstract class PayoutTestBase extends IntegrationTestBase {
         var id = insertUser(role);
         jdbc.update("UPDATE users SET password = ? WHERE id = ?", passwordEncoder.encode(PASSWORD), id);
         return userRepository.findById(id).orElseThrow();
-    }
-
-    protected String bearer(User user) {
-        return "Bearer " + accessToken(user);
     }
 
     protected UUID insertEvent(UUID organizerId, Instant startsAt, Instant endsAt) {
