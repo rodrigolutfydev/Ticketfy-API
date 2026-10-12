@@ -110,6 +110,9 @@ public class OrderService {
                 if (eventRepository.existsByIdAndCancelledAtIsNotNull(itemEventId)) {
                     throw new InvalidEventStateException("Event was cancelled");
                 }
+                if (!ticketTypeRepository.existsByIdAndActiveTrue(ticketType.getId())) {
+                    throw new TicketTypeNotFoundException("Ticket type not found");
+                }
                 if (eventRepository.existsByIdAndStartsAtLessThanEqual(itemEventId, now)
                         || eventRepository.existsByIdAndOrganizerSuspendedAtIsNotNull(itemEventId)) {
                     throw new ProblemException(ProblemType.SALES_CLOSED, "Ticket sales for this event have ended");

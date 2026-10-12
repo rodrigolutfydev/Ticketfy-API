@@ -14,8 +14,8 @@ import java.util.UUID;
 public interface TicketTypeRepository extends JpaRepository<TicketType, UUID> {
     List<TicketType> findByEventIdAndActiveTrue(UUID eventId);
     List<TicketType> findByEventIdOrderByCreatedAtAscNameAsc(UUID eventId);
-    Optional<TicketType> findByIdAndActiveTrue(UUID id);
     boolean existsByEventIdAndQuantitySoldGreaterThan(UUID eventId, int quantity);
+    boolean existsByIdAndActiveTrue(UUID id);
     Optional<TicketType> findByIdAndActiveTrueAndEventActiveTrueAndEventCancelledAtIsNull(UUID id);
 
     @Query("""
@@ -34,6 +34,7 @@ public interface TicketTypeRepository extends JpaRepository<TicketType, UUID> {
         UPDATE TicketType t
            SET t.quantitySold = t.quantitySold + :quantity
          WHERE t.id = :id
+           AND t.active = true
            AND t.quantitySold + :quantity <= t.quantityTotal
            AND EXISTS (
                SELECT 1 FROM Event e
@@ -44,6 +45,15 @@ public interface TicketTypeRepository extends JpaRepository<TicketType, UUID> {
                   AND e.organizer.suspendedAt IS NULL)
         """)
     int reserveStock(@Param("id") UUID id, @Param("quantity") int quantity, @Param("now") Instant now);
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+        UPDATE TicketType t
+           SET t.active = :active, t.updatedAt = :now
+         WHERE t.id = :id
+           AND t.active <> :active
+        """)
+    int changeActive(@Param("id") UUID id, @Param("active") boolean active, @Param("now") Instant now);
 
     @Modifying(flushAutomatically = true)
     @Query("""

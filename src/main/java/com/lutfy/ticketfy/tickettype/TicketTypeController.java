@@ -40,6 +40,20 @@ public class TicketTypeController {
         return ResponseEntity.ok(service.update(eventId, ticketTypeId, dto, authenticated));
     }
 
+    @PostMapping("/{ticketTypeId}/deactivate")
+    @PreAuthorize("hasAnyRole('ORGANIZER','ADMIN')")
+    public ResponseEntity<TicketTypeDetailsDTO> deactivate(@PathVariable UUID eventId, @PathVariable UUID ticketTypeId,
+                                                           @AuthenticationPrincipal User authenticated) {
+        return ResponseEntity.ok(service.deactivate(eventId, ticketTypeId, authenticated));
+    }
+
+    @PostMapping("/{ticketTypeId}/reactivate")
+    @PreAuthorize("hasAnyRole('ORGANIZER','ADMIN')")
+    public ResponseEntity<TicketTypeDetailsDTO> reactivate(@PathVariable UUID eventId, @PathVariable UUID ticketTypeId,
+                                                           @AuthenticationPrincipal User authenticated) {
+        return ResponseEntity.ok(service.reactivate(eventId, ticketTypeId, authenticated));
+    }
+
     @PostMapping
     @PreAuthorize("hasAnyRole('ORGANIZER','ADMIN')")
     public ResponseEntity<TicketTypeDetailsDTO> create(@PathVariable UUID eventId, @RequestBody @Valid TicketTypeCreationDTO dto, @AuthenticationPrincipal User authenticated) {

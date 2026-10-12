@@ -20,6 +20,7 @@ O contrato gerado a partir do código fica em [`openapi.json`](openapi.json). O 
   - [Cupons](#cupons)
   - [Pedidos e pagamento](#pedidos-e-pagamento)
   - [Ingressos e transferência](#ingressos-e-transferência)
+  - [Participantes](#participantes)
   - [Painel do organizador](#painel-do-organizador)
   - [Financeiro do organizador](#financeiro-do-organizador)
   - [Administração](#administração)
@@ -185,6 +186,7 @@ Content-Type: application/problem+json
 | `bad-request` | 400 | Requisição inválida sem tipo mais específico |
 | `invalid-event-dates` | 400 | Fim do evento não é depois do início |
 | `invalid-ticket-type-quantity` | 400 | Quantidade total do lote abaixo do vendido e reservado |
+| `invalid-ticket-type-state` | 409 | Desativar lote já desativado, ou reativar lote já ativo |
 | `mixed-events-order` | 400 | Pedido com lotes de eventos diferentes |
 | `max-per-order-exceeded` | 400 | Quantidade acima do limite por pedido do lote |
 | `max-per-buyer-exceeded` | 409 | Compra passaria do limite por comprador do lote; traz `ticketTypeId`, `maxPerBuyer` e `remaining` |
@@ -557,7 +559,9 @@ O corpo é opcional, e o motivo tem no máximo 500 caracteres. O cancelamento s�
 | GET | `/events/{eventId}/ticket-types` | Lotes ativos, com `soldOut` e `remaining`, sem revelar volume de vendas | Público |
 | GET | `/events/{eventId}/ticket-types/manage` | Todos os lotes com total, vendido e disponível | Dono do evento ou ADMIN |
 | POST | `/events/{eventId}/ticket-types` | Cria um lote | Dono do evento ou ADMIN |
-| PATCH | `/events/{eventId}/ticket-types/{ticketTypeId}` | Altera nome, descrição, preço, quantidade total, limite por pedido e limite por comprador | Dono do evento ou ADMIN |
+| PATCH | `/events/{eventId}/ticket-types/{ticketTypeId}` | Altera nome, descrição, preço, quantidade total, limite por pedido e limite por comprador, inclusive de lote desativado | Dono do evento ou ADMIN |
+| POST | `/events/{eventId}/ticket-types/{ticketTypeId}/deactivate` | Desativa o lote para novas vendas | Dono do evento ou ADMIN |
+| POST | `/events/{eventId}/ticket-types/{ticketTypeId}/reactivate` | Reativa o lote | Dono do evento ou ADMIN |
 
 **Criar lote**
 
@@ -604,6 +608,14 @@ Regras de edição:
 - `quantityTotal` não pode ficar abaixo do vendido mais o reservado (400 `invalid-ticket-type-quantity`).
 - Mudar o preço não altera pedidos já feitos.
 - Lotes de evento cancelado não podem ser editados (409 `invalid-event-state`).
+
+Desativar e reativar:
+
+- Lote desativado não aceita novas reservas (a condição está no próprio `UPDATE` da reserva) e some da lista pública, da busca e do preço mínimo. Continua na gestão (`/manage`, com `active: false`) e nos pedidos e ingressos já existentes.
+- Pedidos pendentes com o lote podem ser pagos dentro do prazo da reserva, e os ingressos pagos continuam válidos.
+- Desativar é permitido mesmo depois do início do evento e mesmo que seja o último lote ativo. Reativar depois do início responde 409 `sales-closed`.
+- Evento cancelado responde 409 `invalid-event-state`; lote já desativado (ou já ativo) responde 409 `invalid-ticket-type-state`.
+- As duas ações ficam na auditoria (`TICKET_TYPE_DEACTIVATED` e `TICKET_TYPE_REACTIVATED`).
 - Nome repetido no mesmo evento responde 409 `ticket-type-name-already-exists`.
 - No `PATCH`, campo ausente ou `null` não muda nada, então `maxPerOrder` não pode ser removido depois de definido. Para `maxPerBuyer`, `0` remove o limite.
 
@@ -828,6 +840,39 @@ A transferência só vale para ingresso `VALID`, de evento não cancelado que ai
 **Check-in**
 
 `POST /tickets/{code}/check-in` responde com o ingresso marcado como `USED`. Um código só passa uma vez; a segunda leitura responde 409 `invalid-ticket-state`.
+
+### Participantes
+
+| Método | Endpoint | Descrição | Acesso |
+|---|---|---|---|
+| GET | `/events/{eventId}/participants` | Ingressos do evento, paginados; filtros `ticketTypeId`, `status` (`VALID`, `USED`, `CANCELLED`) e `q` (nome do dono) | Dono do evento ou ADMIN |
+| GET | `/events/{eventId}/participants.csv` | Mesma lista, com os mesmos filtros, em CSV | Dono do evento ou ADMIN |
+
+```json
+{
+  "content": [
+    {
+      "ticketId": "7c1e…",
+      "ticketTypeId": "ffe5…",
+      "ticketTypeName": "Pista",
+      "status": "USED",
+      "checkedInAt": "2026-12-10T23:41:00Z",
+      "transferred": true,
+      "holderName": "Carla Dias",
+      "codeSuffix": "AB12"
+    }
+  ],
+  "page": { "size": 20, "number": 0, "totalElements": 1, "totalPages": 1 }
+}
+```
+
+Regras da lista:
+
+- Qualquer pessoa que não seja o dono do evento ou um ADMIN recebe 404 `event-not-found`.
+- Só aparecem o nome do dono atual e os 4 últimos caracteres do código; o código inteiro, que é o próprio ingresso, nunca sai da API. E-mail e dados do comprador ficam de fora. Contas excluídas aparecem como `Usuário excluído`.
+- A ordem é fixa, por nome e id do ingresso. A busca por nome não diferencia maiúsculas e trata `%` e `_` como texto.
+- O CSV usa `;`, tem BOM UTF-8, protege contra fórmulas (células iniciadas por `=`, `+`, `-`, `@`, tabulação ou quebra de linha ganham um `'`) e é registrado na auditoria (`PARTICIPANTS_EXPORTED`, com a quantidade de linhas).
+- Não há check-in a partir da lista: o check-in exige o código inteiro (`POST /tickets/{code}/check-in`).
 
 ### Painel do organizador
 

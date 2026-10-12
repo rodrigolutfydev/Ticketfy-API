@@ -26,6 +26,7 @@ public enum ProblemType {
     INVALID_PARAMETER("invalid-parameter", "Invalid parameter", HttpStatus.BAD_REQUEST),
     TICKET_TYPE_NOT_FOUND("ticket-type-not-found", "Ticket type not found", HttpStatus.NOT_FOUND),
     INVALID_TICKET_TYPE_QUANTITY("invalid-ticket-type-quantity", "Invalid ticket type quantity", HttpStatus.BAD_REQUEST),
+    INVALID_TICKET_TYPE_STATE("invalid-ticket-type-state", "Invalid ticket type state", HttpStatus.CONFLICT),
     TICKET_TYPE_NAME_ALREADY_EXISTS("ticket-type-name-already-exists", "Ticket type name already exists", HttpStatus.CONFLICT),
     INVALID_ORDER_STATE("invalid-order-state", "Invalid order state", HttpStatus.CONFLICT),
     INSUFFICIENT_STOCK("insufficient-stock", "Insufficient stock", HttpStatus.CONFLICT),

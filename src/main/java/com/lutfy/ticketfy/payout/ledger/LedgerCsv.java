@@ -1,5 +1,7 @@
 package com.lutfy.ticketfy.payout.ledger;
 
+import com.lutfy.ticketfy.infra.csv.CsvCells;
+
 import java.math.BigDecimal;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -9,9 +11,9 @@ import java.util.UUID;
 
 public final class LedgerCsv {
 
-    static final char BOM = '﻿';
-    private static final String SEPARATOR = ";";
-    private static final String LINE_END = "\r\n";
+    static final char BOM = CsvCells.BOM;
+    private static final String SEPARATOR = CsvCells.SEPARATOR;
+    private static final String LINE_END = CsvCells.LINE_END;
     private static final DateTimeFormatter DATE_TIME = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
     private static final List<String> HEADER = List.of("Data", "Tipo", "Valor", "Evento", "Pedido", "Saque", "Lançamento");
     private static final Map<LedgerEntryType, String> TYPE_LABELS = Map.of(
@@ -41,23 +43,11 @@ public final class LedgerCsv {
     }
 
     static String text(String value) {
-        if (value == null || value.isEmpty()) return "";
-        var safe = startsWithFormulaTrigger(value) ? "'" + value : value;
-        if (safe.contains(SEPARATOR) || safe.contains("\"") || safe.contains("\n") || safe.contains("\r")) {
-            return "\"" + safe.replace("\"", "\"\"") + "\"";
-        }
-        return safe;
+        return CsvCells.text(value);
     }
 
     static String number(BigDecimal value) {
         return value.setScale(2).toPlainString().replace('.', ',');
-    }
-
-    private static boolean startsWithFormulaTrigger(String value) {
-        return switch (value.charAt(0)) {
-            case '=', '+', '-', '@', '\t', '\r' -> true;
-            default -> false;
-        };
     }
 
     private static String id(UUID value) {
