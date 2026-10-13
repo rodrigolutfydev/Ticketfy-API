@@ -519,12 +519,56 @@ Pedidos, pagamentos, extrato, saques e auditoria continuam existindo, ligados à
 | GET | `/events` | Lista eventos ativos, não cancelados e que ainda não terminaram. Filtros `q` (nome), `city`, `category` (um ou mais), `featured` (com `true`, só eventos que ainda não começaram), `soldOut`; ordem padrão `startsAt` | Público |
 | GET | `/events/categories` | Todas as categorias, com a quantidade de eventos visíveis na vitrine em cada uma | Público |
 | GET | `/events/{id}` | Detalha um evento ativo, inclusive já realizado; `salesClosed` indica se ainda é possível comprar | Público |
+| GET | `/events/{id}/calendar.ics` | Arquivo de agenda (iCalendar, RFC 5545) do evento | Público |
 | GET | `/events/mine` | Eventos ativos do usuário; ordem padrão `startsAt` | Autenticado |
 | POST | `/events` | Cria um evento | ORGANIZER ou ADMIN |
 | PUT | `/events/{id}` | Atualiza um evento; campos ausentes ficam como estão | Dono ou ADMIN |
 | POST | `/events/{id}/cancel` | Cancela o evento e reembolsa os pedidos pagos | Dono ou ADMIN |
 | DELETE | `/events/{id}` | Desativa um evento sem vendas nem reservas | Dono ou ADMIN |
 | PATCH | `/events/{id}/featured` | Liga ou desliga o destaque (`{"featured": true}`) | ADMIN |
+
+**Adicionar à agenda**
+
+```http
+GET /events/8c1d…/calendar.ics
+```
+
+```http
+HTTP/1.1 200 OK
+Content-Type: text/calendar;charset=UTF-8
+Content-Disposition: attachment; filename="ticketfy-event-8c1d….ics"
+Cache-Control: no-cache
+
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Ticketfy//Events//EN
+CALSCALE:GREGORIAN
+METHOD:PUBLISH
+BEGIN:VEVENT
+UID:event-8c1d…@ticketfy
+DTSTAMP:20261012T170000Z
+SEQUENCE:0
+LAST-MODIFIED:20261001T120000Z
+DTSTART:20261210T230000Z
+DTEND:20261211T040000Z
+SUMMARY:Festival de Verão
+LOCATION:Marina da Glória\, Av. Infante Dom Henrique\, s/n\, Rio de Janeiro - RJ
+DESCRIPTION:Três palcos e praça de alimentação\n\nhttps://ticketfy.example/
+ events/8c1d…
+STATUS:CONFIRMED
+URL:https://ticketfy.example/events/8c1d…
+END:VEVENT
+END:VCALENDAR
+```
+
+Regras do arquivo:
+
+- Linhas terminam em CRLF e são dobradas em 75 octetos (a continuação começa com um espaço). Datas em UTC.
+- Textos vindos do organizador são escapados (`\\`, `\;`, `\,` e quebras de linha como `\n`), então não criam propriedades novas.
+- `UID` é fixo por evento e `SEQUENCE` cresce a cada alteração, para o calendário atualizar o evento já adicionado.
+- Sem término, não há `DTEND`. Evento cancelado sai com `STATUS:CANCELLED` e o motivo no início da descrição.
+- `URL` e o link na descrição usam `SITE_BASE_URL`; sem ela configurada, o arquivo sai sem link.
+- Evento inexistente ou desativado responde 404 `event-not-found`.
 
 **Criar evento** (depois de `POST /users/me/organizer`)
 
@@ -894,6 +938,7 @@ O reembolso devolve o pagamento, cancela os ingressos e devolve o estoque. Ele �
   "id": "1a9c…",
   "code": "K7Q2M9X4T8B3N6PA",
   "status": "VALID",
+  "eventId": "8c1d…",
   "eventName": "Festival de Verão",
   "eventStartsAt": "2026-12-10T23:00:00Z",
   "ticketTypeName": "Pista",

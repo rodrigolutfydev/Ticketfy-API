@@ -1,5 +1,10 @@
 package com.lutfy.ticketfy.event;
 
+import java.nio.charset.StandardCharsets;
+import org.springframework.http.MediaType;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.CacheControl;
 import com.lutfy.ticketfy.user.User;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
@@ -18,12 +23,17 @@ import java.util.UUID;
 @RequestMapping("/events")
 public class EventController {
 
+    private static final MediaType TEXT_CALENDAR = new MediaType("text", "calendar", StandardCharsets.UTF_8);
+
     private final EventService service;
     private final EventCancellationService cancellationService;
+    private final EventCalendarService calendarService;
 
-    public EventController(EventService service, EventCancellationService cancellationService) {
+    public EventController(EventService service, EventCancellationService cancellationService,
+                           EventCalendarService calendarService) {
         this.service = service;
         this.cancellationService = cancellationService;
+        this.calendarService = calendarService;
     }
 
     @PostMapping
@@ -54,6 +64,17 @@ public class EventController {
     public ResponseEntity<EventDetailsDTO> findById(@PathVariable UUID id) {
         var event = service.findById(id);
         return ResponseEntity.ok(event);
+    }
+
+    @GetMapping(value = "/{id}/calendar.ics", produces = "text/calendar")
+    public ResponseEntity<String> calendar(@PathVariable UUID id) {
+        var body = calendarService.calendar(id);
+        return ResponseEntity.ok()
+                .contentType(TEXT_CALENDAR)
+                .cacheControl(CacheControl.noCache())
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
+                        .filename("ticketfy-event-" + id + ".ics").build().toString())
+                .body(body);
     }
 
     @PutMapping("/{id}")
