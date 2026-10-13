@@ -24,6 +24,7 @@ O que já está pronto na API do Ticketfy e o que vem a seguir. Os detalhes de c
 - [x] Cancelamento de evento com reembolso em lote
 - [x] Transferência de ingresso entre usuários, com código novo e limite por ingresso
 - [x] Cupons de desconto por evento e pedidos de valor zero
+- [x] Adicionar à agenda com arquivo `.ics` (RFC 5545) e link para o Google Agenda
 - [x] Limite por comprador em lotes e cupons, com consumo atômico e devolução na expiração, no cancelamento e (para lotes) no reembolso
 
 ### Organizador e financeiro
@@ -53,7 +54,6 @@ O que já está pronto na API do Ticketfy e o que vem a seguir. Os detalhes de c
 
 ## Próximos passos
 
-- [ ] Adicionar o evento à agenda com arquivo `.ics`
 - [ ] E-mails transacionais com Brevo
 - [ ] Pagamento via Pix com Asaas
 - [ ] Publicar o frontend na Cloudflare Pages

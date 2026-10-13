@@ -42,6 +42,7 @@ class OpenApiExportTest extends IntegrationTestBase {
         assertThat(document.get("info").get("title").asString()).isEqualTo("Ticketfy API");
         assertThat(document.get("paths").has("/users/me/deletion")).isTrue();
         assertThat(document.get("paths").has("/users/me/language")).isTrue();
+        assertThat(document.get("paths").has("/events/{id}/calendar.ics")).isTrue();
 
         Files.createDirectories(OUTPUT.getParent());
         Files.writeString(OUTPUT, mapper.writeValueAsString(document).replace("\r\n", "\n") + "\n", StandardCharsets.UTF_8);

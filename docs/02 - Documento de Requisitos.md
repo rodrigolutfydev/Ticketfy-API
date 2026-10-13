@@ -30,7 +30,7 @@ Os requisitos abaixo derivam das funcionalidades informadas para o Ticketfy e fo
 
 ## 1. Requisitos Funcionais
 
-São 26 requisitos funcionais. RF01 a RF18 vêm da versão original: 13 de prioridade alta e 5 de prioridade média. RF19 a RF26 registram funcionalidades implementadas depois, sem requisito na versão original.
+São 27 requisitos funcionais. RF01 a RF18 vêm da versão original: 13 de prioridade alta e 5 de prioridade média. RF19 a RF27 registram funcionalidades implementadas depois, sem requisito na versão original.
 
 ### RF01 — Cadastro de usuário
 
@@ -207,6 +207,7 @@ Apenas o UC01 — Realizar compra de ingresso está documentado. Os casos UC02 a
 | RF24 Sessões e senha | — | Não documentado | RN03 |
 | RF25 Privacidade | — | Não documentado | RN03 |
 | RF26 Idioma preferido | — | Não documentado | — |
+| RF27 Adicionar à agenda | — | Não documentado | RN09 |
 
 As 23 regras estão ligadas a pelo menos um requisito. RF23 é o único requisito sem regra de negócio própria; suas regras estão na Documentação de Arquitetura (DA13).
 
@@ -400,6 +401,14 @@ As perguntas Q01 a Q04 vêm do Documento de Visão; Q05 a Q08 surgiram nesta an�
 - A API não muda de idioma: o `detail` dos erros continua em inglês. Erros por campo trazem `code` e `params`, e alguns tipos de erro trazem `reason`, para o front montar a mensagem no idioma escolhido.
 - O idioma entra na exportação de dados (RF25).
 
+### RF27 — Adicionar à agenda
+
+**Descrição:** O sistema deve permitir que qualquer pessoa baixe o arquivo de agenda (`.ics`) de um evento e, no front, adicione o evento ao Google Agenda. **Atores:** Visitante, Cliente. **Prioridade:** Baixa. **Situação:** Implementado (`GET /events/{id}/calendar.ics` e botão "Adicionar à agenda" na página do evento e em cada ingresso). **Critérios de aceite:**
+
+- O arquivo segue o RFC 5545, com datas em UTC, e textos do organizador não criam propriedades novas.
+- Baixar de novo o mesmo evento atualiza o evento já adicionado, em vez de duplicá-lo, nos aplicativos que respeitam `UID` e `SEQUENCE`.
+- Evento cancelado sai como cancelado; evento inexistente ou desativado responde 404.
+
 ### Planejado
 
-Funcionalidades do [roadmap](ROADMAP.md) ainda não implementadas, sem requisito detalhado: adicionar o evento à agenda com arquivo `.ics`, e-mails transacionais com Brevo, pagamento via Pix com Asaas, publicação do frontend na Cloudflare Pages, login com Google, monitoramento de erros com Sentry, upload de foto de perfil e de capa de evento e teste de carga com k6.
+Funcionalidades do [roadmap](ROADMAP.md) ainda não implementadas, sem requisito detalhado: e-mails transacionais com Brevo, pagamento via Pix com Asaas, publicação do frontend na Cloudflare Pages, login com Google, monitoramento de erros com Sentry, upload de foto de perfil e de capa de evento e teste de carga com k6.

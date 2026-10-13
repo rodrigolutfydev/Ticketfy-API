@@ -56,6 +56,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/users").permitAll()
                         .requestMatchers(HttpMethod.GET, "/events/mine").authenticated()
                         .requestMatchers(HttpMethod.GET, "/events", "/events/*").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/events/*/calendar.ics").permitAll()
                         .requestMatchers(HttpMethod.GET, "/events/*/ticket-types").permitAll()
                         .requestMatchers(HttpMethod.POST, "/auth/login", "/auth/refresh", "/auth/logout").permitAll()
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
