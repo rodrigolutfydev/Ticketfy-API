@@ -1,6 +1,7 @@
 package com.lutfy.ticketfy.infra.config;
 
 import com.lutfy.ticketfy.IntegrationTestBase;
+import com.lutfy.ticketfy.event.EventCategory;
 import com.lutfy.ticketfy.infra.exception.ProblemType;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,6 +26,7 @@ class OpenApiExportTest extends IntegrationTestBase {
 
     private static final Path OUTPUT = Path.of("docs", "openapi.json");
     private static final Path PROBLEM_TYPES = Path.of("docs", "problem-types.json");
+    private static final Path EVENT_CATEGORIES = Path.of("docs", "event-categories.json");
 
     @Autowired
     private MockMvc mockMvc;
@@ -42,6 +44,17 @@ class OpenApiExportTest extends IntegrationTestBase {
 
         Files.createDirectories(OUTPUT.getParent());
         Files.writeString(OUTPUT, mapper.writeValueAsString(document).replace("\r\n", "\n") + "\n", StandardCharsets.UTF_8);
+    }
+
+    @Test
+    void exportsTheEventCategories() throws Exception {
+        var categories = Arrays.stream(EventCategory.values()).map(Enum::name).toList();
+        assertThat(categories).contains("OTHER").doesNotHaveDuplicates();
+
+        var mapper = JsonMapper.builder().enable(SerializationFeature.INDENT_OUTPUT).build();
+        Files.createDirectories(EVENT_CATEGORIES.getParent());
+        Files.writeString(EVENT_CATEGORIES, mapper.writeValueAsString(categories).replace("\r\n", "\n") + "\n",
+                StandardCharsets.UTF_8);
     }
 
     @Test

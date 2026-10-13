@@ -444,6 +444,17 @@
           }
         }, {
           "in" : "query",
+          "name" : "category",
+          "required" : false,
+          "schema" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string",
+              "enum" : [ "MUSIC", "THEATER", "COMEDY", "PARTIES", "SPORTS", "COURSES", "TALKS", "ARTS", "FOOD", "KIDS", "OTHER" ]
+            }
+          }
+        }, {
+          "in" : "query",
           "name" : "featured",
           "required" : false,
           "schema" : {
@@ -496,6 +507,27 @@
               "*/*" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/EventDetailsDTO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "event-controller" ]
+      }
+    },
+    "/events/categories" : {
+      "get" : {
+        "operationId" : "categories",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/EventCategoryCountDTO"
+                  }
                 }
               }
             },
@@ -2501,6 +2533,19 @@
           }
         }
       },
+      "EventCategoryCountDTO" : {
+        "type" : "object",
+        "properties" : {
+          "category" : {
+            "type" : "string",
+            "enum" : [ "MUSIC", "THEATER", "COMEDY", "PARTIES", "SPORTS", "COURSES", "TALKS", "ARTS", "FOOD", "KIDS", "OTHER" ]
+          },
+          "events" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
+      },
       "EventCreationDTO" : {
         "type" : "object",
         "properties" : {
@@ -2508,6 +2553,10 @@
             "type" : "string",
             "maxLength" : 255,
             "minLength" : 0
+          },
+          "category" : {
+            "type" : "string",
+            "enum" : [ "MUSIC", "THEATER", "COMEDY", "PARTIES", "SPORTS", "COURSES", "TALKS", "ARTS", "FOOD", "KIDS", "OTHER" ]
           },
           "city" : {
             "type" : "string",
@@ -2547,7 +2596,7 @@
             "minLength" : 0
           }
         },
-        "required" : [ "address", "city", "name", "startsAt", "state", "venueName" ]
+        "required" : [ "address", "category", "city", "name", "startsAt", "state", "venueName" ]
       },
       "EventDashboardDTO" : {
         "type" : "object",
@@ -2614,6 +2663,10 @@
           "cancelledAt" : {
             "type" : "string",
             "format" : "date-time"
+          },
+          "category" : {
+            "type" : "string",
+            "enum" : [ "MUSIC", "THEATER", "COMEDY", "PARTIES", "SPORTS", "COURSES", "TALKS", "ARTS", "FOOD", "KIDS", "OTHER" ]
           },
           "city" : {
             "type" : "string"
@@ -2856,6 +2909,10 @@
             "type" : "string",
             "format" : "date-time"
           },
+          "category" : {
+            "type" : "string",
+            "enum" : [ "MUSIC", "THEATER", "COMEDY", "PARTIES", "SPORTS", "COURSES", "TALKS", "ARTS", "FOOD", "KIDS", "OTHER" ]
+          },
           "city" : {
             "type" : "string"
           },
@@ -2894,6 +2951,10 @@
             "type" : "string",
             "maxLength" : 255,
             "minLength" : 0
+          },
+          "category" : {
+            "type" : "string",
+            "enum" : [ "MUSIC", "THEATER", "COMEDY", "PARTIES", "SPORTS", "COURSES", "TALKS", "ARTS", "FOOD", "KIDS", "OTHER" ]
           },
           "city" : {
             "type" : "string",

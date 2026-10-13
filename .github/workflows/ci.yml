@@ -38,7 +38,7 @@ jobs:
 
       - name: Conferir se os arquivos gerados em docs/ estão atualizados
         run: |
-          generated="docs/openapi.json docs/problem-types.json"
+          generated="docs/openapi.json docs/problem-types.json docs/event-categories.json"
           if [ -n "$(git status --porcelain -- $generated)" ]; then
             for file in $generated; do
               if [ -n "$(git status --porcelain -- "$file")" ]; then

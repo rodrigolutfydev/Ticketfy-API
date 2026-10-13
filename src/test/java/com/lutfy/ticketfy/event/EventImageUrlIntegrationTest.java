@@ -127,7 +127,7 @@ class EventImageUrlIntegrationTest extends IntegrationTestBase {
         var startsAt = Instant.now().plus(Duration.ofDays(30));
         var body = """
                 {"name":"Show", %s "venueName":"Arena", "address":"Rua A, 100", "city":"Rio de Janeiro",
-                 "state":"RJ", "startsAt":"%s"}
+                 "state":"RJ", "startsAt":"%s", "category":"MUSIC"}
                 """.formatted(imageField, startsAt);
         return mockMvc.perform(post("/events")
                 .header("Authorization", token)

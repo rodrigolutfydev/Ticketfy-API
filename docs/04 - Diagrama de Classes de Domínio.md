@@ -10,7 +10,7 @@ Esta versão foi revisada contra o código, que é a fonte de verdade. Todas as 
 | --- | --- | --- |
 | Entidade | Classe `@Entity` mapeada para uma tabela. | `User`, `Event`, `TicketType`, `Order`, `OrderItem`, `Payment`, `Ticket`, `TicketTransfer`, `Coupon`, `AuthSession`, `RefreshToken`, `LedgerEntry`, `PayoutAccount`, `Payout`, `PayoutBlock` |
 | Tabela sem entidade | Tabela gravada e lida por JDBC, sem classe JPA. | `audit_log` |
-| Enum | Conjunto fechado de valores, gravado como texto e protegido por CHECK no banco. | `Role`, `OrderStatus`, `PaymentMethod`, `PaymentStatus`, `TicketStatus`, `DiscountType`, `RevocationReason`, `LedgerEntryType`, `PayoutStatus`, `DocumentType`, `PixKeyType`, `AuditAction`, `AuditActorType`, `AuditTargetType` |
+| Enum | Conjunto fechado de valores, gravado como texto e protegido por CHECK no banco. | `Role`, `EventCategory`, `OrderStatus`, `PaymentMethod`, `PaymentStatus`, `TicketStatus`, `DiscountType`, `RevocationReason`, `LedgerEntryType`, `PayoutStatus`, `DocumentType`, `PixKeyType`, `AuditAction`, `AuditActorType`, `AuditTargetType` |
 
 **Convenções**
 
@@ -87,13 +87,14 @@ As setas tracejadas são dependências: cada camada usa a seguinte, mas não gua
 
 ## 1 e 2. Classes e responsabilidades
 
-O domínio tem 15 entidades, 1 tabela sem entidade e 14 enums, organizados em quatro blocos: catálogo, vendas, financeiro do organizador e segurança e auditoria. "Organizador", "Participante", "Local" e "Validação" não viraram classes próprias; a justificativa está logo abaixo da tabela.
+O domínio tem 15 entidades, 1 tabela sem entidade e 15 enums, organizados em quatro blocos: catálogo, vendas, financeiro do organizador e segurança e auditoria. "Organizador", "Participante", "Local" e "Validação" não viraram classes próprias; a justificativa está logo abaixo da tabela.
 
 | Classe | Tipo | Pacote | Responsabilidade |
 | --- | --- | --- | --- |
 | `User` | Entidade | `user` | Representar qualquer pessoa com conta: cliente, organizador ou administrador. Guarda credenciais, perfil, foto e a data de exclusão da conta, e faz a promoção a organizador e a anonimização. |
 | `Role` | Enum | `user` | Definir o perfil de acesso do usuário. |
-| `Event` | Entidade | `event` | Representar um evento, seu local, seu período, seu organizador, o destaque na vitrine e o cancelamento (RF06, RF07). |
+| `Event` | Entidade | `event` | Representar um evento, seu local, seu período, sua categoria, seu organizador, o destaque na vitrine e o cancelamento (RF06, RF07). |
+| `EventCategory` | Enum | `event` | Classificar o evento numa lista fixa de categorias, usada no filtro da vitrine (RF06, RF08). |
 | `TicketType` | Entidade | `tickettype` | Representar um lote de ingressos de um evento, com preço, estoque e limite por pedido (RF09, RF10, RN10 a RN13). |
 | `Coupon` | Entidade | `coupon` | Representar um cupom de desconto de um evento, com tipo, valor, validade e controle de usos (RF19). |
 | `DiscountType` | Enum | `coupon` | Indicar se o desconto é percentual ou de valor fixo. |
@@ -151,6 +152,7 @@ Os atributos abaixo são os do código. Os relacionamentos aparecem como atribut
 | `Event` | `active` | `boolean` | Falso depois da exclusão lógica. |
 | `Event` | `featured` | `boolean` | Destaque na vitrine, definido pelo administrador. |
 | `Event` | `cancelledAt`, `cancellationReason` | `Instant`, `String` | RF07 |
+| `Event` | `category` | `EventCategory` | RF06, RF08; obrigatória na API e `OTHER` como padrão no banco |
 | `Event` | `createdAt`, `updatedAt` | `Instant` | |
 | `TicketType` | `id`, `name`, `description` | `UUID`, `String`, `String` | Nome único no evento (RN10). |
 | `TicketType` | `price` | `BigDecimal` | RN10 |
@@ -229,6 +231,7 @@ Os atributos abaixo são os do código. Os relacionamentos aparecem como atribut
 | `PaymentMethod` | `SIMULATED`, `PIX`, `CREDIT_CARD` (só `SIMULATED` é usado hoje) |
 | `PaymentStatus` | `PENDING`, `APPROVED`, `REJECTED`, `REFUNDED` |
 | `TicketStatus` | `VALID`, `USED`, `CANCELLED` |
+| `EventCategory` | `MUSIC`, `THEATER`, `COMEDY`, `PARTIES`, `SPORTS`, `COURSES`, `TALKS`, `ARTS`, `FOOD`, `KIDS`, `OTHER` |
 | `DiscountType` | `PERCENT`, `FIXED` |
 | `RevocationReason` | `LOGOUT`, `LOGOUT_ALL`, `PASSWORD_CHANGED`, `REUSE_DETECTED`, `ACCOUNT_DELETED` |
 | `LedgerEntryType` | `SALE_CREDIT`, `REFUND_DEBIT`, `PAYOUT_DEBIT`, `PAYOUT_REVERSAL` |
@@ -239,7 +242,7 @@ Os atributos abaixo são os do código. Os relacionamentos aparecem como atribut
 | `AuditTargetType` | `PAYOUT_ACCOUNT`, `PAYOUT`, `ORGANIZER`, `EVENT`, `TICKET_TYPE`, `USER`, `TICKET`, `COUPON` |
 | `AuditAction` | 24 ações: dados de recebimento, ciclo do saque, bloqueio de saques, destaque e cancelamento de evento, preço de lote, troca de senha, reuso de refresh token, transferência de ingresso, ciclo do cupom, exportação de dados e exclusão de conta. |
 
-O evento não tem enum de status: sua situação vem de `active`, `cancelledAt` e das datas.
+O evento não tem enum de status: sua situação vem de `active`, `cancelledAt` e das datas. A categoria (`EventCategory`) é uma lista fixa no código, protegida por CHECK no banco; os nomes exibidos ficam no front, traduzidos pelo código.
 
 ### Métodos de domínio
 
@@ -369,6 +372,19 @@ package "user" {
 }
 
 package "event" {
+  enum EventCategory <<enumeration>> {
+    MUSIC
+    THEATER
+    COMEDY
+    PARTIES
+    SPORTS
+    COURSES
+    TALKS
+    ARTS
+    FOOD
+    KIDS
+    OTHER
+  }
   class Event <<Entity>> {
     - id: UUID
     - name: String
@@ -383,6 +399,7 @@ package "event" {
     - organizer: User
     - active: boolean
     - featured: boolean
+    - category: EventCategory
     - cancelledAt: Instant
     - cancellationReason: String
     + deactivate(): void
@@ -651,6 +668,7 @@ User "0..1" .. "0..*" audit_log : actor_id
 
 ' Uso dos enums
 User ..> Role
+Event ..> EventCategory
 Coupon ..> DiscountType
 Order ..> OrderStatus
 Payment ..> PaymentMethod

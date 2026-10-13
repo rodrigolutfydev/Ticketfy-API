@@ -20,13 +20,15 @@ public record EventDetailsDTO(
         boolean featured,
         Instant cancelledAt,
         String cancellationReason,
-        boolean salesClosed
+        boolean salesClosed,
+        EventCategory category
 ) {
     public EventDetailsDTO(Event event, Instant now) {
         this(event.getId(), event.getName(), event.getDescription(), event.getImageUrl(), event.getVenueName(),
                 event.getAddress(), event.getCity(), event.getState(), event.getStartsAt(),
                 event.getEndsAt(), event.getOrganizer().getName(), event.getOrganizer().getId(), event.getCreatedAt(),
                 event.isFeatured(), event.getCancelledAt(), event.getCancellationReason(),
-                event.isCancelled() || !event.getStartsAt().isAfter(now) || event.getOrganizer().isSuspended());
+                event.isCancelled() || !event.getStartsAt().isAfter(now) || event.getOrganizer().isSuspended(),
+                event.getCategory());
     }
 }

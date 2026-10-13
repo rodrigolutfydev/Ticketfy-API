@@ -11,6 +11,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -25,6 +26,23 @@ public interface EventRepository extends JpaRepository<Event, UUID>, JpaSpecific
     boolean existsByIdAndStartsAtLessThanEqual(UUID id, Instant now);
 
     boolean existsByIdAndOrganizerSuspendedAtIsNotNull(UUID id);
+
+    @Query("""
+        SELECT e.category AS category, COUNT(e) AS events
+          FROM Event e
+         WHERE e.active = true
+           AND e.cancelledAt IS NULL
+           AND COALESCE(e.endsAt, e.startsAt) > :now
+           AND e.organizer.suspendedAt IS NULL
+         GROUP BY e.category
+        """)
+    List<CategoryCount> countVisibleByCategory(@Param("now") Instant now);
+
+    interface CategoryCount {
+        EventCategory getCategory();
+
+        long getEvents();
+    }
 
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("""

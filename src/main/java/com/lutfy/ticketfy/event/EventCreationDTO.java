@@ -26,7 +26,10 @@ public record EventCreationDTO(
         @NotNull @Future
         Instant startsAt,
         @Future
-        Instant endsAt
+        Instant endsAt,
+
+        @NotNull
+        EventCategory category
 ) {
     public EventCreationDTO {
         if (imageUrl != null && imageUrl.isBlank()) imageUrl = null;
