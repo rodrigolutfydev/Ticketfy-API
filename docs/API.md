@@ -9,6 +9,7 @@ O contrato gerado a partir do código fica em [`openapi.json`](openapi.json). O 
 - [Visão geral](#visão-geral)
 - [Autenticação](#autenticação)
 - [Erros](#erros)
+- [Formato dos CSVs](#formato-dos-csvs)
 - [Paginação e ordenação](#paginação-e-ordenação)
 - [Idempotência](#idempotência)
 - [Limites de tentativas](#limites-de-tentativas)
@@ -316,6 +317,23 @@ Os tipos abaixo trazem `reason`, com um dos valores da tabela. A lista também e
 | `too-many-coupon-attempts` | 429 | Limite de cupons inválidos |
 | `too-many-data-exports` | 429 | Limite de exportações de dados |
 | `internal-error` | 500 | Erro inesperado; `detail` é sempre `"Internal server error"` e traz `requestId` |
+
+## Formato dos CSVs
+
+O extrato (`/organizer/ledger.csv`) e a lista de participantes (`/events/{eventId}/participants.csv`) saem no idioma salvo na conta de quem pede (`language`). Os dois idiomas usam UTF-8 com BOM, linhas em CRLF, datas no fuso do painel (`DASHBOARD_TIME_ZONE`) e a mesma proteção contra fórmulas.
+
+| | `pt-BR` | `en` |
+|---|---|---|
+| Separador | `;` | `,` |
+| Valores | `1234,50` | `1234.50` (sem separador de milhar) |
+| Data e hora | `dd/MM/yyyy HH:mm:ss` | `yyyy-MM-dd HH:mm:ss` |
+| Extrato: cabeçalho | `Data;Tipo;Valor;Evento;Pedido;Saque;Lançamento` | `Date,Type,Amount,Event,Order,Withdrawal,Entry` |
+| Extrato: tipos | Venda, Reembolso, Saque, Estorno de saque | Sale, Refund, Withdrawal, Withdrawal reversal |
+| Participantes: cabeçalho | `Participante;Lote;Situação;Check-in;Transferido;Final do código` | `Attendee,Batch,Status,Check-in,Transferred,Code ending` |
+| Participantes: situação | Válido, Utilizado, Cancelado; Sim/Não | Valid, Used, Cancelled; Yes/No |
+| Nome do arquivo | `extrato-ticketfy-<data>.csv`, `participantes-ticketfy-<data>.csv` | `ticketfy-statement-<data>.csv`, `ticketfy-attendees-<data>.csv` |
+
+Texto que contém o separador, aspas ou quebra de linha vai entre aspas. Os termos em inglês são os mesmos do site.
 
 ## Paginação e ordenação
 
@@ -1010,7 +1028,7 @@ Regras da lista:
 - Qualquer pessoa que não seja o dono do evento ou um ADMIN recebe 404 `event-not-found`.
 - Só aparecem o nome do dono atual e os 4 últimos caracteres do código; o código inteiro, que é o próprio ingresso, nunca sai da API. E-mail e dados do comprador ficam de fora. Contas excluídas aparecem como `Usuário excluído`.
 - A ordem é fixa, por nome e id do ingresso. A busca por nome não diferencia maiúsculas e trata `%` e `_` como texto.
-- O CSV usa `;`, tem BOM UTF-8, protege contra fórmulas (células iniciadas por `=`, `+`, `-`, `@`, tabulação ou quebra de linha ganham um `'`) e é registrado na auditoria (`PARTICIPANTS_EXPORTED`, com a quantidade de linhas).
+- O CSV sai no idioma salvo na conta de quem pede (ver [Formato dos CSVs](#formato-dos-csvs)), protege contra fórmulas (células iniciadas por `=`, `+`, `-`, `@`, tabulação ou quebra de linha ganham um `'`) e é registrado na auditoria (`PARTICIPANTS_EXPORTED`, com a quantidade de linhas).
 - Não há check-in a partir da lista: o check-in exige o código inteiro (`POST /tickets/{code}/check-in`).
 
 ### Painel do organizador
@@ -1057,7 +1075,7 @@ O saldo é derivado de um extrato imutável. Cada venda paga credita o valor lí
 |---|---|---|---|
 | GET | `/organizer/balance` | Saldo a liberar, disponível, em saque, retido e total | ORGANIZER |
 | GET | `/organizer/ledger` | Extrato paginado; filtros `eventId`, `from`, `to` (`AAAA-MM-DD`) | ORGANIZER |
-| GET | `/organizer/ledger.csv` | Extrato em CSV (UTF-8 com BOM, `;`, decimais com vírgula), com os mesmos filtros | ORGANIZER |
+| GET | `/organizer/ledger.csv` | Extrato em CSV no idioma da conta (ver [Formato dos CSVs](#formato-dos-csvs)), com os mesmos filtros | ORGANIZER |
 | GET | `/organizer/payout-account` | Dados de recebimento, com documento e chave Pix mascarados | ORGANIZER |
 | PUT | `/organizer/payout-account` | Cadastra ou troca os dados de recebimento (pede senha) | ORGANIZER |
 | POST | `/organizer/payouts` | Pede um saque do saldo disponível (pede senha; aceita `Idempotency-Key`) | ORGANIZER |

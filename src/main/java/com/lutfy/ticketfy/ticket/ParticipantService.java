@@ -61,7 +61,7 @@ public class ParticipantService {
         if (filter.status() != null) details.put("status", filter.status().name());
         if (filter.name() != null) details.put("nameFilter", true);
         auditService.record(AuditAction.PARTICIPANTS_EXPORTED, AuditTargetType.EVENT, eventId, details);
-        return ParticipantCsv.write(participants, zone);
+        return ParticipantCsv.write(participants, zone, requester.getLanguage());
     }
 
     public LocalDate today() {

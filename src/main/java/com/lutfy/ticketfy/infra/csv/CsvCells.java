@@ -3,16 +3,15 @@ package com.lutfy.ticketfy.infra.csv;
 public final class CsvCells {
 
     public static final char BOM = '﻿';
-    public static final String SEPARATOR = ";";
     public static final String LINE_END = "\r\n";
 
     private CsvCells() {
     }
 
-    public static String text(String value) {
+    public static String text(String value, String separator) {
         if (value == null || value.isEmpty()) return "";
         var safe = startsWithFormulaTrigger(value) ? "'" + value : value;
-        if (safe.contains(SEPARATOR) || safe.contains("\"") || safe.contains("\n") || safe.contains("\r")) {
+        if (safe.contains(separator) || safe.contains("\"") || safe.contains("\n") || safe.contains("\r")) {
             return "\"" + safe.replace("\"", "\"\"") + "\"";
         }
         return safe;
