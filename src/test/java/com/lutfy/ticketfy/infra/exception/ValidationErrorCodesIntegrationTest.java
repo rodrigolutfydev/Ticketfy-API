@@ -128,10 +128,11 @@ class ValidationErrorCodesIntegrationTest extends IntegrationTestBase {
     @Test
     void wrongDeletionConfirmationUsesConfirmation() throws Exception {
         var errors = errors(HttpMethod.POST, "/users/me/deletion", userToken,
-                "{\"password\":\"secret\",\"confirmation\":\"DELETE\"}");
+                "{\"password\":\"secret\",\"confirmation\":\"APAGAR\"}");
 
         var confirmation = assertCode(errors, "confirmation", "confirmation");
-        assertThat(confirmation.get("params").get("expected").asString()).isEqualTo("EXCLUIR");
+        assertThat(confirmation.get("params").get("allowed").valueStream().map(JsonNode::asString).toList())
+                .containsExactly("EXCLUIR", "DELETE");
     }
 
     @Test

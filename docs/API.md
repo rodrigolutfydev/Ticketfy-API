@@ -191,7 +191,7 @@ Content-Type: application/problem+json
 | `url` | URL inválida | `protocol` (por exemplo `https`) |
 | `one-of` | Valor fora da lista aceita | `allowed` (lista) |
 | `coupon-code` | Código de cupom fora do formato (letras, dígitos, `-` e `_`) | `min`, `max` |
-| `confirmation` | Texto de confirmação diferente do esperado | `expected` |
+| `confirmation` | Texto de confirmação diferente dos aceitos | `allowed` (lista) |
 | `invalid-document` | CPF ou CNPJ inválido | `documentType` |
 | `invalid-pix-key` | Chave Pix inválida para o tipo | `pixKeyType` |
 | `invalid` | Qualquer outra regra | — |
@@ -501,7 +501,7 @@ Responde 204 e apaga o cookie. Numa única transação, a exclusão:
 
 Pedidos, pagamentos, extrato, saques e auditoria continuam existindo, ligados à conta anonimizada, e o e-mail original pode ser usado num novo cadastro.
 
-Sem `confirmation: "EXCLUIR"`, a resposta é 400 `validation-failed`. Conta suspensa responde 403 `account-suspended`. A exclusão é recusada com 409 nos casos abaixo, verificados nesta ordem:
+`confirmation` aceita `"EXCLUIR"` ou `"DELETE"`, exatamente assim, para o cliente pedir a palavra no idioma do usuário. Outro valor, ou a falta dele, responde 400 `validation-failed`, com `code` `confirmation` e `params.allowed`. Conta suspensa responde 403 `account-suspended`. A exclusão é recusada com 409 nos casos abaixo, verificados nesta ordem:
 
 | Tipo | Motivo |
 |---|---|

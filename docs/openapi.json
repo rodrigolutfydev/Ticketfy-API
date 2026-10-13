@@ -2004,7 +2004,8 @@
         "type" : "object",
         "properties" : {
           "confirmation" : {
-            "type" : "string"
+            "type" : "string",
+            "enum" : [ "EXCLUIR", "DELETE" ]
           },
           "password" : {
             "type" : "string",
