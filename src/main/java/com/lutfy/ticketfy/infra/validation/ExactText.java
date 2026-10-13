@@ -13,7 +13,7 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 @Constraint(validatedBy = ExactTextValidator.class)
 public @interface ExactText {
-    String value();
+    String[] value();
 
     String message() default "must match the expected text";
 

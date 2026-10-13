@@ -33,12 +33,27 @@ class AccountDeletionIntegrationTest extends PrivacyTestBase {
     void requiresTypedConfirmation() throws Exception {
         var user = person("USER", "Ana");
 
-        deleteAccount(user, PASSWORD, "excluir")
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.type").value(endsWith("/validation-failed")))
-                .andExpect(jsonPath("$.errors[0].field").value("confirmation"));
+        for (var confirmation : new String[]{"excluir", "delete", "Delete", "EXCLUIR ", "APAGAR"}) {
+            deleteAccount(user, PASSWORD, confirmation)
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.type").value(endsWith("/validation-failed")))
+                    .andExpect(jsonPath("$.errors[0].field").value("confirmation"))
+                    .andExpect(jsonPath("$.errors[0].code").value("confirmation"))
+                    .andExpect(jsonPath("$.errors[0].params.allowed[0]").value("EXCLUIR"))
+                    .andExpect(jsonPath("$.errors[0].params.allowed[1]").value("DELETE"));
+        }
 
         assertNotDeleted(user);
+    }
+
+    @Test
+    void acceptsTheEnglishConfirmation() throws Exception {
+        var user = person("USER", "Anne");
+
+        deleteAccount(user, PASSWORD, "DELETE").andExpect(status().isNoContent());
+
+        assertThat(jdbc.queryForObject("SELECT deleted_at FROM users WHERE id = ?", java.sql.Timestamp.class, user.getId()))
+                .isNotNull();
     }
 
     @Test
