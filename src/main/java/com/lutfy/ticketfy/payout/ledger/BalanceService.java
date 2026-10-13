@@ -50,7 +50,8 @@ public class BalanceService {
     @Transactional(readOnly = true)
     public String exportLedger(User organizer, UUID eventId, LocalDate from, LocalDate to) {
         checkRange(from, to);
-        return LedgerCsv.write(queries.findAllEntries(organizer.getId(), eventId, start(from), until(to)), zone);
+        return LedgerCsv.write(queries.findAllEntries(organizer.getId(), eventId, start(from), until(to)), zone,
+                organizer.getLanguage());
     }
 
     public LocalDate today() {

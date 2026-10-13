@@ -161,6 +161,23 @@ class ParticipantIntegrationTest extends PayoutTestBase {
     }
 
     @Test
+    void exportsCsvInTheLanguageOfTheAccount() throws Exception {
+        jdbc.update("UPDATE users SET language = 'en' WHERE id = ?", organizer.getId());
+
+        var response = mockMvc.perform(get("/events/{id}/participants.csv", eventId)
+                        .param("status", "VALID")
+                        .header("Authorization", bearer(organizer)))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Disposition", org.hamcrest.Matchers.startsWith("attachment; filename=\"ticketfy-attendees-")))
+                .andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
+
+        var lines = response.substring(1).split("\r\n");
+        assertThat(lines[0]).isEqualTo("Attendee,Batch,Status,Check-in,Transferred,Code ending");
+        assertThat(lines[1]).startsWith("'=Carla Dias,").contains(",Valid,,Yes,");
+        assertThat(lines[2]).startsWith("Ana Lima,").contains(",No,");
+    }
+
+    @Test
     void deletedAccountsAppearAnonymized() throws Exception {
         var pastStart = clock.instant().plus(Duration.ofDays(1));
         var pastEvent = insertEvent(organizer.getId(), pastStart, pastStart.plus(Duration.ofHours(2)));

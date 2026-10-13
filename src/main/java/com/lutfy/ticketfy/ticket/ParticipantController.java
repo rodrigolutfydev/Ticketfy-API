@@ -45,7 +45,7 @@ public class ParticipantController {
                                             @RequestParam(required = false) String q,
                                             @AuthenticationPrincipal User requester) {
         var csv = service.exportCsv(eventId, ticketTypeId, status, q, requester);
-        var filename = "participantes-ticketfy-" + service.today() + ".csv";
+        var filename = ParticipantCsv.filename(service.today().toString(), requester.getLanguage());
         return ResponseEntity.ok()
                 .contentType(new MediaType("text", "csv", StandardCharsets.UTF_8))
                 .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment().filename(filename).build().toString())

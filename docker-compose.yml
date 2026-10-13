@@ -21,10 +21,13 @@ services:
     ports:
       - "8080:8080"
     environment:
+      SPRING_PROFILES_ACTIVE: dev
       DB_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-ticketfy}
       DB_USERNAME: ${DB_USERNAME:-ticketfy_user}
       DB_PASSWORD: ${DB_PASSWORD}
       JWT_SECRET: ${JWT_SECRET}
+      SITE_BASE_URL: ${SITE_BASE_URL:-http://localhost:5173}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173}
     depends_on:
       postgres:
         condition: service_healthy

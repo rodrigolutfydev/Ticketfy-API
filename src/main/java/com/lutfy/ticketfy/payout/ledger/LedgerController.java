@@ -53,7 +53,7 @@ public class LedgerController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @AuthenticationPrincipal User organizer) {
         var csv = service.exportLedger(organizer, eventId, from, to);
-        var filename = "extrato-ticketfy-" + service.today() + ".csv";
+        var filename = LedgerCsv.filename(service.today().toString(), organizer.getLanguage());
         return ResponseEntity.ok()
                 .contentType(new MediaType("text", "csv", StandardCharsets.UTF_8))
                 .header(HttpHeaders.CONTENT_DISPOSITION,

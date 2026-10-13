@@ -65,6 +65,24 @@ class LedgerCsvIntegrationTest extends PayoutTestBase {
     }
 
     @Test
+    void exportsInEnglishForAccountsInEnglish() throws Exception {
+        var event = event("Rock, Pop & Jazz");
+        paidOrder(event, "100.00");
+        jdbc.update("UPDATE users SET language = 'en' WHERE id = ?", organizer.getId());
+
+        var response = mockMvc.perform(get("/organizer/ledger.csv").header("Authorization", bearer(organizer)))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"ticketfy-statement-" + LocalDate.now(ZoneId.of("America/Sao_Paulo")) + ".csv\""))
+                .andReturn().getResponse();
+        var lines = new String(response.getContentAsByteArray(), StandardCharsets.UTF_8).substring(1).split("\r\n");
+
+        assertThat(lines[0]).isEqualTo("Date,Type,Amount,Event,Order,Withdrawal,Entry");
+        assertThat(lines).hasSize(2);
+        assertThat(lines[1]).matches("\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2},Sale,95\\.00,\"Rock, Pop & Jazz\",.*");
+    }
+
+    @Test
     void exportAppliesTheLedgerFilters() throws Exception {
         var first = event("Primeiro");
         var second = event("Segundo");

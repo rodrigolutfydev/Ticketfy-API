@@ -89,6 +89,16 @@ Pré-requisitos: Java 17 ou mais recente e Docker.
 
    A API sobe em `http://localhost:8080`, o Flyway cria as tabelas e o Swagger fica em `/swagger-ui/index.html`.
 
+   Para rodar a API também em contêiner, sem Java instalado, use o perfil `app` do Compose (lê o mesmo `.env`):
+
+   ```bash
+   docker compose --profile app up -d --build
+   curl http://localhost:8080/actuator/health
+   docker compose --profile app down
+   ```
+
+   Nesse modo a API roda no perfil `dev`, com a chave de desenvolvimento dos dados de recebimento e o cookie de sessão sem `Secure`, então não precisa de nenhum segredo de produção. A imagem continua com `prod` como padrão, que é o usado no deploy. `SITE_BASE_URL` e `CORS_ALLOWED_ORIGINS` podem ser trocadas no `.env`.
+
 3. Rode os testes (o Docker precisa estar rodando, porque os testes sobem um PostgreSQL descartável):
 
    ```bash
