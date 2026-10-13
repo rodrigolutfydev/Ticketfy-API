@@ -10,6 +10,7 @@ import org.hibernate.query.criteria.HibernateCriteriaBuilder;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.time.Instant;
+import java.util.Collection;
 
 final class EventSpecifications {
 
@@ -46,6 +47,10 @@ final class EventSpecifications {
 
     static Specification<Event> organizerNotSuspended() {
         return (root, query, cb) -> cb.isNull(root.get("organizer").get("suspendedAt"));
+    }
+
+    static Specification<Event> categoryIn(Collection<EventCategory> categories) {
+        return (root, query, cb) -> root.get("category").in(categories);
     }
 
     static Specification<Event> isFeatured(boolean featured) {

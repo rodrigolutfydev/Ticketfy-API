@@ -441,7 +441,8 @@ Sem `confirmation: "EXCLUIR"`, a resposta é 400 `validation-failed`. Conta susp
 
 | Método | Endpoint | Descrição | Acesso |
 |---|---|---|---|
-| GET | `/events` | Lista eventos ativos, não cancelados e que ainda não terminaram. Filtros `q` (nome), `city`, `featured` (com `true`, só eventos que ainda não começaram), `soldOut`; ordem padrão `startsAt` | Público |
+| GET | `/events` | Lista eventos ativos, não cancelados e que ainda não terminaram. Filtros `q` (nome), `city`, `category` (um ou mais), `featured` (com `true`, só eventos que ainda não começaram), `soldOut`; ordem padrão `startsAt` | Público |
+| GET | `/events/categories` | Todas as categorias, com a quantidade de eventos visíveis na vitrine em cada uma | Público |
 | GET | `/events/{id}` | Detalha um evento ativo, inclusive já realizado; `salesClosed` indica se ainda é possível comprar | Público |
 | GET | `/events/mine` | Eventos ativos do usuário; ordem padrão `startsAt` | Autenticado |
 | POST | `/events` | Cria um evento | ORGANIZER ou ADMIN |
@@ -466,7 +467,8 @@ Content-Type: application/json
   "city": "Rio de Janeiro",
   "state": "RJ",
   "startsAt": "2026-12-10T23:00:00Z",
-  "endsAt": "2026-12-11T04:00:00Z"
+  "endsAt": "2026-12-11T04:00:00Z",
+  "category": "MUSIC"
 }
 ```
 
@@ -490,7 +492,8 @@ HTTP/1.1 201 Created
   "featured": false,
   "cancelledAt": null,
   "cancellationReason": null,
-  "salesClosed": false
+  "salesClosed": false,
+  "category": "MUSIC"
 }
 ```
 
@@ -520,7 +523,8 @@ GET /events?q=festival&city=Rio%20de%20Janeiro&page=0&size=12
       "featured": false,
       "minPrice": 80.00,
       "soldOut": false,
-      "cancelledAt": null
+      "cancelledAt": null,
+      "category": "MUSIC"
     }
   ],
   "page": { "size": 12, "number": 0, "totalElements": 1, "totalPages": 1 }
@@ -528,6 +532,21 @@ GET /events?q=festival&city=Rio%20de%20Janeiro&page=0&size=12
 ```
 
 `minPrice` é o menor preço entre os lotes com estoque. Evento sem lote ativo vem com `minPrice: null`.
+
+**Categorias**
+
+A categoria é obrigatória na criação (`category`) e pode mudar no `PUT`; ausente no `PUT`, a atual é mantida. Os códigos são fixos: `MUSIC` (Música), `THEATER` (Teatro), `COMEDY` (Humor), `PARTIES` (Festas), `SPORTS` (Esportes), `COURSES` (Cursos e workshops), `TALKS` (Palestras e congressos), `ARTS` (Arte e exposições), `FOOD` (Gastronomia), `KIDS` (Infantil) e `OTHER` (Outros). A lista também é publicada em `docs/event-categories.json`, gerado no build. Os nomes exibidos ficam no front.
+
+- A busca aceita várias categorias, repetindo o parâmetro (`?category=MUSIC&category=COMEDY`) ou separando por vírgula, e devolve eventos de qualquer uma delas. Valor fora da lista responde 400 `invalid-parameter`.
+- `GET /events/categories` conta só os eventos que a vitrine mostra: ativos, não cancelados, não terminados e de organizador não suspenso. Todas as categorias vêm na resposta, inclusive as que têm zero.
+
+```json
+[
+  { "category": "MUSIC", "events": 12 },
+  { "category": "THEATER", "events": 3 },
+  { "category": "OTHER", "events": 0 }
+]
+```
 
 **Cancelar evento**
 

@@ -75,10 +75,11 @@ São 25 requisitos funcionais. RF01 a RF18 vêm da versão original: 13 de prior
 
 ### RF06 — Cadastro de evento
 
-**Descrição:** O sistema deve permitir que o organizador cadastre um evento com nome, descrição, imagem de capa por endereço https, local (nome, endereço, cidade e estado) e data e hora de início e término. **Atores:** Organizador, Administrador. **Prioridade:** Alta. **Situação:** Implementado (`POST /events`). **Critérios de aceite:**
+**Descrição:** O sistema deve permitir que o organizador cadastre um evento com nome, descrição, imagem de capa por endereço https, local (nome, endereço, cidade e estado), data e hora de início e término e categoria. **Atores:** Organizador, Administrador. **Prioridade:** Alta. **Situação:** Implementado (`POST /events`). **Critérios de aceite:**
 
 - O evento criado fica vinculado ao usuário autenticado como organizador (RN08).
 - Um evento com data de início no passado ou término anterior ao início é recusado (RN07).
+- A categoria é obrigatória e vem de uma lista fixa (Música, Teatro, Humor, Festas, Esportes, Cursos e workshops, Palestras e congressos, Arte e exposições, Gastronomia, Infantil e Outros); o organizador pode mudá-la na edição.
 
 O limite de ingressos por pedido, previsto aqui na versão original, é definido em cada tipo de ingresso (RF09, RN13).
 
@@ -93,11 +94,12 @@ O limite de ingressos por pedido, previsto aqui na versão original, é definido
 
 ### RF08 — Consulta de eventos
 
-**Descrição:** O sistema deve listar os eventos disponíveis e exibir os detalhes de cada um, incluindo local e tipos de ingresso. **Atores:** Cliente, Organizador, Administrador e visitantes sem conta. **Prioridade:** Alta. **Situação:** Implementado (`GET /events`, `GET /events/{id}` e `GET /events/{id}/ticket-types`, públicos). A busca filtra por nome, cidade, destaque e esgotado, com paginação. **Critérios de aceite:**
+**Descrição:** O sistema deve listar os eventos disponíveis e exibir os detalhes de cada um, incluindo local e tipos de ingresso. **Atores:** Cliente, Organizador, Administrador e visitantes sem conta. **Prioridade:** Alta. **Situação:** Implementado (`GET /events`, `GET /events/{id}` e `GET /events/{id}/ticket-types`, públicos). A busca filtra por nome, cidade, categoria (uma ou várias), destaque e esgotado, com paginação; `GET /events/categories` informa quantos eventos visíveis há em cada categoria. **Critérios de aceite:**
 
 - A listagem exibe apenas eventos ativos, não cancelados e que ainda não terminaram; eventos em andamento continuam na busca. Os destaques (`featured=true`) mostram só eventos que ainda não começaram.
 - O detalhe de um evento já iniciado ou terminado continua acessível e informa `salesClosed: true`.
 - O detalhe do evento informa os tipos de ingresso com preço e disponibilidade.
+- O resumo e o detalhe do evento informam a categoria; categoria inválida na busca responde 400.
 
 ### RF09 — Gerenciamento de tipos de ingresso
 

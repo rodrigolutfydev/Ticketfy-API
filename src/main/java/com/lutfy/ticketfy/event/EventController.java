@@ -11,6 +11,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -36,11 +37,17 @@ public class EventController {
     public ResponseEntity<Page<EventSummaryDTO>> search(
             @RequestParam(required = false) String q,
             @RequestParam(required = false) String city,
+            @RequestParam(required = false) List<EventCategory> category,
             @RequestParam(required = false) Boolean featured,
             @RequestParam(required = false) Boolean soldOut,
             @PageableDefault(size = 20, sort = "startsAt") Pageable pageable) {
-        var page = service.search(q, city, featured, soldOut, pageable);
+        var page = service.search(q, city, category, featured, soldOut, pageable);
         return ResponseEntity.ok(page);
+    }
+
+    @GetMapping("/categories")
+    public ResponseEntity<List<EventCategoryCountDTO>> categories() {
+        return ResponseEntity.ok(service.countByCategory());
     }
 
     @GetMapping("/{id}")

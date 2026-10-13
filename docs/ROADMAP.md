@@ -8,6 +8,7 @@ O que já está pronto na API do Ticketfy e o que vem a seguir. Os detalhes de c
 - [x] Cadastro com BCrypt e papéis USER, ORGANIZER e ADMIN, com auto-promoção a organizador
 - [x] Autorização por papel e por propriedade do recurso
 - [x] Eventos com busca por nome e cidade, paginação, destaque e exclusão lógica
+- [x] Categoria de evento com filtro na vitrine e contagem de eventos por categoria
 - [x] Lotes com preço, quantidade, limite por pedido e edição sem afetar pedidos feitos
 - [x] Foto de perfil e capa de evento por endereço https
 

@@ -19,7 +19,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.Function;
@@ -66,7 +68,8 @@ public class EventService {
     }
 
     @Transactional(readOnly = true)
-    public Page<EventSummaryDTO> search(String q, String city, Boolean featured, Boolean soldOut, Pageable pageable) {
+    public Page<EventSummaryDTO> search(String q, String city, List<EventCategory> categories, Boolean featured,
+                                        Boolean soldOut, Pageable pageable) {
         var now = clock.instant();
         var spec = EventSpecifications.isActive()
                 .and(EventSpecifications.isNotCancelled())
@@ -76,10 +79,20 @@ public class EventService {
         if (name != null) spec = spec.and(EventSpecifications.nameContains(name));
         var cityFilter = normalize(city);
         if (cityFilter != null) spec = spec.and(EventSpecifications.cityEquals(cityFilter));
+        if (categories != null && !categories.isEmpty()) spec = spec.and(EventSpecifications.categoryIn(categories));
         if (featured != null) spec = spec.and(EventSpecifications.isFeatured(featured));
         if (Boolean.TRUE.equals(featured)) spec = spec.and(EventSpecifications.hasNotStarted(now));
         if (soldOut != null) spec = spec.and(EventSpecifications.isSoldOut(soldOut));
         return toSummaries(repository.findAll(spec, pageable));
+    }
+
+    @Transactional(readOnly = true)
+    public List<EventCategoryCountDTO> countByCategory() {
+        var counts = repository.countVisibleByCategory(clock.instant()).stream()
+                .collect(Collectors.toMap(EventRepository.CategoryCount::getCategory, EventRepository.CategoryCount::getEvents));
+        return Arrays.stream(EventCategory.values())
+                .map(category -> new EventCategoryCountDTO(category, counts.getOrDefault(category, 0L)))
+                .toList();
     }
 
     private Page<EventSummaryDTO> toSummaries(Page<Event> events) {

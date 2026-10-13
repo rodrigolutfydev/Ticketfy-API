@@ -24,7 +24,9 @@ public record EventUpdateDTO(
         @Future
         Instant startsAt,
         @Future
-        Instant endsAt
+        Instant endsAt,
+
+        EventCategory category
     ) {
     public EventUpdateDTO {
         if (imageUrl != null && imageUrl.isBlank()) imageUrl = "";

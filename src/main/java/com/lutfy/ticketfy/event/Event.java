@@ -50,6 +50,9 @@ public class Event {
     private boolean active;
     private boolean featured;
 
+    @Enumerated(EnumType.STRING)
+    private EventCategory category;
+
     @Column(name = "cancelled_at")
     private Instant cancelledAt;
 
@@ -72,6 +75,7 @@ public class Event {
         this.state = dto.state();
         this.startsAt = dto.startsAt();
         this.endsAt = dto.endsAt();
+        this.category = dto.category();
         this.organizer = organizer;
         this.active = true;
     }
@@ -86,6 +90,7 @@ public class Event {
         if (dto.state() != null) this.state = dto.state();
         if (dto.startsAt() != null) this.startsAt = dto.startsAt();
         if (dto.endsAt() != null) this.endsAt = dto.endsAt();
+        if (dto.category() != null) this.category = dto.category();
     }
 
     public void deactivate() {
