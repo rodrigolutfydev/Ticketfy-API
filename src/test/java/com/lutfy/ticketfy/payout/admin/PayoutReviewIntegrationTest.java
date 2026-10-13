@@ -108,7 +108,8 @@ class PayoutReviewIntegrationTest extends PayoutTestBase {
         assertThat(available(organizer)).isEqualByComparingTo("45.00");
         approve(admin, payoutId)
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.type").value(PROBLEMS + "invalid-payout-state"));
+                .andExpect(jsonPath("$.type").value(PROBLEMS + "invalid-payout-state"))
+                .andExpect(jsonPath("$.reason").value("not-under-review"));
     }
 
     @Test
@@ -174,7 +175,12 @@ class PayoutReviewIntegrationTest extends PayoutTestBase {
                     succeeded.add(expectedStatus.get(i));
                 } else {
                     assertThat(outcome).isInstanceOfSatisfying(ProblemException.class,
-                            problem -> assertThat(problem.getType()).isEqualTo(ProblemType.INVALID_PAYOUT_STATE));
+                            problem -> {
+                                assertThat(problem.getType()).isEqualTo(ProblemType.INVALID_PAYOUT_STATE);
+                                assertThat(problem.getProperties().get("reason")).isIn(
+                                        "not-under-review", "not-cancellable", "changed-concurrently",
+                                        "already-processing");
+                            });
                 }
             }
 

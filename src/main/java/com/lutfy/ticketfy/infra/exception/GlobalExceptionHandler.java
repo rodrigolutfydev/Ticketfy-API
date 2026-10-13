@@ -1,5 +1,7 @@
 package com.lutfy.ticketfy.infra.exception;
 
+import com.lutfy.ticketfy.infra.validation.ValidationCodes;
+import jakarta.validation.ConstraintViolation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.core.PropertyReferenceException;
@@ -14,6 +16,7 @@ import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingRequestHeaderException;
+import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -41,7 +44,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ProblemDetail> handleValidation(MethodArgumentNotValidException ex) {
         List<ValidationErrorDTO> errors = ex.getBindingResult().getFieldErrors().stream()
-                .map(error -> new ValidationErrorDTO(error.getField(), error.getDefaultMessage()))
+                .map(GlobalExceptionHandler::toValidationError)
                 .toList();
         var problem = problems.create(ProblemType.VALIDATION_FAILED, "Validation failed");
         problem.setProperty("errors", errors);
@@ -128,11 +131,6 @@ public class GlobalExceptionHandler {
         return problems.response(ProblemType.TICKET_TYPE_NOT_FOUND, ex.getMessage());
     }
 
-    @ExceptionHandler(InvalidTicketTypeQuantityException.class)
-    public ResponseEntity<ProblemDetail> handleInvalidTicketTypeQuantity(InvalidTicketTypeQuantityException ex) {
-        return problems.response(ProblemType.INVALID_TICKET_TYPE_QUANTITY, ex.getMessage());
-    }
-
     @ExceptionHandler(TicketTypeNameAlreadyExistsException.class)
     public ResponseEntity<ProblemDetail> handleTicketTypeNameAlreadyExists(TicketTypeNameAlreadyExistsException ex) {
         return problems.response(ProblemType.TICKET_TYPE_NAME_ALREADY_EXISTS, ex.getMessage());
@@ -140,7 +138,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(InvalidOrderStateException.class)
     public ResponseEntity<ProblemDetail> handleInvalidOrderState(InvalidOrderStateException ex) {
-        return problems.response(ProblemType.INVALID_ORDER_STATE, ex.getMessage());
+        return reasoned(ProblemType.INVALID_ORDER_STATE, ex);
     }
 
     @ExceptionHandler(InsufficientStockException.class)
@@ -165,12 +163,12 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(InvalidPaymentStateException.class)
     public ResponseEntity<ProblemDetail> handleInvalidPaymentState(InvalidPaymentStateException ex) {
-        return problems.response(ProblemType.INVALID_PAYMENT_STATE, ex.getMessage());
+        return reasoned(ProblemType.INVALID_PAYMENT_STATE, ex);
     }
 
     @ExceptionHandler(InvalidTicketStateException.class)
     public ResponseEntity<ProblemDetail> handleInvalidTicketState(InvalidTicketStateException ex) {
-        return problems.response(ProblemType.INVALID_TICKET_STATE, ex.getMessage());
+        return reasoned(ProblemType.INVALID_TICKET_STATE, ex);
     }
 
     @ExceptionHandler(TicketNotFoundException.class)
@@ -195,7 +193,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(InvalidEventStateException.class)
     public ResponseEntity<ProblemDetail> handleInvalidEventState(InvalidEventStateException ex) {
-        return problems.response(ProblemType.INVALID_EVENT_STATE, ex.getMessage());
+        return reasoned(ProblemType.INVALID_EVENT_STATE, ex);
     }
 
     @ExceptionHandler(EventHasSalesException.class)
@@ -249,5 +247,21 @@ public class GlobalExceptionHandler {
                 .contentType(MediaType.APPLICATION_PROBLEM_JSON)
                 .header("Retry-After", String.valueOf(ex.getRetryAfterSeconds()))
                 .body(problem);
+    }
+
+    private ResponseEntity<ProblemDetail> reasoned(ProblemType type, ReasonedException ex) {
+        var problem = problems.create(type, ex.getMessage());
+        if (ex.getReason() != null) {
+            problem.setProperty(ProblemReason.PROPERTY, ex.getReason().value());
+        }
+        return problems.response(problem);
+    }
+
+    private static ValidationErrorDTO toValidationError(FieldError error) {
+        ConstraintViolation<?> violation = error.contains(ConstraintViolation.class)
+                ? error.unwrap(ConstraintViolation.class)
+                : null;
+        var payload = ValidationCodes.of(violation);
+        return new ValidationErrorDTO(error.getField(), error.getDefaultMessage(), payload.code(), payload.params());
     }
 }

@@ -1,5 +1,6 @@
 package com.lutfy.ticketfy.payment;
 
+import com.lutfy.ticketfy.infra.exception.ProblemReason;
 import com.lutfy.ticketfy.infra.exception.InvalidPaymentStateException;
 import com.lutfy.ticketfy.order.Order;
 import jakarta.persistence.*;
@@ -49,7 +50,7 @@ public class Payment {
 
     public void approve() {
         if (status != PaymentStatus.PENDING) {
-            throw new InvalidPaymentStateException("Only pending payments can be approved");
+            throw new InvalidPaymentStateException(ProblemReason.PAYMENT_NOT_PENDING, "Only pending payments can be approved");
         }
         this.status = PaymentStatus.APPROVED;
         this.approvedAt = Instant.now();
@@ -57,7 +58,7 @@ public class Payment {
 
     public void refund(String reference) {
         if (status != PaymentStatus.APPROVED) {
-            throw new InvalidPaymentStateException("Only approved payments can be refunded");
+            throw new InvalidPaymentStateException(ProblemReason.PAYMENT_NOT_APPROVED, "Only approved payments can be refunded");
         }
         this.status = PaymentStatus.REFUNDED;
         this.refundedAt = Instant.now();
@@ -66,7 +67,7 @@ public class Payment {
 
     public void reject() {
         if (status != PaymentStatus.PENDING) {
-            throw new InvalidPaymentStateException("Only pending payments can be rejected");
+            throw new InvalidPaymentStateException(ProblemReason.PAYMENT_NOT_PENDING, "Only pending payments can be rejected");
         }
         this.status = PaymentStatus.REJECTED;
     }

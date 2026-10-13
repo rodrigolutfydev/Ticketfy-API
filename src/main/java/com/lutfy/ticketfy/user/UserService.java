@@ -74,6 +74,13 @@ public class UserService {
         return new UserDetailsDTO(user);
     }
 
+    @Transactional
+    public UserDetailsDTO updateLanguage(UUID userId, LanguageUpdateDTO dto) {
+        var user = lockActive(userId);
+        user.changeLanguage(Language.fromCode(dto.language()).orElseThrow());
+        return new UserDetailsDTO(user);
+    }
+
     private User lockActive(UUID userId) {
         var user = repository.findForUpdate(userId)
                 .orElseThrow(() -> new UserNotFoundException("User not found"));

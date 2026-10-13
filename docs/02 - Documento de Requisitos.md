@@ -30,7 +30,7 @@ Os requisitos abaixo derivam das funcionalidades informadas para o Ticketfy e fo
 
 ## 1. Requisitos Funcionais
 
-São 25 requisitos funcionais. RF01 a RF18 vêm da versão original: 13 de prioridade alta e 5 de prioridade média. RF19 a RF25 registram funcionalidades implementadas depois, sem requisito na versão original.
+São 26 requisitos funcionais. RF01 a RF18 vêm da versão original: 13 de prioridade alta e 5 de prioridade média. RF19 a RF26 registram funcionalidades implementadas depois, sem requisito na versão original.
 
 ### RF01 — Cadastro de usuário
 
@@ -206,6 +206,7 @@ Apenas o UC01 — Realizar compra de ingresso está documentado. Os casos UC02 a
 | RF23 Auditoria | — | Não documentado | — |
 | RF24 Sessões e senha | — | Não documentado | RN03 |
 | RF25 Privacidade | — | Não documentado | RN03 |
+| RF26 Idioma preferido | — | Não documentado | — |
 
 As 23 regras estão ligadas a pelo menos um requisito. RF23 é o único requisito sem regra de negócio própria; suas regras estão na Documentação de Arquitetura (DA13).
 
@@ -390,6 +391,15 @@ As perguntas Q01 a Q04 vêm do Documento de Visão; Q05 a Q08 surgiram nesta an�
 - A exportação exige a senha e tem limite de vezes por período.
 - A exclusão exige a senha e uma confirmação, é recusada para administradores e enquanto houver saldo, saque em andamento, evento ativo ou ingresso para evento futuro, e anonimiza a conta (RNF15).
 
+### RF26 — Idioma preferido
+
+**Descrição:** O sistema deve guardar na conta o idioma preferido do usuário, português (`pt-BR`) ou inglês (`en`), e permitir que ele o consulte e altere. **Atores:** Cliente, Organizador, Administrador. **Prioridade:** Média. **Situação:** Implementado (`GET /users/me`, `PATCH /users/me/language` e `language` opcional em `POST /users`). **Critérios de aceite:**
+
+- Conta nova e conta existente ficam em `pt-BR` quando o idioma não é informado.
+- Valor diferente de `pt-BR` e `en` é recusado com erro de validação.
+- A API não muda de idioma: o `detail` dos erros continua em inglês. Erros por campo trazem `code` e `params`, e alguns tipos de erro trazem `reason`, para o front montar a mensagem no idioma escolhido.
+- O idioma entra na exportação de dados (RF25).
+
 ### Planejado
 
-Funcionalidades do [roadmap](ROADMAP.md) ainda não implementadas, sem requisito detalhado: idioma preferido salvo na conta, adicionar o evento à agenda com arquivo `.ics`, e-mails transacionais com Brevo, pagamento via Pix com Asaas, publicação do frontend na Cloudflare Pages, login com Google, monitoramento de erros com Sentry, upload de foto de perfil e de capa de evento e teste de carga com k6.
+Funcionalidades do [roadmap](ROADMAP.md) ainda não implementadas, sem requisito detalhado: adicionar o evento à agenda com arquivo `.ics`, e-mails transacionais com Brevo, pagamento via Pix com Asaas, publicação do frontend na Cloudflare Pages, login com Google, monitoramento de erros com Sentry, upload de foto de perfil e de capa de evento e teste de carga com k6.

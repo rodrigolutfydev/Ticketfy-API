@@ -42,7 +42,8 @@ class PayoutBlockIntegrationTest extends PayoutTestBase {
                 .andExpect(jsonPath("$.blockedBy").value(admin.getId().toString()));
         block(admin, organizer, "de novo")
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.type").value(PROBLEMS + "invalid-payout-block-state"));
+                .andExpect(jsonPath("$.type").value(PROBLEMS + "invalid-payout-block-state"))
+                .andExpect(jsonPath("$.reason").value("already-blocked"));
 
         requestPayout(organizer, "20.00", PASSWORD, null)
                 .andExpect(status().isConflict())
@@ -56,7 +57,10 @@ class PayoutBlockIntegrationTest extends PayoutTestBase {
         unblock(admin, organizer)
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.payoutsBlocked").value(false));
-        unblock(admin, organizer).andExpect(status().isConflict());
+        unblock(admin, organizer)
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.type").value(PROBLEMS + "invalid-payout-block-state"))
+                .andExpect(jsonPath("$.reason").value("not-blocked"));
         assertThat(balance(organizer).get("payoutsBlocked").asBoolean()).isFalse();
         requestPayout(organizer, "20.00", PASSWORD, null)
                 .andExpect(status().isCreated())

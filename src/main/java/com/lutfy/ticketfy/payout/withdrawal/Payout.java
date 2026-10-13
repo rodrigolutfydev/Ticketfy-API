@@ -1,5 +1,6 @@
 package com.lutfy.ticketfy.payout.withdrawal;
 
+import com.lutfy.ticketfy.infra.exception.ProblemReason;
 import com.lutfy.ticketfy.infra.crypto.EncryptedStringConverter;
 import com.lutfy.ticketfy.infra.exception.ProblemException;
 import com.lutfy.ticketfy.infra.exception.ProblemType;
@@ -77,7 +78,7 @@ public class Payout {
 
     public void cancel(Instant now) {
         if (status != PayoutStatus.REQUESTED && status != PayoutStatus.UNDER_REVIEW) {
-            throw new ProblemException(ProblemType.INVALID_PAYOUT_STATE,
+            throw new ProblemException(ProblemReason.PAYOUT_NOT_CANCELLABLE,
                     "Only requested or under review payouts can be cancelled");
         }
         this.status = PayoutStatus.CANCELLED;
@@ -85,14 +86,16 @@ public class Payout {
     }
 
     public void approve(UUID reviewer, Instant now) {
-        require(PayoutStatus.UNDER_REVIEW, "Only payouts under review can be approved");
+        require(PayoutStatus.UNDER_REVIEW, ProblemReason.PAYOUT_NOT_UNDER_REVIEW,
+                "Only payouts under review can be approved");
         this.status = PayoutStatus.REQUESTED;
         this.reviewedBy = reviewer;
         this.reviewedAt = now;
     }
 
     public void reject(UUID reviewer, String reason, Instant now) {
-        require(PayoutStatus.UNDER_REVIEW, "Only payouts under review can be rejected");
+        require(PayoutStatus.UNDER_REVIEW, ProblemReason.PAYOUT_NOT_UNDER_REVIEW,
+                "Only payouts under review can be rejected");
         this.status = PayoutStatus.REJECTED;
         this.rejectionReason = reason;
         this.reviewedBy = reviewer;
@@ -131,6 +134,12 @@ public class Payout {
     private void require(PayoutStatus expected, String message) {
         if (status != expected) {
             throw new ProblemException(ProblemType.INVALID_PAYOUT_STATE, message);
+        }
+    }
+
+    private void require(PayoutStatus expected, ProblemReason reason, String message) {
+        if (status != expected) {
+            throw new ProblemException(reason, message);
         }
     }
 }

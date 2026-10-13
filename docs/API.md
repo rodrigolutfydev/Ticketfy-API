@@ -138,7 +138,8 @@ Toda resposta de erro segue a RFC 7807 (`application/problem+json`):
 | `type` | URI estável do tipo de erro: `https://ticketfy-api.onrender.com/problems/<slug>`. Use o slug para decidir o que mostrar |
 | `title` | Resumo fixo do tipo |
 | `status` | Código HTTP |
-| `detail` | Mensagem em inglês, específica da ocorrência. Não é traduzida pela API |
+| `detail` | Mensagem em inglês, específica da ocorrência, para desenvolvedores. Não é traduzida pela API nem deve ser mostrada ao usuário |
+| `reason` | Presente em alguns tipos: motivo estável dentro do tipo, para o cliente escolher a mensagem (ver [Motivos](#motivos)) |
 | `instance` | Caminho da requisição |
 
 Alguns tipos trazem propriedades extras, listadas na tabela abaixo. Erros 5xx trazem `requestId`, igual ao header `X-Request-Id`. Respostas 429 trazem o header `Retry-After` em segundos.
@@ -156,7 +157,7 @@ Content-Type: application/problem+json
 }
 ```
 
-Erros de validação trazem `errors`, com um item por campo:
+Erros de validação trazem `errors`, com um item por campo. Cada item tem `field`, `message` (em inglês), `code` (regra violada, estável) e `params` (parâmetros da regra, objeto possivelmente vazio). O cliente monta a frase no idioma do usuário a partir de `code` e `params`:
 
 ```http
 HTTP/1.1 400 Bad Request
@@ -169,10 +170,69 @@ Content-Type: application/problem+json
   "detail": "Validation failed",
   "instance": "/users",
   "errors": [
-    { "field": "password", "message": "Password must be at least 8 characters long" }
+    { "field": "password", "message": "Password must be at least 8 characters long", "code": "size", "params": { "min": 8, "max": 72 } },
+    { "field": "email", "message": "must be a well-formed email address", "code": "email", "params": {} }
   ]
 }
 ```
+
+### Códigos de validação
+
+| `code` | Quando | `params` |
+|---|---|---|
+| `required` | Campo ausente, nulo ou em branco | — |
+| `size` | Texto fora do tamanho | `min` e/ou `max` (só os que a regra define) |
+| `count` | Lista vazia ou fora do tamanho (por exemplo `items` do pedido) | `min` e/ou `max` |
+| `email` | E-mail malformado | — |
+| `positive` | Número precisa ser maior que zero | — |
+| `positive-or-zero` | Número não pode ser negativo | — |
+| `digits` | Número com dígitos demais | `integer`, `fraction` |
+| `future` | Data precisa estar no futuro | — |
+| `url` | URL inválida | `protocol` (por exemplo `https`) |
+| `one-of` | Valor fora da lista aceita | `allowed` (lista) |
+| `coupon-code` | Código de cupom fora do formato (letras, dígitos, `-` e `_`) | `min`, `max` |
+| `confirmation` | Texto de confirmação diferente do esperado | `expected` |
+| `invalid-document` | CPF ou CNPJ inválido | `documentType` |
+| `invalid-pix-key` | Chave Pix inválida para o tipo | `pixKeyType` |
+| `invalid` | Qualquer outra regra | — |
+
+Campos de listas aparecem com índice, como `items[0].quantity`.
+
+### Motivos
+
+Os tipos abaixo trazem `reason`, com um dos valores da tabela. A lista também está em `docs/problem-types.json` (campo `reasons` de cada tipo). Um motivo novo pode aparecer no futuro: o cliente deve cair na mensagem geral do tipo quando não conhecer o valor.
+
+| Tipo | `reason` | Quando | Propriedades extras |
+|---|---|---|---|
+| `invalid-coupon-settings` | `percent-out-of-range` | Percentual fora de 0,01 a 100 | `min`, `max` |
+| | `ends-before-starts` | Fim da validade não é depois do início | — |
+| | `max-uses-below-used` | Limite de usos abaixo dos usos já feitos | `usesCount` |
+| `coupon-already-used` | `discount-locked` | Mudar tipo ou valor de cupom já usado | — |
+| | `delete-blocked` | Excluir cupom já usado | — |
+| `invalid-ticket-type-quantity` | `below-sold` | Quantidade total abaixo do vendido e reservado | `quantitySold` |
+| `invalid-ticket-type-state` | `already-active` | Reativar lote já ativo | — |
+| | `already-inactive` | Desativar lote já desativado | — |
+| `invalid-event-state` | `cancelled` | Evento cancelado | — |
+| | `ended` | Cancelar evento já encerrado | — |
+| `invalid-order-state` | `expired` | Pagar pedido com a reserva vencida | — |
+| | `refund-period-ended` | Reembolso fora do prazo | — |
+| | `tickets-used` | Reembolso de pedido com ingresso já usado | — |
+| | `not-pending` | Pagar ou cancelar pedido que não está pendente | — |
+| | `not-paid` | Reembolsar pedido que não está pago | — |
+| `invalid-payment-state` | `already-paid` | Pagar pedido já pago | — |
+| | `not-pending` | Aprovar ou recusar pagamento que não está pendente | — |
+| | `not-approved` | Estornar pagamento que não foi aprovado | — |
+| `invalid-ticket-state` | `event-cancelled` | Check-in em evento cancelado | — |
+| | `not-valid` | Ingresso já usado ou cancelado (check-in, transferência, cancelamento) | — |
+| | `transfer-unavailable` | O ingresso mudou durante a transferência | — |
+| `invalid-suspension-state` | `already-suspended` | Suspender conta já suspensa | — |
+| | `not-suspended` | Reativar conta que não está suspensa | — |
+| `invalid-payout-state` | `already-processing` | Cancelar saque que entrou em processamento | — |
+| | `not-cancellable` | Cancelar saque que não está solicitado nem em análise | — |
+| | `not-under-review` | Aprovar ou recusar saque que não está em análise | — |
+| | `changed-concurrently` | O saque mudou por outra ação ao mesmo tempo | — |
+| `invalid-payout-block-state` | `already-blocked` | Bloquear saques já bloqueados | — |
+| | `not-blocked` | Desbloquear saques que não estão bloqueados | — |
 
 ### Tipos de erro
 
@@ -185,13 +245,13 @@ Content-Type: application/problem+json
 | `invalid-parameter` | 400 | Parâmetro com valor inválido: UUID, enum, data, página, `sort`, intervalo de datas ou `Idempotency-Key` |
 | `bad-request` | 400 | Requisição inválida sem tipo mais específico |
 | `invalid-event-dates` | 400 | Fim do evento não é depois do início |
-| `invalid-ticket-type-quantity` | 400 | Quantidade total do lote abaixo do vendido e reservado |
+| `invalid-ticket-type-quantity` | 400 | Quantidade total do lote abaixo do vendido e reservado; traz `reason` e `quantitySold` |
 | `invalid-ticket-type-state` | 409 | Desativar lote já desativado, ou reativar lote já ativo |
 | `mixed-events-order` | 400 | Pedido com lotes de eventos diferentes |
 | `max-per-order-exceeded` | 400 | Quantidade acima do limite por pedido do lote |
 | `max-per-buyer-exceeded` | 409 | Compra passaria do limite por comprador do lote; traz `ticketTypeId`, `maxPerBuyer` e `remaining` |
 | `self-transfer` | 400 | Transferência para o próprio e-mail |
-| `invalid-coupon-settings` | 400 | Percentual acima de 100, fim antes do início ou limite abaixo dos usos |
+| `invalid-coupon-settings` | 400 | Percentual acima de 100, fim antes do início ou limite abaixo dos usos; traz `reason` |
 | `pix-key-not-found` | 400 | Chave Pix não encontrada no provedor |
 | `pix-key-holder-mismatch` | 400 | Chave Pix de outro documento |
 | `payout-below-minimum` | 400 | Saque abaixo do mínimo; traz `minAmount` |
@@ -311,7 +371,8 @@ Os limites ficam em memória, por instância da aplicação, exceto o de exporta
 | Método | Endpoint | Descrição | Acesso |
 |---|---|---|---|
 | POST | `/users` | Cadastra um usuário com papel `USER` | Público |
-| GET | `/users/me` | Dados do usuário autenticado | Autenticado |
+| GET | `/users/me` | Dados do usuário autenticado, com o idioma preferido | Autenticado |
+| PATCH | `/users/me/language` | Troca o idioma preferido (`pt-BR` ou `en`) | Autenticado |
 | PATCH | `/users/me/avatar` | Troca a foto (`avatarUrl` https); `""` ou `null` remove | Autenticado |
 | PATCH | `/users/me/password` | Troca a senha, encerra todas as sessões e abre uma nova | Autenticado |
 | POST | `/users/me/organizer` | Torna o usuário organizador; responde 204 e o token atual continua valendo | Autenticado |
@@ -329,7 +390,8 @@ Content-Type: application/json
 {
   "name": "Ana Souza",
   "email": "ana@email.com",
-  "password": "senhaForte123"
+  "password": "senhaForte123",
+  "language": "pt-BR"
 }
 ```
 
@@ -341,11 +403,24 @@ HTTP/1.1 201 Created
   "name": "Ana Souza",
   "email": "ana@email.com",
   "role": "USER",
-  "avatarUrl": null
+  "avatarUrl": null,
+  "language": "pt-BR"
 }
 ```
 
-A senha tem de 8 a 72 caracteres. E-mail repetido responde 409 `email-already-exists`.
+A senha tem de 8 a 72 caracteres. E-mail repetido responde 409 `email-already-exists`. `language` é opcional: sem ele, a conta fica em `pt-BR`.
+
+**Trocar o idioma**
+
+```http
+PATCH /users/me/language
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{ "language": "en" }
+```
+
+A resposta tem o formato de `GET /users/me`. Valores aceitos: `pt-BR` e `en`, exatamente assim. Outro valor responde 400 `validation-failed` com `code` `one-of` e `params.allowed`; sem o campo, `code` `required`. O idioma serve ao frontend e, no futuro, aos e-mails: a API continua respondendo em inglês no `detail`, qualquer que seja o idioma da conta.
 
 **Trocar a senha**
 
@@ -388,7 +463,7 @@ Cache-Control: no-store
 {
   "schemaVersion": 1,
   "generatedAt": "2026-10-08T17:00:00Z",
-  "profile": { "id": "…", "name": "Ana Souza", "email": "ana@email.com", "role": "ORGANIZER", "avatarUrl": null, "createdAt": "…", "updatedAt": "…" },
+  "profile": { "id": "…", "name": "Ana Souza", "email": "ana@email.com", "role": "ORGANIZER", "avatarUrl": null, "language": "pt-BR", "createdAt": "…", "updatedAt": "…" },
   "orders": [ { "id": "…", "status": "PAID", "subtotalAmount": 100.00, "discountAmount": 10.00, "totalAmount": 90.00, "couponCode": "AMIGO10", "event": { "id": "…", "name": "Festival de Verão", "startsAt": "…" }, "items": [ ], "payments": [ ] } ],
   "tickets": [ ],
   "transfers": [ { "ticketId": "…", "direction": "SENT", "event": { }, "ticketTypeName": "Pista", "transferredAt": "…" } ],

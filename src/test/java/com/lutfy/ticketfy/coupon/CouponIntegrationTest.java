@@ -237,7 +237,8 @@ class CouponIntegrationTest extends CouponTestBase {
 
         updateCoupon(couponId, "{\"discountType\":\"PERCENT\",\"discountValue\":20.00,\"active\":true}")
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.type").value(endsWith("/coupon-already-used")));
+                .andExpect(jsonPath("$.type").value(endsWith("/coupon-already-used")))
+                .andExpect(jsonPath("$.reason").value("discount-locked"));
         updateCoupon(couponId, "{\"discountType\":\"FIXED\",\"discountValue\":10.00,\"active\":true}")
                 .andExpect(status().isConflict());
         updateCoupon(couponId, "{\"discountType\":\"PERCENT\",\"discountValue\":10.0,\"maxUses\":3,\"active\":true}")
@@ -246,7 +247,9 @@ class CouponIntegrationTest extends CouponTestBase {
                 .andExpect(jsonPath("$.maxUses").value(3));
         mockMvc.perform(delete("/events/{eventId}/coupons/{id}", eventId, couponId)
                         .header(HttpHeaders.AUTHORIZATION, bearer(organizer)))
-                .andExpect(status().isConflict());
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.type").value(endsWith("/coupon-already-used")))
+                .andExpect(jsonPath("$.reason").value("delete-blocked"));
 
         assertThatThrownBy(() -> jdbc.update("UPDATE coupons SET discount_value = 99 WHERE id = ?", couponId))
                 .hasMessageContaining("cannot change");
@@ -272,7 +275,9 @@ class CouponIntegrationTest extends CouponTestBase {
 
         updateCoupon(couponId, "{\"discountType\":\"PERCENT\",\"discountValue\":10.00,\"maxUses\":1,\"active\":true}")
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.type").value(endsWith("/invalid-coupon-settings")));
+                .andExpect(jsonPath("$.type").value(endsWith("/invalid-coupon-settings")))
+                .andExpect(jsonPath("$.reason").value("max-uses-below-used"))
+                .andExpect(jsonPath("$.usesCount").value(2));
         updateCoupon(couponId, "{\"discountType\":\"PERCENT\",\"discountValue\":10.00,\"maxUses\":2,\"active\":true}")
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.usesCount").value(2));
@@ -302,7 +307,20 @@ class CouponIntegrationTest extends CouponTestBase {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"code\":\"DEMAIS\",\"discountType\":\"PERCENT\",\"discountValue\":150}"))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.type").value(endsWith("/invalid-coupon-settings")));
+                .andExpect(jsonPath("$.type").value(endsWith("/invalid-coupon-settings")))
+                .andExpect(jsonPath("$.reason").value("percent-out-of-range"))
+                .andExpect(jsonPath("$.min").value(0.01))
+                .andExpect(jsonPath("$.max").value(100));
+        mockMvc.perform(post("/events/{eventId}/coupons", eventId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(organizer))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"code":"DATAS","discountType":"FIXED","discountValue":5,
+                                 "startsAt":"2030-02-01T00:00:00Z","endsAt":"2030-01-01T00:00:00Z"}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value(endsWith("/invalid-coupon-settings")))
+                .andExpect(jsonPath("$.reason").value("ends-before-starts"));
         mockMvc.perform(post("/events/{eventId}/coupons", eventId)
                         .header(HttpHeaders.AUTHORIZATION, bearer(user("ORGANIZER")))
                         .contentType(MediaType.APPLICATION_JSON)

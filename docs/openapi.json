@@ -1930,6 +1930,34 @@
         "tags" : [ "privacy-controller" ]
       }
     },
+    "/users/me/language" : {
+      "patch" : {
+        "operationId" : "updateLanguage",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/LanguageUpdateDTO"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/UserDetailsDTO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "user-controller" ]
+      }
+    },
     "/users/me/organizer" : {
       "post" : {
         "operationId" : "becomeOrganizer",
@@ -1976,8 +2004,7 @@
         "type" : "object",
         "properties" : {
           "confirmation" : {
-            "type" : "string",
-            "pattern" : "EXCLUIR"
+            "type" : "string"
           },
           "password" : {
             "type" : "string",
@@ -2198,8 +2225,7 @@
             "type" : "boolean"
           },
           "code" : {
-            "type" : "string",
-            "pattern" : "\\s*[A-Za-z0-9_-]{3,30}\\s*"
+            "type" : "string"
           },
           "discountType" : {
             "type" : "string",
@@ -3016,6 +3042,16 @@
             "type" : "number"
           }
         }
+      },
+      "LanguageUpdateDTO" : {
+        "type" : "object",
+        "properties" : {
+          "language" : {
+            "type" : "string",
+            "enum" : [ "pt-BR", "en" ]
+          }
+        },
+        "required" : [ "language" ]
       },
       "LedgerEntryDTO" : {
         "type" : "object",
@@ -3910,6 +3946,10 @@
             "type" : "string",
             "format" : "uuid"
           },
+          "language" : {
+            "type" : "string",
+            "enum" : [ "pt-BR", "en" ]
+          },
           "name" : {
             "type" : "string"
           },
@@ -4288,8 +4328,7 @@
           "name" : {
             "type" : "string",
             "maxLength" : 150,
-            "minLength" : 0,
-            "pattern" : "(?s).*\\S.*"
+            "minLength" : 0
           },
           "price" : {
             "type" : "number",
@@ -4373,6 +4412,10 @@
             "type" : "string",
             "format" : "uuid"
           },
+          "language" : {
+            "type" : "string",
+            "enum" : [ "pt-BR", "en" ]
+          },
           "name" : {
             "type" : "string"
           },
@@ -4390,6 +4433,11 @@
             "format" : "email",
             "maxLength" : 150,
             "minLength" : 0
+          },
+          "language" : {
+            "type" : "string",
+            "default" : "pt-BR",
+            "enum" : [ "pt-BR", "en" ]
           },
           "name" : {
             "type" : "string",

@@ -86,7 +86,8 @@ class TicketTransferIntegrationTest extends TicketTransferTestBase {
         mockMvc.perform(post("/tickets/{code}/check-in", code(ticketId)).header("Authorization", bearer(organizer)))
                 .andExpect(status().isOk());
 
-        expectProblem(transfer(buyer, ticketId, user("USER").getEmail(), PASSWORD), 409, "invalid-ticket-state");
+        expectProblem(transfer(buyer, ticketId, user("USER").getEmail(), PASSWORD), 409, "invalid-ticket-state")
+                .andExpect(jsonPath("$.reason").value("not-valid"));
         assertThat(owner(ticketId)).isEqualTo(buyer.getId());
     }
 
@@ -97,7 +98,8 @@ class TicketTransferIntegrationTest extends TicketTransferTestBase {
         mockMvc.perform(post("/events/{id}/cancel", eventId).header("Authorization", bearer(organizer)))
                 .andExpect(status().isOk());
 
-        expectProblem(transfer(buyer, ticketId, user("USER").getEmail(), PASSWORD), 409, "invalid-event-state");
+        expectProblem(transfer(buyer, ticketId, user("USER").getEmail(), PASSWORD), 409, "invalid-event-state")
+                .andExpect(jsonPath("$.reason").value("cancelled"));
     }
 
     @Test
@@ -274,8 +276,8 @@ class TicketTransferIntegrationTest extends TicketTransferTestBase {
                 .content(jsonMapper.writeValueAsString(Map.of("recipientEmail", email, "password", password))));
     }
 
-    private void expectProblem(ResultActions result, int status, String slug) throws Exception {
-        result.andExpect(status().is(status)).andExpect(jsonPath("$.type", endsWith("/" + slug)));
+    private ResultActions expectProblem(ResultActions result, int status, String slug) throws Exception {
+        return result.andExpect(status().is(status)).andExpect(jsonPath("$.type", endsWith("/" + slug)));
     }
 
     private String bearer(User user) {

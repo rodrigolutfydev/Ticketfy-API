@@ -39,6 +39,12 @@ public class UserController {
         return ResponseEntity.ok(service.updateAvatar(user.getId(), dto));
     }
 
+    @PatchMapping("/me/language")
+    public ResponseEntity<UserDetailsDTO> updateLanguage(@AuthenticationPrincipal User user,
+                                                         @RequestBody @Valid LanguageUpdateDTO dto) {
+        return ResponseEntity.ok(service.updateLanguage(user.getId(), dto));
+    }
+
     @PatchMapping("/me/password")
     public ResponseEntity<LoginResponseDTO> changePassword(@AuthenticationPrincipal User user,
                                                            @RequestBody @Valid PasswordChangeDTO dto) {

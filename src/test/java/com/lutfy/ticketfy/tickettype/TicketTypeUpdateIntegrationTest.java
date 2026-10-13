@@ -148,7 +148,9 @@ class TicketTypeUpdateIntegrationTest extends IntegrationTestBase {
 
         update(organizerId, "{\"name\":\"Renomeado\",\"quantityTotal\":36}")
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.detail").value("quantityTotal cannot be lower than the 37 tickets already sold or reserved"));
+                .andExpect(jsonPath("$.detail").value("quantityTotal cannot be lower than the 37 tickets already sold or reserved"))
+                .andExpect(jsonPath("$.reason").value("below-sold"))
+                .andExpect(jsonPath("$.quantitySold").value(37));
 
         var row = stored();
         assertThat(row.get("quantity_total")).isEqualTo(100);

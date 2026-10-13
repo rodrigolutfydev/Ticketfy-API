@@ -1,9 +1,11 @@
 package com.lutfy.ticketfy.user;
 
+import com.lutfy.ticketfy.infra.exception.ProblemReason;
 import com.lutfy.ticketfy.infra.exception.InvalidRoleChangeException;
 import com.lutfy.ticketfy.infra.exception.ProblemException;
 import com.lutfy.ticketfy.infra.exception.ProblemType;
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -47,6 +49,9 @@ public class User implements UserDetails {
     @Column(name = "avatar_url", length = 500)
     private String avatarUrl;
 
+    @Convert(converter = LanguageConverter.class)
+    private Language language = Language.DEFAULT;
+
     @CreationTimestamp
     @Column(updatable = false)
     private Instant createdAt;
@@ -67,6 +72,8 @@ public class User implements UserDetails {
         this.name = data.name();
         this.email = data.email();
         this.password = encodedPassword;
+        this.language = data.language() == null ? Language.DEFAULT
+                : Language.fromCode(data.language()).orElse(Language.DEFAULT);
     }
 
     public void promoteToOrganizer() {
@@ -82,6 +89,10 @@ public class User implements UserDetails {
 
     public void changeAvatar(String url) {
         this.avatarUrl = (url == null || url.isBlank()) ? null : url;
+    }
+
+    public void changeLanguage(Language language) {
+        this.language = language;
     }
 
     public void anonymize(String encodedPassword, Instant now) {
@@ -102,7 +113,7 @@ public class User implements UserDetails {
 
     public void suspend(String reason, UUID admin, Instant now) {
         if (isSuspended()) {
-            throw new ProblemException(ProblemType.INVALID_SUSPENSION_STATE, "Account is already suspended");
+            throw new ProblemException(ProblemReason.ACCOUNT_ALREADY_SUSPENDED, "Account is already suspended");
         }
         this.suspendedAt = now;
         this.suspensionReason = reason;
@@ -111,7 +122,7 @@ public class User implements UserDetails {
 
     public void reactivate() {
         if (!isSuspended()) {
-            throw new ProblemException(ProblemType.INVALID_SUSPENSION_STATE, "Account is not suspended");
+            throw new ProblemException(ProblemReason.ACCOUNT_NOT_SUSPENDED, "Account is not suspended");
         }
         this.suspendedAt = null;
         this.suspensionReason = null;

@@ -108,11 +108,13 @@ class TicketTypeDeactivationIntegrationTest extends PayoutTestBase {
     void refusesInvalidDeactivationsAndReactivations() throws Exception {
         reactivate(organizer, lot)
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.type").value(PROBLEMS + "invalid-ticket-type-state"));
+                .andExpect(jsonPath("$.type").value(PROBLEMS + "invalid-ticket-type-state"))
+                .andExpect(jsonPath("$.reason").value("already-active"));
         deactivate(organizer, lot).andExpect(status().isOk());
         deactivate(organizer, lot)
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.type").value(PROBLEMS + "invalid-ticket-type-state"));
+                .andExpect(jsonPath("$.type").value(PROBLEMS + "invalid-ticket-type-state"))
+                .andExpect(jsonPath("$.reason").value("already-inactive"));
 
         var otherOrganizer = user("ORGANIZER");
         deactivate(otherOrganizer, otherLot)
@@ -130,7 +132,8 @@ class TicketTypeDeactivationIntegrationTest extends PayoutTestBase {
         jdbc.update("UPDATE events SET cancelled_at = NOW() WHERE id = ?", eventId);
         reactivate(organizer, lot)
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.type").value(PROBLEMS + "invalid-event-state"));
+                .andExpect(jsonPath("$.type").value(PROBLEMS + "invalid-event-state"))
+                .andExpect(jsonPath("$.reason").value("cancelled"));
 
         jdbc.update("UPDATE events SET active = false WHERE id = ?", foreignEvent);
         deactivate(otherOrganizer, foreignEvent, foreignLot)

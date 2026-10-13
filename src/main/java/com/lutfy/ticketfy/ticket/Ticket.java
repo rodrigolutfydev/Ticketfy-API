@@ -1,5 +1,6 @@
 package com.lutfy.ticketfy.ticket;
 
+import com.lutfy.ticketfy.infra.exception.ProblemReason;
 import com.lutfy.ticketfy.infra.exception.InvalidTicketStateException;
 import com.lutfy.ticketfy.order.Order;
 import com.lutfy.ticketfy.order.OrderItem;
@@ -58,7 +59,7 @@ public class Ticket {
 
     public void cancel() {
         if (status != TicketStatus.VALID) {
-            throw new InvalidTicketStateException("Only valid tickets can be cancelled");
+            throw new InvalidTicketStateException(ProblemReason.TICKET_NOT_VALID, "Only valid tickets can be cancelled");
         }
         this.status = TicketStatus.CANCELLED;
     }

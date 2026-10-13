@@ -1,5 +1,6 @@
 package com.lutfy.ticketfy.order;
 
+import com.lutfy.ticketfy.infra.exception.ProblemReason;
 import com.lutfy.ticketfy.coupon.CouponCodes;
 import com.lutfy.ticketfy.coupon.CouponService;
 import com.lutfy.ticketfy.event.EventRepository;
@@ -108,7 +109,7 @@ public class OrderService {
             int affectedRows = ticketTypeRepository.reserveStock(ticketType.getId(), itemRequest.quantity(), now);
             if (affectedRows == 0) {
                 if (eventRepository.existsByIdAndCancelledAtIsNotNull(itemEventId)) {
-                    throw new InvalidEventStateException("Event was cancelled");
+                    throw new InvalidEventStateException(ProblemReason.EVENT_CANCELLED, "Event was cancelled");
                 }
                 if (!ticketTypeRepository.existsByIdAndActiveTrue(ticketType.getId())) {
                     throw new TicketTypeNotFoundException("Ticket type not found");
@@ -189,7 +190,7 @@ public class OrderService {
         var deadline = Instant.now().plus(Duration.ofHours(refundDeadlineHours));
         for (var item : order.getItems()) {
             if (item.getTicketType().getEvent().getStartsAt().isBefore(deadline)) {
-                throw new InvalidOrderStateException("The refund period for this event has ended");
+                throw new InvalidOrderStateException(ProblemReason.ORDER_REFUND_PERIOD_ENDED, "The refund period for this event has ended");
             }
         }
 

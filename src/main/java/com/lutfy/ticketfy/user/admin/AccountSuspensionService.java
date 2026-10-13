@@ -6,6 +6,7 @@ import com.lutfy.ticketfy.audit.AuditTargetType;
 import com.lutfy.ticketfy.auth.AuthSessionService;
 import com.lutfy.ticketfy.auth.RevocationReason;
 import com.lutfy.ticketfy.infra.exception.ProblemException;
+import com.lutfy.ticketfy.infra.exception.ProblemReason;
 import com.lutfy.ticketfy.infra.exception.ProblemType;
 import com.lutfy.ticketfy.order.OrderRepository;
 import com.lutfy.ticketfy.order.OrderService;
@@ -58,7 +59,7 @@ public class AccountSuspensionService {
             throw new ProblemException(ProblemType.ADMIN_ACCOUNT_SUSPENSION, "Admin accounts cannot be suspended");
         }
         if (user.isSuspended()) {
-            throw new ProblemException(ProblemType.INVALID_SUSPENSION_STATE, "Account is already suspended");
+            throw new ProblemException(ProblemReason.ACCOUNT_ALREADY_SUSPENDED, "Account is already suspended");
         }
         var pendingOrderIds = orderRepository.lockPendingIdsByUserId(userId);
         for (var orderId : pendingOrderIds) {

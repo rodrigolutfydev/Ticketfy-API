@@ -11,6 +11,7 @@ O que já está pronto na API do Ticketfy e o que vem a seguir. Os detalhes de c
 - [x] Categoria de evento com filtro na vitrine e contagem de eventos por categoria
 - [x] Lotes com preço, quantidade, limite por pedido e edição sem afetar pedidos feitos
 - [x] Foto de perfil e capa de evento por endereço https
+- [x] Idioma preferido salvo na conta (português e inglês), com erros por campo e motivos estruturados para o front traduzir
 
 ### Compra e ingressos
 - [x] Pedidos com vários itens e preço congelado
@@ -52,7 +53,6 @@ O que já está pronto na API do Ticketfy e o que vem a seguir. Os detalhes de c
 
 ## Próximos passos
 
-- [ ] Idioma preferido salvo na conta
 - [ ] Adicionar o evento à agenda com arquivo `.ics`
 - [ ] E-mails transacionais com Brevo
 - [ ] Pagamento via Pix com Asaas
