@@ -10,7 +10,7 @@ Esta versão foi revisada contra o código, que é a fonte de verdade. Todas as 
 | --- | --- | --- |
 | Entidade | Classe `@Entity` mapeada para uma tabela. | `User`, `Event`, `TicketType`, `Order`, `OrderItem`, `Payment`, `Ticket`, `TicketTransfer`, `Coupon`, `AuthSession`, `RefreshToken`, `LedgerEntry`, `PayoutAccount`, `Payout`, `PayoutBlock` |
 | Tabela sem entidade | Tabela gravada e lida por JDBC, sem classe JPA. | `audit_log` |
-| Enum | Conjunto fechado de valores, gravado como texto e protegido por CHECK no banco. | `Role`, `EventCategory`, `OrderStatus`, `PaymentMethod`, `PaymentStatus`, `TicketStatus`, `DiscountType`, `RevocationReason`, `LedgerEntryType`, `PayoutStatus`, `DocumentType`, `PixKeyType`, `AuditAction`, `AuditActorType`, `AuditTargetType` |
+| Enum | Conjunto fechado de valores, gravado como texto e protegido por CHECK no banco. | `Role`, `Language`, `EventCategory`, `OrderStatus`, `PaymentMethod`, `PaymentStatus`, `TicketStatus`, `DiscountType`, `RevocationReason`, `LedgerEntryType`, `PayoutStatus`, `DocumentType`, `PixKeyType`, `AuditAction`, `AuditActorType`, `AuditTargetType` |
 
 **Convenções**
 
@@ -46,6 +46,7 @@ package "com.lutfy.ticketfy.user" {
     + register(dto: UserRegistrationDTO): ResponseEntity<UserDetailsDTO>
     + me(user: User): ResponseEntity<UserDetailsDTO>
     + updateAvatar(user: User, dto: UserAvatarUpdateDTO): ResponseEntity<UserDetailsDTO>
+    + updateLanguage(user: User, dto: LanguageUpdateDTO): ResponseEntity<UserDetailsDTO>
     + changePassword(user: User, dto: PasswordChangeDTO): ResponseEntity<LoginResponseDTO>
     + becomeOrganizer(user: User): ResponseEntity<Void>
   }
@@ -54,6 +55,7 @@ package "com.lutfy.ticketfy.user" {
     + becomeOrganizer(user: User): void
     + changePassword(userId: UUID, dto: PasswordChangeDTO): IssuedSession
     + updateAvatar(userId: UUID, dto: UserAvatarUpdateDTO): UserDetailsDTO
+    + updateLanguage(userId: UUID, dto: LanguageUpdateDTO): UserDetailsDTO
   }
   interface UserRepository <<Repository>> {
     + findByEmail(email: String): Optional<User>
@@ -63,6 +65,7 @@ package "com.lutfy.ticketfy.user" {
     name: String
     email: String
     password: String
+    language: String
   }
   class UserDetailsDTO <<record>> {
     id: UUID
@@ -70,6 +73,7 @@ package "com.lutfy.ticketfy.user" {
     email: String
     role: Role
     avatarUrl: String
+    language: Language
   }
   class User <<Entity>>
 }
@@ -87,12 +91,13 @@ As setas tracejadas são dependências: cada camada usa a seguinte, mas não gua
 
 ## 1 e 2. Classes e responsabilidades
 
-O domínio tem 15 entidades, 1 tabela sem entidade e 15 enums, organizados em quatro blocos: catálogo, vendas, financeiro do organizador e segurança e auditoria. "Organizador", "Participante", "Local" e "Validação" não viraram classes próprias; a justificativa está logo abaixo da tabela.
+O domínio tem 15 entidades, 1 tabela sem entidade e 16 enums, organizados em quatro blocos: catálogo, vendas, financeiro do organizador e segurança e auditoria. "Organizador", "Participante", "Local" e "Validação" não viraram classes próprias; a justificativa está logo abaixo da tabela.
 
 | Classe | Tipo | Pacote | Responsabilidade |
 | --- | --- | --- | --- |
-| `User` | Entidade | `user` | Representar qualquer pessoa com conta: cliente, organizador ou administrador. Guarda credenciais, perfil, foto e a data de exclusão da conta, e faz a promoção a organizador e a anonimização. |
+| `User` | Entidade | `user` | Representar qualquer pessoa com conta: cliente, organizador ou administrador. Guarda credenciais, perfil, foto, idioma preferido e a data de exclusão da conta, e faz a promoção a organizador e a anonimização. |
 | `Role` | Enum | `user` | Definir o perfil de acesso do usuário. |
+| `Language` | Enum | `user` | Definir o idioma preferido da conta, usado pelo front (RF26). |
 | `Event` | Entidade | `event` | Representar um evento, seu local, seu período, sua categoria, seu organizador, o destaque na vitrine e o cancelamento (RF06, RF07). |
 | `EventCategory` | Enum | `event` | Classificar o evento numa lista fixa de categorias, usada no filtro da vitrine (RF06, RF08). |
 | `TicketType` | Entidade | `tickettype` | Representar um lote de ingressos de um evento, com preço, estoque e limite por pedido (RF09, RF10, RN10 a RN13). |
@@ -142,6 +147,7 @@ Os atributos abaixo são os do código. Os relacionamentos aparecem como atribut
 | `User` | `name`, `email`, `password` | `String` | E-mail único (RN01); senha com hash BCrypt (RNF01). |
 | `User` | `role` | `Role` | RN02 |
 | `User` | `avatarUrl` | `String` | Endereço https opcional. |
+| `User` | `language` | `Language` | Padrão `PT_BR` (RF26). |
 | `User` | `createdAt`, `updatedAt` | `Instant` | |
 | `User` | `deletedAt` | `Instant` | Preenchido na exclusão da conta, que anonimiza nome, e-mail, foto e senha (RNF15). Não há campo de ativação (ver C03). |
 | `Event` | `id` | `UUID` | |
@@ -227,6 +233,7 @@ Os atributos abaixo são os do código. Os relacionamentos aparecem como atribut
 | Enum | Valores |
 | --- | --- |
 | `Role` | `USER`, `ORGANIZER`, `ADMIN` |
+| `Language` | `PT_BR` (gravado e exposto como `pt-BR`), `EN` (`en`) |
 | `OrderStatus` | `PENDING`, `PAID`, `EXPIRED`, `CANCELLED`, `REFUNDED` |
 | `PaymentMethod` | `SIMULATED`, `PIX`, `CREDIT_CARD` (só `SIMULATED` é usado hoje) |
 | `PaymentStatus` | `PENDING`, `APPROVED`, `REJECTED`, `REFUNDED` |
@@ -253,6 +260,7 @@ São listados apenas métodos que protegem uma regra de negócio dentro da próp
 | `User` | `promoteToOrganizer(): void` | Recusa promover quem já é organizador ou administrador (RF04). |
 | `User` | `changePassword(encodedPassword: String): void` | RF24 |
 | `User` | `changeAvatar(url: String): void` | — |
+| `User` | `changeLanguage(language: Language): void` | RF26 |
 | `User` | `anonymize(encodedPassword: String, now: Instant): void` | RNF15: substitui nome, e-mail, foto e senha e grava `deletedAt`. |
 | `User` | `isDeleted(): boolean` | RN03 |
 | `Event` | `updateFrom(dto: EventUpdateDTO): void` | RF07 |

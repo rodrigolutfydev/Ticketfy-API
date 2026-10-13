@@ -1,5 +1,6 @@
 package com.lutfy.ticketfy.ticket;
 
+import com.lutfy.ticketfy.infra.exception.ProblemReason;
 import com.lutfy.ticketfy.audit.AuditAction;
 import com.lutfy.ticketfy.audit.AuditService;
 import com.lutfy.ticketfy.audit.AuditTargetType;
@@ -64,7 +65,7 @@ public class TicketTransferService {
                 .orElseThrow(() -> new TicketNotFoundException("Ticket not found"));
         var now = policy.now();
         if (event.isCancelled()) {
-            throw new InvalidEventStateException("Event was cancelled");
+            throw new InvalidEventStateException(ProblemReason.EVENT_CANCELLED, "Event was cancelled");
         }
         if (!event.getStartsAt().isAfter(now)) {
             throw new ProblemException(ProblemType.TICKET_TRANSFER_CLOSED,
@@ -77,7 +78,7 @@ public class TicketTransferService {
                 .filter(found -> found.getOwner().getId().equals(sender.getId()))
                 .orElseThrow(() -> new TicketNotFoundException("Ticket not found"));
         if (ticket.getStatus() != TicketStatus.VALID) {
-            throw new InvalidTicketStateException("Only valid tickets can be transferred");
+            throw new InvalidTicketStateException(ProblemReason.TICKET_NOT_VALID, "Only valid tickets can be transferred");
         }
         if (ticket.getTransferCount() >= policy.maxPerTicket()) {
             throw new ProblemException(ProblemType.TICKET_TRANSFER_LIMIT_REACHED,
@@ -99,7 +100,7 @@ public class TicketTransferService {
         int updated = ticketRepository.transfer(ticketId, sender, recipient, ticketService.generateCode(), now,
                 TicketStatus.VALID, policy.maxPerTicket());
         if (updated == 0) {
-            throw new InvalidTicketStateException("Ticket is no longer available for transfer");
+            throw new InvalidTicketStateException(ProblemReason.TICKET_TRANSFER_UNAVAILABLE, "Ticket is no longer available for transfer");
         }
 
         transferRepository.saveAndFlush(new TicketTransfer(ticketId, sender.getId(), recipient.getId(), now));

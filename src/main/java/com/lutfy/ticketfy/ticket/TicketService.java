@@ -1,5 +1,6 @@
 package com.lutfy.ticketfy.ticket;
 
+import com.lutfy.ticketfy.infra.exception.ProblemReason;
 import com.lutfy.ticketfy.infra.exception.EventAccessDeniedException;
 import com.lutfy.ticketfy.infra.exception.InvalidOrderStateException;
 import com.lutfy.ticketfy.infra.exception.InvalidTicketStateException;
@@ -60,12 +61,12 @@ public class TicketService {
             throw new EventAccessDeniedException("You are not the organizer of this event");
         }
         if (ticket.getTicketType().getEvent().isCancelled()) {
-            throw new InvalidTicketStateException("Event was cancelled");
+            throw new InvalidTicketStateException(ProblemReason.TICKET_EVENT_CANCELLED, "Event was cancelled");
         }
 
         int updated = ticketRepository.checkIn(code, Instant.now(), TicketStatus.USED, TicketStatus.VALID);
         if (updated == 0) {
-            throw new InvalidTicketStateException("Ticket is not valid for check-in");
+            throw new InvalidTicketStateException(ProblemReason.TICKET_NOT_VALID, "Ticket is not valid for check-in");
         }
 
         var usedTicket = ticketRepository.findByCode(code)
@@ -97,7 +98,7 @@ public class TicketService {
         int cancelled = ticketRepository.cancelValidByOrderId(
                 orderId, Instant.now(), TicketStatus.CANCELLED, TicketStatus.VALID);
         if (cancelled != total) {
-            throw new InvalidOrderStateException("Order has tickets that were already used");
+            throw new InvalidOrderStateException(ProblemReason.ORDER_TICKETS_USED, "Order has tickets that were already used");
         }
     }
 }

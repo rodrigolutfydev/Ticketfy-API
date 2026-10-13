@@ -1,313 +1,391 @@
 [ {
   "slug" : "email-already-exists",
   "status" : 409,
-  "title" : "Email already exists"
+  "title" : "Email already exists",
+  "reasons" : [ ]
 }, {
   "slug" : "validation-failed",
   "status" : 400,
-  "title" : "Validation failed"
+  "title" : "Validation failed",
+  "reasons" : [ ]
 }, {
   "slug" : "malformed-request-body",
   "status" : 400,
-  "title" : "Malformed request body"
+  "title" : "Malformed request body",
+  "reasons" : [ ]
 }, {
   "slug" : "missing-parameter",
   "status" : 400,
-  "title" : "Missing parameter"
+  "title" : "Missing parameter",
+  "reasons" : [ ]
 }, {
   "slug" : "missing-header",
   "status" : 400,
-  "title" : "Missing header"
+  "title" : "Missing header",
+  "reasons" : [ ]
 }, {
   "slug" : "bad-request",
   "status" : 400,
-  "title" : "Bad request"
+  "title" : "Bad request",
+  "reasons" : [ ]
 }, {
   "slug" : "unsupported-media-type",
   "status" : 415,
-  "title" : "Unsupported media type"
+  "title" : "Unsupported media type",
+  "reasons" : [ ]
 }, {
   "slug" : "invalid-credentials",
   "status" : 401,
-  "title" : "Invalid credentials"
+  "title" : "Invalid credentials",
+  "reasons" : [ ]
 }, {
   "slug" : "authentication-required",
   "status" : 401,
-  "title" : "Authentication required"
+  "title" : "Authentication required",
+  "reasons" : [ ]
 }, {
   "slug" : "session-expired",
   "status" : 401,
-  "title" : "Session expired"
+  "title" : "Session expired",
+  "reasons" : [ ]
 }, {
   "slug" : "auth-request-rejected",
   "status" : 403,
-  "title" : "Auth request rejected"
+  "title" : "Auth request rejected",
+  "reasons" : [ ]
 }, {
   "slug" : "access-denied",
   "status" : 403,
-  "title" : "Access denied"
+  "title" : "Access denied",
+  "reasons" : [ ]
 }, {
   "slug" : "too-many-login-attempts",
   "status" : 429,
-  "title" : "Too many login attempts"
+  "title" : "Too many login attempts",
+  "reasons" : [ ]
 }, {
   "slug" : "internal-error",
   "status" : 500,
-  "title" : "Internal server error"
+  "title" : "Internal server error",
+  "reasons" : [ ]
 }, {
   "slug" : "invalid-role-change",
   "status" : 409,
-  "title" : "Invalid role change"
+  "title" : "Invalid role change",
+  "reasons" : [ ]
 }, {
   "slug" : "user-not-found",
   "status" : 404,
-  "title" : "User not found"
+  "title" : "User not found",
+  "reasons" : [ ]
 }, {
   "slug" : "event-not-found",
   "status" : 404,
-  "title" : "Event not found"
+  "title" : "Event not found",
+  "reasons" : [ ]
 }, {
   "slug" : "event-access-denied",
   "status" : 403,
-  "title" : "Event access denied"
+  "title" : "Event access denied",
+  "reasons" : [ ]
 }, {
   "slug" : "invalid-event-dates",
   "status" : 400,
-  "title" : "Invalid event dates"
+  "title" : "Invalid event dates",
+  "reasons" : [ ]
 }, {
   "slug" : "invalid-parameter",
   "status" : 400,
-  "title" : "Invalid parameter"
+  "title" : "Invalid parameter",
+  "reasons" : [ ]
 }, {
   "slug" : "ticket-type-not-found",
   "status" : 404,
-  "title" : "Ticket type not found"
+  "title" : "Ticket type not found",
+  "reasons" : [ ]
 }, {
   "slug" : "invalid-ticket-type-quantity",
   "status" : 400,
-  "title" : "Invalid ticket type quantity"
+  "title" : "Invalid ticket type quantity",
+  "reasons" : [ "below-sold" ]
 }, {
   "slug" : "invalid-ticket-type-state",
   "status" : 409,
-  "title" : "Invalid ticket type state"
+  "title" : "Invalid ticket type state",
+  "reasons" : [ "already-active", "already-inactive" ]
 }, {
   "slug" : "ticket-type-name-already-exists",
   "status" : 409,
-  "title" : "Ticket type name already exists"
+  "title" : "Ticket type name already exists",
+  "reasons" : [ ]
 }, {
   "slug" : "invalid-order-state",
   "status" : 409,
-  "title" : "Invalid order state"
+  "title" : "Invalid order state",
+  "reasons" : [ "expired", "refund-period-ended", "tickets-used", "not-pending", "not-paid" ]
 }, {
   "slug" : "insufficient-stock",
   "status" : 409,
-  "title" : "Insufficient stock"
+  "title" : "Insufficient stock",
+  "reasons" : [ ]
 }, {
   "slug" : "mixed-events-order",
   "status" : 400,
-  "title" : "Mixed events order"
+  "title" : "Mixed events order",
+  "reasons" : [ ]
 }, {
   "slug" : "max-per-order-exceeded",
   "status" : 400,
-  "title" : "Max per order exceeded"
+  "title" : "Max per order exceeded",
+  "reasons" : [ ]
 }, {
   "slug" : "max-per-buyer-exceeded",
   "status" : 409,
-  "title" : "Max per buyer exceeded"
+  "title" : "Max per buyer exceeded",
+  "reasons" : [ ]
 }, {
   "slug" : "order-not-found",
   "status" : 404,
-  "title" : "Order not found"
+  "title" : "Order not found",
+  "reasons" : [ ]
 }, {
   "slug" : "order-has-transferred-tickets",
   "status" : 409,
-  "title" : "Order has transferred tickets"
+  "title" : "Order has transferred tickets",
+  "reasons" : [ ]
 }, {
   "slug" : "invalid-payment-state",
   "status" : 409,
-  "title" : "Invalid payment state"
+  "title" : "Invalid payment state",
+  "reasons" : [ "already-paid", "not-pending", "not-approved" ]
 }, {
   "slug" : "invalid-ticket-state",
   "status" : 409,
-  "title" : "Invalid ticket state"
+  "title" : "Invalid ticket state",
+  "reasons" : [ "event-cancelled", "not-valid", "transfer-unavailable" ]
 }, {
   "slug" : "ticket-not-found",
   "status" : 404,
-  "title" : "Ticket not found"
+  "title" : "Ticket not found",
+  "reasons" : [ ]
 }, {
   "slug" : "ticket-transfer-closed",
   "status" : 409,
-  "title" : "Ticket transfer closed"
+  "title" : "Ticket transfer closed",
+  "reasons" : [ ]
 }, {
   "slug" : "ticket-transfer-limit-reached",
   "status" : 409,
-  "title" : "Ticket transfer limit reached"
+  "title" : "Ticket transfer limit reached",
+  "reasons" : [ ]
 }, {
   "slug" : "self-transfer",
   "status" : 400,
-  "title" : "Self transfer"
+  "title" : "Self transfer",
+  "reasons" : [ ]
 }, {
   "slug" : "transfer-recipient-unavailable",
   "status" : 422,
-  "title" : "Transfer recipient unavailable"
+  "title" : "Transfer recipient unavailable",
+  "reasons" : [ ]
 }, {
   "slug" : "too-many-transfer-attempts",
   "status" : 429,
-  "title" : "Too many transfer attempts"
+  "title" : "Too many transfer attempts",
+  "reasons" : [ ]
 }, {
   "slug" : "resource-not-found",
   "status" : 404,
-  "title" : "Resource not found"
+  "title" : "Resource not found",
+  "reasons" : [ ]
 }, {
   "slug" : "method-not-allowed",
   "status" : 405,
-  "title" : "Method not allowed"
+  "title" : "Method not allowed",
+  "reasons" : [ ]
 }, {
   "slug" : "invalid-event-state",
   "status" : 409,
-  "title" : "Invalid event state"
+  "title" : "Invalid event state",
+  "reasons" : [ "cancelled", "ended" ]
 }, {
   "slug" : "event-has-sales",
   "status" : 409,
-  "title" : "Event has sales"
+  "title" : "Event has sales",
+  "reasons" : [ ]
 }, {
   "slug" : "sales-closed",
   "status" : 409,
-  "title" : "Sales closed"
+  "title" : "Sales closed",
+  "reasons" : [ ]
 }, {
   "slug" : "invalid-password",
   "status" : 403,
-  "title" : "Invalid password"
+  "title" : "Invalid password",
+  "reasons" : [ ]
 }, {
   "slug" : "too-many-password-attempts",
   "status" : 429,
-  "title" : "Too many password attempts"
+  "title" : "Too many password attempts",
+  "reasons" : [ ]
 }, {
   "slug" : "payout-account-not-found",
   "status" : 404,
-  "title" : "Payout account not found"
+  "title" : "Payout account not found",
+  "reasons" : [ ]
 }, {
   "slug" : "payout-account-required",
   "status" : 409,
-  "title" : "Payout account required"
+  "title" : "Payout account required",
+  "reasons" : [ ]
 }, {
   "slug" : "payout-account-cooldown",
   "status" : 409,
-  "title" : "Payout account cooldown"
+  "title" : "Payout account cooldown",
+  "reasons" : [ ]
 }, {
   "slug" : "pix-key-not-found",
   "status" : 400,
-  "title" : "Pix key not found"
+  "title" : "Pix key not found",
+  "reasons" : [ ]
 }, {
   "slug" : "pix-key-holder-mismatch",
   "status" : 400,
-  "title" : "Pix key holder mismatch"
+  "title" : "Pix key holder mismatch",
+  "reasons" : [ ]
 }, {
   "slug" : "payout-in-progress",
   "status" : 409,
-  "title" : "Payout in progress"
+  "title" : "Payout in progress",
+  "reasons" : [ ]
 }, {
   "slug" : "negative-available-balance",
   "status" : 409,
-  "title" : "Negative available balance"
+  "title" : "Negative available balance",
+  "reasons" : [ ]
 }, {
   "slug" : "payout-below-minimum",
   "status" : 400,
-  "title" : "Payout below minimum"
+  "title" : "Payout below minimum",
+  "reasons" : [ ]
 }, {
   "slug" : "payout-exceeds-available",
   "status" : 409,
-  "title" : "Payout exceeds available balance"
+  "title" : "Payout exceeds available balance",
+  "reasons" : [ ]
 }, {
   "slug" : "payout-not-found",
   "status" : 404,
-  "title" : "Payout not found"
+  "title" : "Payout not found",
+  "reasons" : [ ]
 }, {
   "slug" : "invalid-payout-state",
   "status" : 409,
-  "title" : "Invalid payout state"
+  "title" : "Invalid payout state",
+  "reasons" : [ "already-processing", "not-cancellable", "not-under-review", "changed-concurrently" ]
 }, {
   "slug" : "payouts-blocked",
   "status" : 409,
-  "title" : "Payouts blocked"
+  "title" : "Payouts blocked",
+  "reasons" : [ ]
 }, {
   "slug" : "invalid-payout-block-state",
   "status" : 409,
-  "title" : "Invalid payout block state"
+  "title" : "Invalid payout block state",
+  "reasons" : [ "already-blocked", "not-blocked" ]
 }, {
   "slug" : "organizer-not-found",
   "status" : 404,
-  "title" : "Organizer not found"
+  "title" : "Organizer not found",
+  "reasons" : [ ]
 }, {
   "slug" : "coupon-not-found",
   "status" : 404,
-  "title" : "Coupon not found"
+  "title" : "Coupon not found",
+  "reasons" : [ ]
 }, {
   "slug" : "coupon-code-already-exists",
   "status" : 409,
-  "title" : "Coupon code already exists"
+  "title" : "Coupon code already exists",
+  "reasons" : [ ]
 }, {
   "slug" : "coupon-already-used",
   "status" : 409,
-  "title" : "Coupon already used"
+  "title" : "Coupon already used",
+  "reasons" : [ "discount-locked", "delete-blocked" ]
 }, {
   "slug" : "invalid-coupon-settings",
   "status" : 400,
-  "title" : "Invalid coupon settings"
+  "title" : "Invalid coupon settings",
+  "reasons" : [ "percent-out-of-range", "ends-before-starts", "max-uses-below-used" ]
 }, {
   "slug" : "invalid-coupon",
   "status" : 422,
-  "title" : "Invalid coupon"
+  "title" : "Invalid coupon",
+  "reasons" : [ ]
 }, {
   "slug" : "coupon-buyer-limit-reached",
   "status" : 422,
-  "title" : "Coupon buyer limit reached"
+  "title" : "Coupon buyer limit reached",
+  "reasons" : [ ]
 }, {
   "slug" : "too-many-coupon-attempts",
   "status" : 429,
-  "title" : "Too many coupon attempts"
+  "title" : "Too many coupon attempts",
+  "reasons" : [ ]
 }, {
   "slug" : "email-not-allowed",
   "status" : 400,
-  "title" : "Email not allowed"
+  "title" : "Email not allowed",
+  "reasons" : [ ]
 }, {
   "slug" : "too-many-data-exports",
   "status" : 429,
-  "title" : "Too many data exports"
+  "title" : "Too many data exports",
+  "reasons" : [ ]
 }, {
   "slug" : "admin-account-deletion",
   "status" : 409,
-  "title" : "Admin account deletion"
+  "title" : "Admin account deletion",
+  "reasons" : [ ]
 }, {
   "slug" : "account-suspended",
   "status" : 403,
-  "title" : "Account suspended"
+  "title" : "Account suspended",
+  "reasons" : [ ]
 }, {
   "slug" : "admin-account-suspension",
   "status" : 409,
-  "title" : "Admin account suspension"
+  "title" : "Admin account suspension",
+  "reasons" : [ ]
 }, {
   "slug" : "invalid-suspension-state",
   "status" : 409,
-  "title" : "Invalid suspension state"
+  "title" : "Invalid suspension state",
+  "reasons" : [ "already-suspended", "not-suspended" ]
 }, {
   "slug" : "account-has-payout-block",
   "status" : 409,
-  "title" : "Account has payout block"
+  "title" : "Account has payout block",
+  "reasons" : [ ]
 }, {
   "slug" : "account-has-payout-in-progress",
   "status" : 409,
-  "title" : "Account has payout in progress"
+  "title" : "Account has payout in progress",
+  "reasons" : [ ]
 }, {
   "slug" : "account-has-balance",
   "status" : 409,
-  "title" : "Account has balance"
+  "title" : "Account has balance",
+  "reasons" : [ ]
 }, {
   "slug" : "account-has-active-events",
   "status" : 409,
-  "title" : "Account has active events"
+  "title" : "Account has active events",
+  "reasons" : [ ]
 }, {
   "slug" : "account-has-upcoming-tickets",
   "status" : 409,
-  "title" : "Account has upcoming tickets"
+  "title" : "Account has upcoming tickets",
+  "reasons" : [ ]
 } ]

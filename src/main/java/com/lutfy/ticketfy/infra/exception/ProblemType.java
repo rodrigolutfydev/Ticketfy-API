@@ -2,6 +2,9 @@ package com.lutfy.ticketfy.infra.exception;
 
 import org.springframework.http.HttpStatus;
 
+import java.util.Arrays;
+import java.util.List;
+
 public enum ProblemType {
 
     EMAIL_ALREADY_EXISTS("email-already-exists", "Email already exists", HttpStatus.CONFLICT),
@@ -103,5 +106,12 @@ public enum ProblemType {
 
     public HttpStatus status() {
         return status;
+    }
+
+    public List<String> reasons() {
+        return Arrays.stream(ProblemReason.values())
+                .filter(reason -> reason.type() == this)
+                .map(ProblemReason::value)
+                .toList();
     }
 }

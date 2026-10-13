@@ -82,7 +82,7 @@ public class DataExportService {
 
         var export = new DataExportDTO(DataExportDTO.SCHEMA_VERSION, now,
                 new Profile(user.getId(), user.getName(), user.getEmail(), user.getRole(), user.getAvatarUrl(),
-                        user.getCreatedAt(), user.getUpdatedAt()),
+                        user.getLanguage(), user.getCreatedAt(), user.getUpdatedAt()),
                 queries.findOrders(user.getId()),
                 queries.findOwnedTickets(user.getId()),
                 queries.findTransfers(user.getId()),

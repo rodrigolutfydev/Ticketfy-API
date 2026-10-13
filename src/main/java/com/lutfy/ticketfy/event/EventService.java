@@ -1,5 +1,6 @@
 package com.lutfy.ticketfy.event;
 
+import com.lutfy.ticketfy.infra.exception.ProblemReason;
 import com.lutfy.ticketfy.audit.AuditAction;
 import com.lutfy.ticketfy.audit.AuditService;
 import com.lutfy.ticketfy.audit.AuditTargetType;
@@ -141,14 +142,14 @@ public class EventService {
         var current = repository.findByIdAndActiveTrue(id)
                 .orElseThrow(() -> new EventNotFoundException("Event not found"));
         if (current.isCancelled()) {
-            throw new InvalidEventStateException("Event is already cancelled");
+            throw new InvalidEventStateException(ProblemReason.EVENT_CANCELLED, "Event is already cancelled");
         }
-        throw new InvalidEventStateException("Event has already ended");
+        throw new InvalidEventStateException(ProblemReason.EVENT_ENDED, "Event has already ended");
     }
 
     private void checkNotCancelled(Event event) {
         if (event.isCancelled()) {
-            throw new InvalidEventStateException("Event was cancelled");
+            throw new InvalidEventStateException(ProblemReason.EVENT_CANCELLED, "Event was cancelled");
         }
     }
 

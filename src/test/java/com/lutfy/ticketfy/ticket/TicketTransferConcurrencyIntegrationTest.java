@@ -1,5 +1,6 @@
 package com.lutfy.ticketfy.ticket;
 
+import com.lutfy.ticketfy.infra.exception.ProblemReason;
 import com.lutfy.ticketfy.event.EventCancellationDTO;
 import com.lutfy.ticketfy.event.EventCancellationService;
 import com.lutfy.ticketfy.infra.exception.InvalidEventStateException;
@@ -161,6 +162,10 @@ class TicketTransferConcurrencyIntegrationTest extends TicketTransferTestBase {
             if (result != null) {
                 assertThat(result).isInstanceOfAny(InvalidTicketStateException.class, TicketNotFoundException.class,
                         InvalidEventStateException.class, ProblemException.class);
+                if (result instanceof InvalidTicketStateException ticketState) {
+                    assertThat(ticketState.getReason()).isIn(ProblemReason.TICKET_NOT_VALID,
+                            ProblemReason.TICKET_TRANSFER_UNAVAILABLE);
+                }
             }
         });
     }

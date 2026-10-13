@@ -194,7 +194,8 @@ class PayoutRequestIntegrationTest extends PayoutTestBase {
         assertThat(ledgerCount("PAYOUT_REVERSAL")).isEqualTo(1);
         mockMvc.perform(post("/organizer/payouts/" + payoutId + "/cancel").header("Authorization", bearer(organizer)))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.type").value(PROBLEMS + "invalid-payout-state"));
+                .andExpect(jsonPath("$.type").value(PROBLEMS + "invalid-payout-state"))
+                .andExpect(jsonPath("$.reason").value("not-cancellable"));
         requestPayout(organizer, "95.00", PASSWORD, null).andExpect(status().isCreated());
     }
 

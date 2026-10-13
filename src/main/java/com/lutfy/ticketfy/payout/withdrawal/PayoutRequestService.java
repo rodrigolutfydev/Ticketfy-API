@@ -1,5 +1,6 @@
 package com.lutfy.ticketfy.payout.withdrawal;
 
+import com.lutfy.ticketfy.infra.exception.ProblemReason;
 import com.lutfy.ticketfy.audit.AuditAction;
 import com.lutfy.ticketfy.audit.AuditService;
 import com.lutfy.ticketfy.audit.AuditTargetType;
@@ -152,7 +153,7 @@ public class PayoutRequestService {
         try {
             payoutRepository.saveAndFlush(payout);
         } catch (ObjectOptimisticLockingFailureException ex) {
-            throw new ProblemException(ProblemType.INVALID_PAYOUT_STATE, "Payout is already being processed");
+            throw new ProblemException(ProblemReason.PAYOUT_ALREADY_PROCESSING, "Payout is already being processed");
         }
         ledgerService.recordPayoutReversal(payout);
         auditService.record(AuditAction.PAYOUT_CANCELLED, AuditTargetType.PAYOUT, payout.getId(),

@@ -1,5 +1,6 @@
 package com.lutfy.ticketfy.coupon;
 
+import com.lutfy.ticketfy.infra.exception.ProblemReason;
 import com.lutfy.ticketfy.audit.AuditAction;
 import com.lutfy.ticketfy.audit.AuditService;
 import com.lutfy.ticketfy.audit.AuditTargetType;
@@ -97,12 +98,13 @@ public class CouponService {
         var settings = dto.settings();
         validate(settings);
         if (coupon.isUsed() && coupon.changesDiscount(settings)) {
-            throw new ProblemException(ProblemType.COUPON_ALREADY_USED,
+            throw new ProblemException(ProblemReason.COUPON_DISCOUNT_LOCKED,
                     "Discount type and value cannot change after the coupon was used");
         }
         if (settings.maxUses() != null && settings.maxUses() < coupon.getUsesCount()) {
-            throw new ProblemException(ProblemType.INVALID_COUPON_SETTINGS,
-                    "maxUses cannot be lower than the " + coupon.getUsesCount() + " uses already made");
+            throw new ProblemException(ProblemReason.COUPON_MAX_USES_BELOW_USED,
+                    "maxUses cannot be lower than the " + coupon.getUsesCount() + " uses already made",
+                    Map.of("usesCount", coupon.getUsesCount()));
         }
 
         var before = describe(current(coupon));
@@ -141,7 +143,7 @@ public class CouponService {
         var coupon = couponRepository.findForUpdate(couponId, eventId)
                 .orElseThrow(() -> new ProblemException(ProblemType.COUPON_NOT_FOUND, "Coupon not found"));
         if (coupon.isUsed()) {
-            throw new ProblemException(ProblemType.COUPON_ALREADY_USED,
+            throw new ProblemException(ProblemReason.COUPON_DELETE_BLOCKED,
                     "Coupons that were already used cannot be deleted; deactivate it instead");
         }
         couponRepository.delete(coupon);
@@ -215,12 +217,13 @@ public class CouponService {
 
     private static void validate(CouponSettings settings) {
         if (settings.discountType() == DiscountType.PERCENT && settings.discountValue().compareTo(MAX_PERCENT) > 0) {
-            throw new ProblemException(ProblemType.INVALID_COUPON_SETTINGS,
-                    "Percentage discounts must be between 0.01 and 100");
+            throw new ProblemException(ProblemReason.COUPON_PERCENT_OUT_OF_RANGE,
+                    "Percentage discounts must be between 0.01 and 100",
+                    Map.of("min", new BigDecimal("0.01"), "max", MAX_PERCENT));
         }
         if (settings.startsAt() != null && settings.endsAt() != null
                 && !settings.endsAt().isAfter(settings.startsAt())) {
-            throw new ProblemException(ProblemType.INVALID_COUPON_SETTINGS, "endsAt must be after startsAt");
+            throw new ProblemException(ProblemReason.COUPON_ENDS_BEFORE_STARTS, "endsAt must be after startsAt");
         }
     }
 
@@ -274,7 +277,7 @@ public class CouponService {
 
     private static void checkNotCancelled(Event event) {
         if (event.isCancelled()) {
-            throw new InvalidEventStateException("Event was cancelled");
+            throw new InvalidEventStateException(ProblemReason.EVENT_CANCELLED, "Event was cancelled");
         }
     }
 }

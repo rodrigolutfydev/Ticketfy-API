@@ -1,5 +1,6 @@
 package com.lutfy.ticketfy.tickettype;
 
+import com.lutfy.ticketfy.infra.exception.ProblemReason;
 import com.lutfy.ticketfy.audit.AuditAction;
 import com.lutfy.ticketfy.audit.AuditService;
 import com.lutfy.ticketfy.audit.AuditTargetType;
@@ -8,7 +9,6 @@ import com.lutfy.ticketfy.event.EventRepository;
 import com.lutfy.ticketfy.infra.exception.EventAccessDeniedException;
 import com.lutfy.ticketfy.infra.exception.EventNotFoundException;
 import com.lutfy.ticketfy.infra.exception.InvalidEventStateException;
-import com.lutfy.ticketfy.infra.exception.InvalidTicketTypeQuantityException;
 import com.lutfy.ticketfy.infra.exception.ProblemException;
 import com.lutfy.ticketfy.infra.exception.ProblemType;
 import com.lutfy.ticketfy.infra.exception.TicketTypeNameAlreadyExistsException;
@@ -80,8 +80,9 @@ public class TicketTypeService {
         if (dto.quantityTotal() != null
                 && ticketTypeRepository.changeQuantityTotal(ticketTypeId, dto.quantityTotal()) == 0) {
             entityManager.refresh(ticketType);
-            throw new InvalidTicketTypeQuantityException("quantityTotal cannot be lower than the "
-                    + ticketType.getQuantitySold() + " tickets already sold or reserved");
+            throw new ProblemException(ProblemReason.TICKET_TYPE_BELOW_SOLD, "quantityTotal cannot be lower than the "
+                    + ticketType.getQuantitySold() + " tickets already sold or reserved",
+                    Map.of("quantitySold", ticketType.getQuantitySold()));
         }
 
         entityManager.refresh(ticketType);
@@ -114,8 +115,9 @@ public class TicketTypeService {
                     "Ticket sales for this event have ended, so the ticket type cannot be reactivated");
         }
         if (ticketTypeRepository.changeActive(ticketTypeId, active, now) == 0) {
-            throw new ProblemException(ProblemType.INVALID_TICKET_TYPE_STATE,
-                    active ? "Ticket type is already active" : "Ticket type is already inactive");
+            throw active
+                    ? new ProblemException(ProblemReason.TICKET_TYPE_ALREADY_ACTIVE, "Ticket type is already active")
+                    : new ProblemException(ProblemReason.TICKET_TYPE_ALREADY_INACTIVE, "Ticket type is already inactive");
         }
         auditService.record(active ? AuditAction.TICKET_TYPE_REACTIVATED : AuditAction.TICKET_TYPE_DEACTIVATED,
                 AuditTargetType.TICKET_TYPE, ticketTypeId, Map.of("eventId", eventId, "name", ticketType.getName()));
@@ -164,7 +166,7 @@ public class TicketTypeService {
 
     private void checkNotCancelled(Event event) {
         if (event.isCancelled()) {
-            throw new InvalidEventStateException("Event was cancelled");
+            throw new InvalidEventStateException(ProblemReason.EVENT_CANCELLED, "Event was cancelled");
         }
     }
 

@@ -96,7 +96,8 @@ class SalesWindowIntegrationTest extends ClockedIntegrationTestBase {
         travelTo(startsAt.plus(Duration.ofMinutes(15)));
         pay(orderId)
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.type").value(endsWith("/invalid-order-state")));
+                .andExpect(jsonPath("$.type").value(endsWith("/invalid-order-state")))
+                .andExpect(jsonPath("$.reason").value("expired"));
 
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM tickets WHERE order_id = ?", Long.class, orderId))
                 .isZero();

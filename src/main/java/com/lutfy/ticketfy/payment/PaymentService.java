@@ -1,5 +1,6 @@
 package com.lutfy.ticketfy.payment;
 
+import com.lutfy.ticketfy.infra.exception.ProblemReason;
 import com.lutfy.ticketfy.infra.exception.InvalidEventStateException;
 import com.lutfy.ticketfy.infra.exception.InvalidOrderStateException;
 import com.lutfy.ticketfy.infra.exception.InvalidPaymentStateException;
@@ -53,13 +54,13 @@ public class PaymentService {
             throw new OrderNotFoundException("Order not found");
         }
         if (order.belongsToCancelledEvent()) {
-            throw new InvalidEventStateException("The event for this order was cancelled");
+            throw new InvalidEventStateException(ProblemReason.EVENT_CANCELLED, "The event for this order was cancelled");
         }
         if (paymentRepository.existsByOrderIdAndStatus(orderId, PaymentStatus.APPROVED)) {
-            throw new InvalidPaymentStateException("This order has already been paid");
+            throw new InvalidPaymentStateException(ProblemReason.PAYMENT_ALREADY_PAID, "This order has already been paid");
         }
         if (order.isExpired(clock.instant())) {
-            throw new InvalidOrderStateException("This order has expired");
+            throw new InvalidOrderStateException(ProblemReason.ORDER_EXPIRED, "This order has expired");
         }
 
         var payment = new Payment(order, PaymentMethod.SIMULATED);

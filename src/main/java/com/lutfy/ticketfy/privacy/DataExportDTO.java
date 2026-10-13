@@ -4,6 +4,7 @@ import com.lutfy.ticketfy.payout.account.DocumentType;
 import com.lutfy.ticketfy.payout.account.PixKeyType;
 import com.lutfy.ticketfy.payout.ledger.BalanceDTO;
 import com.lutfy.ticketfy.payout.ledger.LedgerEntryDTO;
+import com.lutfy.ticketfy.user.Language;
 import com.lutfy.ticketfy.user.Role;
 
 import java.math.BigDecimal;
@@ -22,7 +23,7 @@ public record DataExportDTO(
 ) {
     public static final int SCHEMA_VERSION = 1;
 
-    public record Profile(UUID id, String name, String email, Role role, String avatarUrl,
+    public record Profile(UUID id, String name, String email, Role role, String avatarUrl, Language language,
                           Instant createdAt, Instant updatedAt) {}
 
     public record EventRef(UUID id, String name, Instant startsAt) {}

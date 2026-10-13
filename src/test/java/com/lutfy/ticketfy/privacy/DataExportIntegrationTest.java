@@ -64,6 +64,7 @@ class DataExportIntegrationTest extends PrivacyTestBase {
         assertThat(profile.get("name").asString()).isEqualTo(exporter.getName());
         assertThat(profile.get("email").asString()).isEqualTo(exporter.getEmail());
         assertThat(profile.get("avatarUrl").asString()).isEqualTo(exporter.getAvatarUrl());
+        assertThat(profile.get("language").asString()).isEqualTo("pt-BR");
 
         var order = find(export.get("orders"), "id", orderId.toString());
         assertThat(order.get("status").asString()).isEqualTo("PAID");

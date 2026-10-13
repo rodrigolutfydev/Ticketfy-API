@@ -1,5 +1,6 @@
 package com.lutfy.ticketfy.payout.admin;
 
+import com.lutfy.ticketfy.infra.exception.ProblemReason;
 import com.lutfy.ticketfy.audit.AuditAction;
 import com.lutfy.ticketfy.audit.AuditService;
 import com.lutfy.ticketfy.audit.AuditTargetType;
@@ -104,7 +105,7 @@ public class AdminPayoutService {
     public OrganizerPayoutStatusDTO block(UUID organizerId, String reason, User admin) {
         var organizer = findOrganizer(organizerId);
         if (blockRepository.existsById(organizerId)) {
-            throw new ProblemException(ProblemType.INVALID_PAYOUT_BLOCK_STATE, "Payouts are already blocked");
+            throw new ProblemException(ProblemReason.PAYOUTS_ALREADY_BLOCKED, "Payouts are already blocked");
         }
         var trimmed = reason.trim();
         blockRepository.saveAndFlush(new PayoutBlock(organizerId, trimmed, admin.getId(), clock.instant()));
@@ -117,7 +118,7 @@ public class AdminPayoutService {
     public OrganizerPayoutStatusDTO unblock(UUID organizerId) {
         var organizer = findOrganizer(organizerId);
         var block = blockRepository.findById(organizerId)
-                .orElseThrow(() -> new ProblemException(ProblemType.INVALID_PAYOUT_BLOCK_STATE, "Payouts are not blocked"));
+                .orElseThrow(() -> new ProblemException(ProblemReason.PAYOUTS_NOT_BLOCKED, "Payouts are not blocked"));
         blockRepository.delete(block);
         blockRepository.flush();
         auditService.record(AuditAction.PAYOUTS_UNBLOCKED, AuditTargetType.ORGANIZER, organizerId,
@@ -147,7 +148,7 @@ public class AdminPayoutService {
         try {
             payoutRepository.saveAndFlush(payout);
         } catch (ObjectOptimisticLockingFailureException ex) {
-            throw new ProblemException(ProblemType.INVALID_PAYOUT_STATE, "Payout was changed by another action");
+            throw new ProblemException(ProblemReason.PAYOUT_CHANGED_CONCURRENTLY, "Payout was changed by another action");
         }
     }
 

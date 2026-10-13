@@ -41,6 +41,7 @@ class OpenApiExportTest extends IntegrationTestBase {
 
         assertThat(document.get("info").get("title").asString()).isEqualTo("Ticketfy API");
         assertThat(document.get("paths").has("/users/me/deletion")).isTrue();
+        assertThat(document.get("paths").has("/users/me/language")).isTrue();
 
         Files.createDirectories(OUTPUT.getParent());
         Files.writeString(OUTPUT, mapper.writeValueAsString(document).replace("\r\n", "\n") + "\n", StandardCharsets.UTF_8);
@@ -65,10 +66,14 @@ class OpenApiExportTest extends IntegrationTestBase {
                     entry.put("slug", type.slug());
                     entry.put("status", type.status().value());
                     entry.put("title", type.title());
+                    entry.put("reasons", type.reasons());
                     return entry;
                 })
                 .toList();
         assertThat(types).extracting(entry -> entry.get("slug")).doesNotHaveDuplicates();
+        assertThat(types).filteredOn(entry -> entry.get("slug").equals("invalid-coupon-settings"))
+                .singleElement()
+                .satisfies(entry -> assertThat(entry.get("reasons")).asList().contains("max-uses-below-used"));
 
         var mapper = JsonMapper.builder().enable(SerializationFeature.INDENT_OUTPUT).build();
         Files.createDirectories(PROBLEM_TYPES.getParent());

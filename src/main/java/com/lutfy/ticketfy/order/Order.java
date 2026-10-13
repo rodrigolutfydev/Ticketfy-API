@@ -1,5 +1,6 @@
 package com.lutfy.ticketfy.order;
 
+import com.lutfy.ticketfy.infra.exception.ProblemReason;
 import com.lutfy.ticketfy.event.Event;
 import com.lutfy.ticketfy.infra.exception.InvalidOrderStateException;
 import com.lutfy.ticketfy.user.User;
@@ -90,21 +91,21 @@ public class Order {
 
     public void markAsPaid() {
         if (status != OrderStatus.PENDING) {
-            throw new InvalidOrderStateException("Only pending orders can be paid");
+            throw new InvalidOrderStateException(ProblemReason.ORDER_NOT_PENDING, "Only pending orders can be paid");
         }
         this.status = OrderStatus.PAID;
     }
 
     public void confirmWithoutPayment() {
         if (status != OrderStatus.PENDING || !isFree()) {
-            throw new InvalidOrderStateException("Only pending orders with a zero total can be confirmed without payment");
+            throw new InvalidOrderStateException(ProblemReason.ORDER_NOT_PENDING, "Only pending orders with a zero total can be confirmed without payment");
         }
         this.status = OrderStatus.PAID;
     }
 
     public void expire(Instant now) {
         if (status != OrderStatus.PENDING) {
-            throw new InvalidOrderStateException("Only pending orders can expire");
+            throw new InvalidOrderStateException(ProblemReason.ORDER_NOT_PENDING, "Only pending orders can expire");
         }
         if (!isExpired(now)) {
             throw new InvalidOrderStateException("Order has not reached its expiration time");
@@ -114,14 +115,14 @@ public class Order {
 
     public void cancel() {
         if (status != OrderStatus.PENDING) {
-            throw new InvalidOrderStateException("Only pending orders can be cancelled");
+            throw new InvalidOrderStateException(ProblemReason.ORDER_NOT_PENDING, "Only pending orders can be cancelled");
         }
         this.status = OrderStatus.CANCELLED;
     }
 
     public void refund() {
         if (status != OrderStatus.PAID) {
-            throw new InvalidOrderStateException("Only paid orders can be refunded");
+            throw new InvalidOrderStateException(ProblemReason.ORDER_NOT_PAID, "Only paid orders can be refunded");
         }
         this.status = OrderStatus.REFUNDED;
     }

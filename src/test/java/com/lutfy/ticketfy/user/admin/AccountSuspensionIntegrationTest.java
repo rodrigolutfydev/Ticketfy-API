@@ -118,11 +118,13 @@ class AccountSuspensionIntegrationTest extends PayoutTestBase {
                 .andExpect(jsonPath("$.type").value(PROBLEMS + "user-not-found"));
         reactivate(admin, buyer)
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.type").value(PROBLEMS + "invalid-suspension-state"));
+                .andExpect(jsonPath("$.type").value(PROBLEMS + "invalid-suspension-state"))
+                .andExpect(jsonPath("$.reason").value("not-suspended"));
         suspend(admin, buyer, "Primeira").andExpect(status().isOk());
         suspend(admin, buyer, "Segunda")
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.type").value(PROBLEMS + "invalid-suspension-state"));
+                .andExpect(jsonPath("$.type").value(PROBLEMS + "invalid-suspension-state"))
+                .andExpect(jsonPath("$.reason").value("already-suspended"));
 
         for (var outsider : List.of(user("USER"), user("ORGANIZER"))) {
             find(outsider, organizer.getEmail()).andExpect(status().isForbidden());

@@ -8,7 +8,7 @@ class SensitiveUserDTOTest {
 
     @Test
     void registrationToStringNeverShowsThePasswordOrPersonalData() {
-        var dto = new UserRegistrationDTO("Ana Souza", "ana@email.com", "senha-secreta-123");
+        var dto = new UserRegistrationDTO("Ana Souza", "ana@email.com", "senha-secreta-123", null);
 
         assertThat(dto.toString())
                 .doesNotContain("senha-secreta-123")
