@@ -9,6 +9,7 @@ import jakarta.servlet.DispatcherType;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.Customizer;
@@ -74,7 +75,7 @@ public class SecurityConfig {
         config.setAllowedOrigins(allowedOrigins);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("Authorization", "Content-Type", "Idempotency-Key", AuthOriginFilter.HEADER));
-        config.setExposedHeaders(List.of("Retry-After", RequestIdFilter.HEADER));
+        config.setExposedHeaders(List.of("Retry-After", RequestIdFilter.HEADER, HttpHeaders.CONTENT_DISPOSITION));
         config.setMaxAge(3600L);
 
         var source = new UrlBasedCorsConfigurationSource();

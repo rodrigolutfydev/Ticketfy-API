@@ -39,6 +39,7 @@ O contrato gerado a partir do código fica em [`openapi.json`](openapi.json). O 
 | Dinheiro | Número decimal com 2 casas, em reais: `80.00` |
 | Identificadores | UUID |
 | Rastreio | Toda resposta traz `X-Request-Id`. O cliente pode enviar o próprio (letras, números e hífen, até 64 caracteres) |
+| CORS | Só as origens de `CORS_ALLOWED_ORIGINS`, sem credenciais. O navegador consegue ler `Retry-After`, `X-Request-Id` e `Content-Disposition` (nome do arquivo nos downloads de CSV, JSON e `.ics`) |
 
 Na coluna **Acesso** das tabelas de endpoints:
 
@@ -61,7 +62,7 @@ A cada requisição, a API confere no banco a sessão que emitiu o token. Logout
 
 ### Refresh token em cookie
 
-O refresh token nunca aparece no corpo da resposta. Ele vai no cookie `__Host-ticketfy_rt` (`HttpOnly`, `Secure`, `SameSite=Strict`, `Path=/`), vale **30 minutos sem uso** e é trocado a cada renovação. A sessão dura no máximo **12 horas**. Reapresentar um refresh token já usado encerra a sessão inteira.
+O refresh token nunca aparece no corpo da resposta. Ele vai no cookie `__Host-ticketfy_rt` (`HttpOnly`, `Secure`, `SameSite=Strict`, `Path=/`), vale **30 minutos sem uso** e é trocado a cada renovação. A sessão dura no máximo **12 horas**. Reapresentar um refresh token já usado encerra a sessão inteira, com uma exceção: se ele foi trocado há menos de **30 segundos** e o sucessor ainda não foi usado, a API entende que a resposta anterior se perdeu (o cliente desistiu da requisição, por exemplo com a API acordando), invalida o sucessor que nunca chegou ao navegador e devolve um par novo normalmente. Um sucessor invalidado dessa forma, se aparecer depois, encerra a sessão.
 
 | Rota | O que faz |
 |---|---|
@@ -239,11 +240,11 @@ Os tipos abaixo trazem `reason`, com um dos valores da tabela. A lista também e
 
 | Slug | Status | Quando acontece |
 |---|---|---|
-| `validation-failed` | 400 | Campo inválido no corpo; ver `errors` |
+| `validation-failed` | 400 | Campo inválido no corpo ou cabeçalho inválido (`Idempotency-Key` em `POST /orders`); ver `errors` |
 | `malformed-request-body` | 400 | JSON malformado ou com tipo errado |
 | `missing-parameter` | 400 | Parâmetro de query obrigatório ausente |
 | `missing-header` | 400 | Header obrigatório ausente |
-| `invalid-parameter` | 400 | Parâmetro com valor inválido: UUID, enum, data, página, `sort`, intervalo de datas ou `Idempotency-Key` |
+| `invalid-parameter` | 400 | Parâmetro com valor inválido: UUID, enum, data, página, `sort`, intervalo de datas ou `Idempotency-Key` em `POST /organizer/payouts` |
 | `bad-request` | 400 | Requisição inválida sem tipo mais específico |
 | `invalid-event-dates` | 400 | Fim do evento não é depois do início |
 | `invalid-ticket-type-quantity` | 400 | Quantidade total do lote abaixo do vendido e reservado; traz `reason` e `quantitySold` |
@@ -369,6 +370,20 @@ Duas rotas aceitam o header opcional `Idempotency-Key` (1 a 100 caracteres; reco
 |---|---|
 | `POST /orders` | Repetir a chave devolve o mesmo pedido em vez de criar outro. A chave usada por outro usuário responde 404 `order-not-found` |
 | `POST /organizer/payouts` | Repetir a chave do mesmo organizador devolve o mesmo saque. Sem chave, um segundo saque enquanto o primeiro está em andamento responde 409 `payout-in-progress` |
+
+Em `POST /orders`, a chave precisa ter de 1 a 100 caracteres ASCII visíveis (sem espaço, acento ou caractere de controle). Fora disso, a resposta é 400 `validation-failed` com `field` igual a `Idempotency-Key` e `code` `size` (com `params.min` e `params.max`) ou `invalid`, antes de qualquer acesso ao banco:
+
+```json
+{
+  "type": "https://ticketfy-api.onrender.com/problems/validation-failed",
+  "status": 400,
+  "errors": [
+    { "field": "Idempotency-Key", "message": "Idempotency-Key must have between 1 and 100 characters", "code": "size", "params": { "min": 1, "max": 100 } }
+  ]
+}
+```
+
+Em `POST /organizer/payouts`, a chave vazia ou com mais de 100 caracteres responde 400 `invalid-parameter`.
 
 ## Limites de tentativas
 

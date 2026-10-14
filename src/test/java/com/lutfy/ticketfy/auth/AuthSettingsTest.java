@@ -17,6 +17,7 @@ class AuthSettingsTest {
                     "ticketfy.auth.access-token-minutes=10",
                     "ticketfy.auth.refresh-token-idle-minutes=30",
                     "ticketfy.auth.session-max-hours=12",
+                    "ticketfy.auth.refresh-reuse-grace-seconds=30",
                     "ticketfy.auth.cookie-name=__Host-ticketfy_rt",
                     "ticketfy.auth.cookie-secure=true",
                     "ticketfy.auth.proxy-secret=" + SECRET);
@@ -89,5 +90,34 @@ class AuthSettingsTest {
         assertThat(dev.getProperty("ticketfy.auth.cookie-secure")).isEqualTo("false");
         assertThat(prod.getProperty("ticketfy.auth.cookie-secure")).isNull();
         assertThat(prod.getProperty("ticketfy.auth.proxy-secret")).isNull();
+    }
+
+    @Test
+    void refreshReuseGraceCannotExceedSixtySeconds() {
+        runner.withPropertyValues("ticketfy.auth.refresh-reuse-grace-seconds=61")
+                .run(context -> assertThat(context).hasFailed()
+                        .getFailure()
+                        .rootCause()
+                        .isInstanceOf(IllegalStateException.class)
+                        .hasMessageContaining("refresh-reuse-grace-seconds must be between 0 and 60"));
+    }
+
+    @Test
+    void refreshReuseGraceCannotBeNegative() {
+        runner.withPropertyValues("ticketfy.auth.refresh-reuse-grace-seconds=-1")
+                .run(context -> assertThat(context).hasFailed()
+                        .getFailure()
+                        .rootCause()
+                        .hasMessageContaining("refresh-reuse-grace-seconds must be between 0 and 60"));
+    }
+
+    @Test
+    void refreshReuseGraceIsThirtySecondsInEveryProfile() throws Exception {
+        var properties = PropertiesLoaderUtils.loadProperties(new ClassPathResource("application.properties"));
+        assertThat(properties.getProperty("ticketfy.auth.refresh-reuse-grace-seconds")).isEqualTo("30");
+        for (var profile : new String[] {"application-dev.properties", "application-prod.properties"}) {
+            assertThat(PropertiesLoaderUtils.loadProperties(new ClassPathResource(profile))
+                    .getProperty("ticketfy.auth.refresh-reuse-grace-seconds")).isNull();
+        }
     }
 }

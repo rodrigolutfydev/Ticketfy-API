@@ -70,6 +70,6 @@ class TokenServiceTest {
     }
 
     private static AuthSettings settings() {
-        return new AuthSettings(10, 30, 12, "ticketfy_rt", false, "", new MockEnvironment());
+        return new AuthSettings(10, 30, 12, 30, "ticketfy_rt", false, "", new MockEnvironment());
     }
 }

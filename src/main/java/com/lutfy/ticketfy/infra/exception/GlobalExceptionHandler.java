@@ -2,6 +2,8 @@ package com.lutfy.ticketfy.infra.exception;
 
 import com.lutfy.ticketfy.infra.validation.ValidationCodes;
 import jakarta.validation.ConstraintViolation;
+import org.springframework.context.MessageSourceResolvable;
+import org.springframework.core.MethodParameter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.core.PropertyReferenceException;
@@ -17,9 +19,14 @@ import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.validation.FieldError;
+import org.springframework.validation.method.ParameterErrors;
+import org.springframework.validation.method.ParameterValidationResult;
 import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
@@ -45,6 +52,18 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ProblemDetail> handleValidation(MethodArgumentNotValidException ex) {
         List<ValidationErrorDTO> errors = ex.getBindingResult().getFieldErrors().stream()
                 .map(GlobalExceptionHandler::toValidationError)
+                .toList();
+        var problem = problems.create(ProblemType.VALIDATION_FAILED, "Validation failed");
+        problem.setProperty("errors", errors);
+        return problems.response(problem);
+    }
+
+    @ExceptionHandler(HandlerMethodValidationException.class)
+    public ResponseEntity<ProblemDetail> handleMethodValidation(HandlerMethodValidationException ex) {
+        List<ValidationErrorDTO> errors = ex.getParameterValidationResults().stream()
+                .flatMap(result -> result instanceof ParameterErrors parameterErrors
+                        ? parameterErrors.getFieldErrors().stream().map(GlobalExceptionHandler::toValidationError)
+                        : parameterValidationErrors(result).stream())
                 .toList();
         var problem = problems.create(ProblemType.VALIDATION_FAILED, "Validation failed");
         problem.setProperty("errors", errors);
@@ -255,6 +274,47 @@ public class GlobalExceptionHandler {
             problem.setProperty(ProblemReason.PROPERTY, ex.getReason().value());
         }
         return problems.response(problem);
+    }
+
+    private static List<ValidationErrorDTO> parameterValidationErrors(ParameterValidationResult result) {
+        var field = parameterName(result.getMethodParameter());
+        return result.getResolvableErrors().stream()
+                .map(error -> {
+                    ConstraintViolation<?> violation = unwrapViolation(result, error);
+                    var payload = ValidationCodes.of(violation);
+                    return new ValidationErrorDTO(field, error.getDefaultMessage(), payload.code(), payload.params());
+                })
+                .toList();
+    }
+
+    private static ConstraintViolation<?> unwrapViolation(ParameterValidationResult result,
+                                                          MessageSourceResolvable error) {
+        try {
+            return result.unwrap(error, ConstraintViolation.class);
+        } catch (RuntimeException ex) {
+            return null;
+        }
+    }
+
+    private static String parameterName(MethodParameter parameter) {
+        var header = parameter.getParameterAnnotation(RequestHeader.class);
+        if (header != null) {
+            return firstNonBlank(header.name(), header.value(), parameter.getParameterName());
+        }
+        var param = parameter.getParameterAnnotation(RequestParam.class);
+        if (param != null) {
+            return firstNonBlank(param.name(), param.value(), parameter.getParameterName());
+        }
+        return firstNonBlank(parameter.getParameterName());
+    }
+
+    private static String firstNonBlank(String... candidates) {
+        for (var candidate : candidates) {
+            if (candidate != null && !candidate.isBlank()) {
+                return candidate;
+            }
+        }
+        return "unknown";
     }
 
     private static ValidationErrorDTO toValidationError(FieldError error) {
