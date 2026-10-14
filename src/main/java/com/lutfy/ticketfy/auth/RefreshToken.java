@@ -12,6 +12,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -35,6 +36,7 @@ public class RefreshToken {
     private Instant expiresAt;
     private Instant usedAt;
     private UUID replacedBy;
+    private Instant revokedAt;
 
     public RefreshToken(AuthSession session, byte[] tokenHash, Instant now, Instant expiresAt) {
         this.session = session;
@@ -47,6 +49,14 @@ public class RefreshToken {
         return usedAt != null;
     }
 
+    public boolean isRevoked() {
+        return revokedAt != null;
+    }
+
+    public boolean wasRotatedWithin(Duration grace, Instant now) {
+        return usedAt != null && now.isBefore(usedAt.plus(grace));
+    }
+
     public boolean isExpired(Instant now) {
         return !now.isBefore(expiresAt);
     }
@@ -54,5 +64,13 @@ public class RefreshToken {
     public void replaceWith(RefreshToken successor, Instant now) {
         this.usedAt = now;
         this.replacedBy = successor.getId();
+    }
+
+    public void redirectTo(RefreshToken successor) {
+        this.replacedBy = successor.getId();
+    }
+
+    public void revoke(Instant now) {
+        this.revokedAt = now;
     }
 }

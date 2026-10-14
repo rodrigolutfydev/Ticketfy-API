@@ -138,6 +138,7 @@ class AuthSessionIntegrationTest extends IntegrationTestBase {
         var rotated = refresh(first).andExpect(status().isOk()).andReturn();
         var second = cookieValue(rotated);
         var accessToken = bodyToken(rotated);
+        rotatedLongAgo(first);
 
         var reuse = refresh(first)
                 .andExpect(status().isUnauthorized())
@@ -160,6 +161,7 @@ class AuthSessionIntegrationTest extends IntegrationTestBase {
         var stolen = cookieValue(login(user, PASSWORD).andReturn());
         var otherDevice = login(user, PASSWORD).andReturn();
         refresh(stolen).andExpect(status().isOk());
+        rotatedLongAgo(stolen);
 
         refresh(stolen).andExpect(status().isUnauthorized());
 
@@ -168,17 +170,118 @@ class AuthSessionIntegrationTest extends IntegrationTestBase {
     }
 
     @Test
-    void concurrentRefreshWithTheSameTokenHasOneWinnerAndRevokesTheFamily() throws Exception {
+    void concurrentRefreshWithTheSameTokenLeavesAtMostOneActiveToken() throws Exception {
         var raw = authSessions.start(user).refreshToken();
 
         var outcomes = race(() -> authSessions.refresh(raw), () -> authSessions.refresh(raw));
 
-        assertThat(outcomes.stream().filter(Optional::isPresent).count()).isLessThanOrEqualTo(1);
-        assertThat(outcomes.stream().filter(Optional::isEmpty).count()).isGreaterThanOrEqualTo(1);
+        assertThat(revokedReasons(user)).isEmpty();
+        assertThat(activeRefreshTokens(user)).isEqualTo(1);
+        var working = outcomes.stream()
+                .flatMap(Optional::stream)
+                .filter(session -> isActive(session.refreshToken()))
+                .toList();
+        assertThat(working).hasSize(1);
+        assertThat(authSessions.refresh(working.get(0).refreshToken())).isPresent();
+    }
+
+    @Test
+    void concurrentRetriesOfARotatedTokenLeaveAtMostOneActiveToken() throws Exception {
+        var raw = authSessions.start(user).refreshToken();
+        authSessions.refresh(raw).orElseThrow();
+
+        var outcomes = race(() -> authSessions.refresh(raw), () -> authSessions.refresh(raw),
+                () -> authSessions.refresh(raw));
+
+        assertThat(revokedReasons(user)).isEmpty();
+        assertThat(activeRefreshTokens(user)).isEqualTo(1);
+        assertThat(outcomes.stream().flatMap(Optional::stream)
+                .filter(session -> isActive(session.refreshToken())).count()).isEqualTo(1);
+    }
+
+    @Test
+    void retryWithinTheGraceWindowIssuesANewPairAndKeepsTheSession() throws Exception {
+        var first = cookieValue(login(user, PASSWORD).andReturn());
+        var lost = cookieValue(refresh(first).andExpect(status().isOk()).andReturn());
+
+        var retried = refresh(first)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.expiresIn").value(600))
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, containsString("no-store")))
+                .andReturn();
+        var delivered = cookieValue(retried);
+
+        assertThat(delivered).isNotEqualTo(first).isNotEqualTo(lost);
+        assertThat(revokedReasons(user)).isEmpty();
+        assertThat(activeRefreshTokens(user)).isEqualTo(1);
+        me(bodyToken(retried)).andExpect(status().isOk());
+        var firstRow = jdbc.queryForMap("SELECT replaced_by FROM refresh_tokens WHERE token_hash = ?",
+                (Object) AuthSessionService.hash(first));
+        assertThat(firstRow.get("replaced_by")).isEqualTo(tokenId(delivered));
+        assertThat(jdbc.queryForObject("SELECT revoked_at FROM refresh_tokens WHERE token_hash = ?",
+                java.sql.Timestamp.class, (Object) AuthSessionService.hash(lost))).isNotNull();
+        refresh(delivered).andExpect(status().isOk());
+    }
+
+    @Test
+    void replacementThatWasNeverDeliveredStopsWorking() throws Exception {
+        var first = cookieValue(login(user, PASSWORD).andReturn());
+        var lost = cookieValue(refresh(first).andExpect(status().isOk()).andReturn());
+        refresh(first).andExpect(status().isOk());
+
+        refresh(lost)
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.type").value(PROBLEMS + "session-expired"));
         assertThat(revokedReasons(user)).containsExactly("REUSE_DETECTED");
-        for (var outcome : outcomes) {
-            outcome.ifPresent(session -> assertThat(authSessions.refresh(session.refreshToken())).isEmpty());
-        }
+    }
+
+    @Test
+    void retryWithinTheWindowAfterTheReplacementWasUsedRevokesTheFamily() throws Exception {
+        var first = cookieValue(login(user, PASSWORD).andReturn());
+        var second = cookieValue(refresh(first).andExpect(status().isOk()).andReturn());
+        var third = refresh(second).andExpect(status().isOk()).andReturn();
+
+        refresh(first).andExpect(status().isUnauthorized());
+
+        assertThat(revokedReasons(user)).containsExactly("REUSE_DETECTED");
+        me(bodyToken(third)).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void reuseAfterTheGraceWindowRevokesTheFamily() throws Exception {
+        var first = cookieValue(login(user, PASSWORD).andReturn());
+        var lost = refresh(first).andExpect(status().isOk()).andReturn();
+        rotatedLongAgo(first);
+
+        refresh(first).andExpect(status().isUnauthorized());
+
+        assertThat(revokedReasons(user)).containsExactly("REUSE_DETECTED");
+        refresh(cookieValue(lost)).andExpect(status().isUnauthorized());
+        me(bodyToken(lost)).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void graceWindowEndsThirtySecondsAfterTheRotation() throws Exception {
+        var first = cookieValue(login(user, PASSWORD).andReturn());
+        refresh(first).andExpect(status().isOk());
+        jdbc.update("UPDATE refresh_tokens SET used_at = used_at - INTERVAL '31 seconds' WHERE token_hash = ?",
+                (Object) AuthSessionService.hash(first));
+
+        refresh(first).andExpect(status().isUnauthorized());
+
+        assertThat(revokedReasons(user)).containsExactly("REUSE_DETECTED");
+    }
+
+    @Test
+    void graceWindowDoesNotReviveALoggedOutSession() throws Exception {
+        var first = cookieValue(login(user, PASSWORD).andReturn());
+        var second = cookieValue(refresh(first).andExpect(status().isOk()).andReturn());
+        mockMvc.perform(post("/auth/logout").with(fromFrontend()).cookie(new Cookie(COOKIE, second)))
+                .andExpect(status().isNoContent());
+
+        refresh(first).andExpect(status().isUnauthorized());
+
+        assertThat(revokedReasons(user)).containsExactly("LOGOUT");
     }
 
     @Test
@@ -424,6 +527,29 @@ class AuthSessionIntegrationTest extends IntegrationTestBase {
         var header = result.getResponse().getHeader(HttpHeaders.SET_COOKIE);
         assertThat(header).startsWith(COOKIE + "=");
         return header.substring(COOKIE.length() + 1, header.indexOf(';'));
+    }
+
+    private void rotatedLongAgo(String cookie) {
+        jdbc.update("UPDATE refresh_tokens SET used_at = used_at - INTERVAL '1 minute' WHERE token_hash = ?",
+                (Object) AuthSessionService.hash(cookie));
+    }
+
+    private UUID tokenId(String cookie) {
+        return jdbc.queryForObject("SELECT id FROM refresh_tokens WHERE token_hash = ?", UUID.class,
+                (Object) AuthSessionService.hash(cookie));
+    }
+
+    private boolean isActive(String cookie) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("""
+                SELECT used_at IS NULL AND revoked_at IS NULL FROM refresh_tokens WHERE token_hash = ?
+                """, Boolean.class, (Object) AuthSessionService.hash(cookie)));
+    }
+
+    private int activeRefreshTokens(User target) {
+        return jdbc.queryForObject("""
+                SELECT COUNT(*) FROM refresh_tokens t JOIN auth_sessions s ON s.id = t.session_id
+                 WHERE s.user_id = ? AND t.used_at IS NULL AND t.revoked_at IS NULL
+                """, Integer.class, target.getId());
     }
 
     private List<UUID> sessionIds(User target) {

@@ -1342,7 +1342,10 @@
           "name" : "Idempotency-Key",
           "required" : false,
           "schema" : {
-            "type" : "string"
+            "type" : "string",
+            "maxLength" : 100,
+            "minLength" : 1,
+            "pattern" : "[\\x21-\\x7E]*"
           }
         } ],
         "requestBody" : {

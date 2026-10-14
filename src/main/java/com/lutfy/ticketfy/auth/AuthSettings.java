@@ -12,10 +12,12 @@ public class AuthSettings {
 
     private static final String HOST_PREFIX = "__Host-";
     private static final int MIN_PROXY_SECRET_LENGTH = 32;
+    private static final Duration MAX_REFRESH_REUSE_GRACE = Duration.ofSeconds(60);
 
     private final Duration accessTokenTtl;
     private final Duration refreshTokenIdleTtl;
     private final Duration sessionMaxAge;
+    private final Duration refreshReuseGrace;
     private final String cookieName;
     private final boolean cookieSecure;
     private final String proxySecret;
@@ -23,6 +25,7 @@ public class AuthSettings {
     public AuthSettings(@Value("${ticketfy.auth.access-token-minutes}") long accessTokenMinutes,
                         @Value("${ticketfy.auth.refresh-token-idle-minutes}") long refreshTokenIdleMinutes,
                         @Value("${ticketfy.auth.session-max-hours}") long sessionMaxHours,
+                        @Value("${ticketfy.auth.refresh-reuse-grace-seconds}") long refreshReuseGraceSeconds,
                         @Value("${ticketfy.auth.cookie-name}") String cookieName,
                         @Value("${ticketfy.auth.cookie-secure}") boolean cookieSecure,
                         @Value("${ticketfy.auth.proxy-secret}") String proxySecret,
@@ -30,6 +33,10 @@ public class AuthSettings {
         this.accessTokenTtl = positive(Duration.ofMinutes(accessTokenMinutes), "access-token-minutes");
         this.refreshTokenIdleTtl = positive(Duration.ofMinutes(refreshTokenIdleMinutes), "refresh-token-idle-minutes");
         this.sessionMaxAge = positive(Duration.ofHours(sessionMaxHours), "session-max-hours");
+        this.refreshReuseGrace = Duration.ofSeconds(refreshReuseGraceSeconds);
+        if (refreshReuseGrace.isNegative() || refreshReuseGrace.compareTo(MAX_REFRESH_REUSE_GRACE) > 0) {
+            throw new IllegalStateException("ticketfy.auth.refresh-reuse-grace-seconds must be between 0 and 60");
+        }
         this.cookieName = cookieName.trim();
         this.cookieSecure = cookieSecure;
         this.proxySecret = proxySecret.trim();
@@ -60,6 +67,10 @@ public class AuthSettings {
 
     public Duration sessionMaxAge() {
         return sessionMaxAge;
+    }
+
+    public Duration refreshReuseGrace() {
+        return refreshReuseGrace;
     }
 
     public String cookieName() {

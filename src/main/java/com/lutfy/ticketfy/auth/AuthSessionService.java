@@ -73,6 +73,7 @@ public class AuthSessionService {
         if (current == null) {
             return Optional.empty();
         }
+        var lostReplacement = lostReplacement(current, now);
         var session = current.getSession();
         switch (userLocks.lock(session.getUser().getId())) {
             case SUSPENDED -> throw UserLocks.accountSuspended();
@@ -82,20 +83,42 @@ public class AuthSessionService {
             case ACTIVE -> {
             }
         }
-        if (current.isUsed()) {
-            if (session.revoke(RevocationReason.REUSE_DETECTED, now)) {
-                auditService.record(AuditAction.SESSION_REUSE_DETECTED, AuditTargetType.USER,
-                        session.getUser().getId(), Map.of("sessionId", session.getId()));
-            }
+        if (current.isRevoked() || (current.isUsed() && lostReplacement.isEmpty())) {
+            revokeForReuse(session, now);
             return Optional.empty();
         }
-        if (!session.isActive(now) || current.isExpired(now)) {
+        if (!session.isActive(now)) {
+            return Optional.empty();
+        }
+        if (lostReplacement.isPresent()) {
+            lostReplacement.get().revoke(now);
+            session.touch(now);
+            var successor = newRefreshToken(session, now);
+            current.redirectTo(successor.entity());
+            return Optional.of(issue(session, successor, now));
+        }
+        if (current.isExpired(now)) {
             return Optional.empty();
         }
         session.touch(now);
         var successor = newRefreshToken(session, now);
         current.replaceWith(successor.entity(), now);
         return Optional.of(issue(session, successor, now));
+    }
+
+    private Optional<RefreshToken> lostReplacement(RefreshToken current, Instant now) {
+        if (current.isRevoked() || !current.wasRotatedWithin(settings.refreshReuseGrace(), now)) {
+            return Optional.empty();
+        }
+        return refreshTokens.findByIdForUpdate(current.getReplacedBy())
+                .filter(replacement -> !replacement.isUsed() && !replacement.isRevoked());
+    }
+
+    private void revokeForReuse(AuthSession session, Instant now) {
+        if (session.revoke(RevocationReason.REUSE_DETECTED, now)) {
+            auditService.record(AuditAction.SESSION_REUSE_DETECTED, AuditTargetType.USER,
+                    session.getUser().getId(), Map.of("sessionId", session.getId()));
+        }
     }
 
     @Transactional

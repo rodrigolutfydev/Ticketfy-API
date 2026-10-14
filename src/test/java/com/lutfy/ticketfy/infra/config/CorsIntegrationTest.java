@@ -1,9 +1,11 @@
 package com.lutfy.ticketfy.infra.config;
 
 import com.lutfy.ticketfy.IntegrationTestBase;
+import com.lutfy.ticketfy.user.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -24,6 +26,9 @@ class CorsIntegrationTest extends IntegrationTestBase {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @Autowired
+    private UserRepository userRepository;
 
     @Test
     void preflightAllowsIdempotencyKeyOnOrders() throws Exception {
@@ -104,5 +109,20 @@ class CorsIntegrationTest extends IntegrationTestBase {
                 .andExpect(status().isOk())
                 .andExpect(header().exists("X-Request-Id"))
                 .andExpect(header().string("Access-Control-Expose-Headers", containsString("X-Request-Id")));
+    }
+
+    @Test
+    void csvDownloadExposesContentDispositionToTheBrowser() throws Exception {
+        var organizer = userRepository.findById(insertUser("ORGANIZER")).orElseThrow();
+
+        mockMvc.perform(get("/organizer/ledger.csv")
+                        .header("Origin", FRONTEND)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken(organizer)))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION, containsString("attachment")))
+                .andExpect(header().string("Access-Control-Allow-Origin", FRONTEND))
+                .andExpect(header().string("Access-Control-Expose-Headers", containsString("Retry-After")))
+                .andExpect(header().string("Access-Control-Expose-Headers", containsString("X-Request-Id")))
+                .andExpect(header().string("Access-Control-Expose-Headers", containsString("Content-Disposition")));
     }
 }

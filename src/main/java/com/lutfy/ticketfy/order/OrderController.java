@@ -2,6 +2,8 @@ package com.lutfy.ticketfy.order;
 
 import com.lutfy.ticketfy.user.User;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -25,7 +27,10 @@ public class OrderController {
     @PostMapping
     public ResponseEntity<OrderDetailsDTO> create(
             @RequestBody @Valid OrderCreationDTO dto,
-            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+            @RequestHeader(value = "Idempotency-Key", required = false)
+            @Size(min = 1, max = 100, message = "Idempotency-Key must have between 1 and 100 characters")
+            @Pattern(regexp = "[\\x21-\\x7E]*", message = "Idempotency-Key must contain only visible ASCII characters")
+            String idempotencyKey,
             @AuthenticationPrincipal User authenticated) {
         OrderDetailsDTO order;
         try {
