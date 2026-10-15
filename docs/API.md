@@ -260,7 +260,8 @@ Os tipos abaixo trazem `reason`, com um dos valores da tabela. A lista também e
 | | `not-pending` | Aprovar ou recusar pagamento que não está pendente | — |
 | | `not-approved` | Estornar pagamento que não foi aprovado | — |
 | `invalid-ticket-state` | `event-cancelled` | Check-in em evento cancelado | — |
-| | `not-valid` | Ingresso já usado ou cancelado (check-in, transferência, cancelamento) | — |
+| | `already-used` | Check-in de ingresso já usado | `usedAt` |
+| | `not-valid` | Ingresso cancelado (check-in) ou já usado ou cancelado (transferência, cancelamento) | — |
 | | `transfer-unavailable` | O ingresso mudou durante a transferência | — |
 | `invalid-suspension-state` | `already-suspended` | Suspender conta já suspensa | — |
 | | `not-suspended` | Reativar conta que não está suspensa | — |
@@ -625,6 +626,7 @@ O e-mail é comparado sem diferenciar maiúsculas e sem os espaços das pontas; 
 | GET | `/events/mine` | Eventos ativos do usuário; ordem padrão `startsAt` | Autenticado |
 | POST | `/events` | Cria um evento | ORGANIZER ou ADMIN |
 | PUT | `/events/{id}` | Atualiza um evento; campos ausentes ficam como estão | Dono ou ADMIN |
+| GET | `/events/{id}/cancellation-preview` | Quantos pedidos e ingressos o cancelamento afeta, por tipo | Dono ou ADMIN |
 | POST | `/events/{id}/cancel` | Cancela o evento e reembolsa os pedidos pagos | Dono ou ADMIN |
 | DELETE | `/events/{id}` | Desativa um evento sem vendas nem reservas | Dono ou ADMIN |
 | PATCH | `/events/{id}/featured` | Liga ou desliga o destaque (`{"featured": true}`) | ADMIN |
@@ -784,13 +786,45 @@ Content-Type: application/json
   "eventId": "8c1d…",
   "cancelledAt": "2026-10-08T17:00:00Z",
   "refundedOrders": 12,
+  "cancelledFreeOrders": 2,
   "cancelledOrders": 3,
   "pendingOrders": 0,
-  "requiresManualAction": 0
+  "requiresManualAction": 1,
+  "usedTickets": 4
 }
 ```
 
-O corpo é opcional, e o motivo tem no máximo 500 caracteres. O cancelamento só vale antes do fim do evento. Os pedidos pagos são reembolsados e os pendentes, cancelados, cada um em transação própria. Uma rotina reprocessa o que falhar.
+O corpo é opcional, e o motivo tem no máximo 500 caracteres. O cancelamento só vale antes do fim do evento. Cada pedido é tratado em transação própria, e uma rotina reprocessa o que falhar:
+
+| Campo | Pedidos |
+|---|---|
+| `refundedOrders` | Pagos com valor acima de zero, sem ingresso usado: reembolsados (`REFUNDED`) |
+| `cancelledFreeOrders` | Gratuitos (total R$ 0,00): ficam `CANCELLED`, sem reembolso; ingressos válidos cancelados, os usados continuam `USED` |
+| `cancelledOrders` | Pendentes: cancelados |
+| `pendingOrders` | Falharam agora e serão refeitos pela rotina |
+| `requiresManualAction` | Pagos com valor acima de zero e com ingresso usado: continuam `PAID` e precisam de reembolso manual |
+
+`usedTickets` é o número de ingressos do evento que já passaram pelo check-in. Pedido gratuito nunca entra em `requiresManualAction`, mesmo com ingresso usado.
+
+**Prévia do cancelamento**
+
+```http
+GET /events/{id}/cancellation-preview
+Authorization: Bearer <token>
+```
+
+```json
+{
+  "eventId": "8c1d…",
+  "ordersToRefund": 12,
+  "freeOrdersToCancel": 2,
+  "pendingOrdersToCancel": 3,
+  "ordersRequiringManualAction": 1,
+  "usedTickets": 4
+}
+```
+
+Usa as mesmas regras do cancelamento, para a tela de confirmação. Os números são do momento da consulta. O `ordersByStatus` do dashboard conta todos os pedidos `PAID`, inclusive os gratuitos e os com ingresso usado, e não serve para essa contagem.
 
 ### Lotes
 
@@ -977,9 +1011,14 @@ HTTP/1.1 201 Created
     }
   ],
   "tickets": [],
-  "eventCancelled": false
+  "eventCancelled": false,
+  "eventId": "8c1d…",
+  "eventName": "Festival de Inverno",
+  "eventStartsAt": "2026-11-20T22:00:00Z"
 }
 ```
+
+`GET /orders` traz, em cada pedido, `id`, `status`, `totalAmount`, `createdAt`, `eventId`, `eventName` e `eventStartsAt`.
 
 Regras do pedido:
 
@@ -1080,7 +1119,21 @@ A transferência só vale para ingresso `VALID`, de evento não cancelado que ai
 
 **Check-in**
 
-`POST /tickets/{code}/check-in` responde com o ingresso marcado como `USED`. Um código só passa uma vez; a segunda leitura responde 409 `invalid-ticket-state`.
+`POST /tickets/{code}/check-in` responde com o ingresso marcado como `USED`. Um código só passa uma vez. A segunda leitura responde 409 `invalid-ticket-state` com `reason` `already-used` e o momento do primeiro check-in em `usedAt`:
+
+```json
+{
+  "type": "https://ticketfy-api.onrender.com/problems/invalid-ticket-state",
+  "title": "Invalid ticket state",
+  "status": 409,
+  "detail": "Ticket was already used",
+  "instance": "/tickets/K7Q2M9X4T8B3N6PA/check-in",
+  "reason": "already-used",
+  "usedAt": "2026-10-08T21:14:03.512Z"
+}
+```
+
+Ingresso cancelado responde 409 `invalid-ticket-state` com `reason` `not-valid`, sem `usedAt`.
 
 ### Participantes
 

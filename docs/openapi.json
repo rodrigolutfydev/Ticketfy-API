@@ -1225,6 +1225,33 @@
         "tags" : [ "event-controller" ]
       }
     },
+    "/events/{id}/cancellation-preview" : {
+      "get" : {
+        "operationId" : "cancellationPreview",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EventCancellationPreviewDTO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "event-controller" ]
+      }
+    },
     "/events/{id}/dashboard" : {
       "get" : {
         "operationId" : "eventDashboard",
@@ -2594,12 +2621,45 @@
           }
         }
       },
+      "EventCancellationPreviewDTO" : {
+        "type" : "object",
+        "properties" : {
+          "eventId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "freeOrdersToCancel" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "ordersRequiringManualAction" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "ordersToRefund" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "pendingOrdersToCancel" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "usedTickets" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
       "EventCancellationResultDTO" : {
         "type" : "object",
         "properties" : {
           "cancelledAt" : {
             "type" : "string",
             "format" : "date-time"
+          },
+          "cancelledFreeOrders" : {
+            "type" : "integer",
+            "format" : "int32"
           },
           "cancelledOrders" : {
             "type" : "integer",
@@ -2618,6 +2678,10 @@
             "format" : "int32"
           },
           "requiresManualAction" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "usedTickets" : {
             "type" : "integer",
             "format" : "int32"
           }
@@ -3220,6 +3284,17 @@
           "eventCancelled" : {
             "type" : "boolean"
           },
+          "eventId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "eventName" : {
+            "type" : "string"
+          },
+          "eventStartsAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
           "expiresAt" : {
             "type" : "string",
             "format" : "date-time"
@@ -3358,6 +3433,17 @@
         "type" : "object",
         "properties" : {
           "createdAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "eventId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "eventName" : {
+            "type" : "string"
+          },
+          "eventStartsAt" : {
             "type" : "string",
             "format" : "date-time"
           },

@@ -120,6 +120,13 @@ public class Order {
         this.status = OrderStatus.CANCELLED;
     }
 
+    public void cancelFreeOfCancelledEvent() {
+        if (status != OrderStatus.PAID || !isFree()) {
+            throw new InvalidOrderStateException(ProblemReason.ORDER_NOT_PAID, "Only paid orders with a zero total can be cancelled with their event");
+        }
+        this.status = OrderStatus.CANCELLED;
+    }
+
     public void refund() {
         if (status != OrderStatus.PAID) {
             throw new InvalidOrderStateException(ProblemReason.ORDER_NOT_PAID, "Only paid orders can be refunded");

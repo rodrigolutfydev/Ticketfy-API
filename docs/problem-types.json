@@ -162,7 +162,7 @@
   "slug" : "invalid-ticket-state",
   "status" : 409,
   "title" : "Invalid ticket state",
-  "reasons" : [ "event-cancelled", "not-valid", "transfer-unavailable" ]
+  "reasons" : [ "event-cancelled", "not-valid", "already-used", "transfer-unavailable" ]
 }, {
   "slug" : "ticket-not-found",
   "status" : 404,

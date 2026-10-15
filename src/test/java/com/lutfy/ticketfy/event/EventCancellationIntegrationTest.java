@@ -102,9 +102,11 @@ class EventCancellationIntegrationTest extends IntegrationTestBase {
                 .andExpect(jsonPath("$.eventId").value(eventId.toString()))
                 .andExpect(jsonPath("$.cancelledAt").isNotEmpty())
                 .andExpect(jsonPath("$.refundedOrders").value(3))
+                .andExpect(jsonPath("$.cancelledFreeOrders").value(0))
                 .andExpect(jsonPath("$.cancelledOrders").value(2))
                 .andExpect(jsonPath("$.pendingOrders").value(0))
-                .andExpect(jsonPath("$.requiresManualAction").value(0));
+                .andExpect(jsonPath("$.requiresManualAction").value(0))
+                .andExpect(jsonPath("$.usedTickets").value(0));
 
         for (var orderId : paid) {
             assertThat(orderStatus(orderId)).isEqualTo("REFUNDED");
@@ -244,12 +246,73 @@ class EventCancellationIntegrationTest extends IntegrationTestBase {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.refundedOrders").value(0))
                 .andExpect(jsonPath("$.pendingOrders").value(0))
-                .andExpect(jsonPath("$.requiresManualAction").value(1));
+                .andExpect(jsonPath("$.requiresManualAction").value(1))
+                .andExpect(jsonPath("$.usedTickets").value(1));
         cancellationService.processPendingOrders();
 
         assertThat(orderStatus(orderId)).isEqualTo("PAID");
         assertThat(ticketStatuses(orderId)).containsExactlyInAnyOrder("USED", "VALID");
         verify(paymentGateway, never()).refund(argThat(request -> request != null));
+    }
+
+    @Test
+    void previewAndResultSeparatePaidFreeAndUsed() throws Exception {
+        var refundable = paidOrder(user("USER"), 2);
+        var paidWithUsedTicket = paidOrder(user("USER"), 2);
+        checkIn(paidWithUsedTicket);
+        var freeLot = insertFreeTicketType();
+        var free = orderService.create(new OrderCreationDTO(List.of(new OrderItemRequestDTO(freeLot, 2))), null, user("USER")).id();
+        checkIn(free);
+        var pending = pendingOrder(user("USER"), 1);
+        clearInvocations(paymentGateway);
+
+        mockMvc.perform(get("/events/{id}/cancellation-preview", eventId).header("Authorization", bearer(organizer)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.eventId").value(eventId.toString()))
+                .andExpect(jsonPath("$.ordersToRefund").value(1))
+                .andExpect(jsonPath("$.freeOrdersToCancel").value(1))
+                .andExpect(jsonPath("$.pendingOrdersToCancel").value(1))
+                .andExpect(jsonPath("$.ordersRequiringManualAction").value(1))
+                .andExpect(jsonPath("$.usedTickets").value(2));
+
+        cancel(organizer, null)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.refundedOrders").value(1))
+                .andExpect(jsonPath("$.cancelledFreeOrders").value(1))
+                .andExpect(jsonPath("$.cancelledOrders").value(1))
+                .andExpect(jsonPath("$.pendingOrders").value(0))
+                .andExpect(jsonPath("$.requiresManualAction").value(1))
+                .andExpect(jsonPath("$.usedTickets").value(2));
+
+        assertThat(orderStatus(refundable)).isEqualTo("REFUNDED");
+        assertThat(orderStatus(paidWithUsedTicket)).isEqualTo("PAID");
+        assertThat(orderStatus(free)).isEqualTo("CANCELLED");
+        assertThat(ticketStatuses(free)).containsExactlyInAnyOrder("USED", "CANCELLED");
+        assertThat(orderStatus(pending)).isEqualTo("CANCELLED");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM payments WHERE order_id = ?", Long.class, free)).isZero();
+        verify(paymentGateway).refund(argThat(request -> request != null));
+        assertThat(cancellationService.processPendingOrders()).isZero();
+    }
+
+    @Test
+    void freeOrderThatFailedIsRetriedByTheJobEvenWithAUsedTicket() throws Exception {
+        var freeLot = insertFreeTicketType();
+        var free = orderService.create(new OrderCreationDTO(List.of(new OrderItemRequestDTO(freeLot, 2))), null, user("USER")).id();
+        checkIn(free);
+        eventService.markCancelled(eventId, null, organizer);
+
+        assertThat(cancellationService.processPendingOrders()).isEqualTo(1);
+        assertThat(orderStatus(free)).isEqualTo("CANCELLED");
+        assertThat(ticketStatuses(free)).containsExactlyInAnyOrder("USED", "CANCELLED");
+    }
+
+    @Test
+    void onlyOwnerOrAdminCanPreview() throws Exception {
+        mockMvc.perform(get("/events/{id}/cancellation-preview", eventId).header("Authorization", bearer(user("ORGANIZER"))))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(get("/events/{id}/cancellation-preview", eventId).header("Authorization", bearer(user("ADMIN"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.ordersToRefund").value(0));
     }
 
     @Test
@@ -331,6 +394,21 @@ class EventCancellationIntegrationTest extends IntegrationTestBase {
             request.contentType(MediaType.APPLICATION_JSON).content(body);
         }
         return mockMvc.perform(request);
+    }
+
+    private void checkIn(UUID orderId) throws Exception {
+        var code = jdbc.queryForList("SELECT code FROM tickets WHERE order_id = ?", String.class, orderId).get(0);
+        mockMvc.perform(post("/tickets/{code}/check-in", code).header("Authorization", bearer(organizer)))
+                .andExpect(status().isOk());
+    }
+
+    private UUID insertFreeTicketType() {
+        var id = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO ticket_types (id, event_id, name, price, quantity_total, quantity_sold, max_per_order, active)
+                VALUES (?, ?, 'Gratuito', 0, 50, 0, 4, true)
+                """, id, eventId);
+        return id;
     }
 
     private User user(String role) {

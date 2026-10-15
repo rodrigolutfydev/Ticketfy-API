@@ -79,11 +79,25 @@ class OrderAndTicketReasonIntegrationTest extends TicketTransferTestBase {
     }
 
     @Test
-    void checkInOfAUsedTicketIsNotValid() throws Exception {
+    void checkInOfAUsedTicketIsAlreadyUsedWithTheCheckInTime() throws Exception {
         var ticketId = ticketOf(paidOrder(user("USER"), 1));
         checkIn(ticketId).andExpect(status().isOk());
+        var usedAt = jdbc.queryForObject("SELECT used_at FROM tickets WHERE id = ?", Timestamp.class, ticketId)
+                .toInstant();
 
-        expectReason(checkIn(ticketId), 409, "invalid-ticket-state", "not-valid");
+        expectReason(checkIn(ticketId), 409, "invalid-ticket-state", "already-used")
+                .andExpect(jsonPath("$.usedAt").value(usedAt.toString()));
+    }
+
+    @Test
+    void checkInOfACancelledTicketIsNotValidWithoutUsedAt() throws Exception {
+        var buyer = user("USER");
+        var orderId = paidOrder(buyer, 1);
+        var ticketId = ticketOf(orderId);
+        refund(buyer, orderId).andExpect(status().isOk());
+
+        expectReason(checkIn(ticketId), 409, "invalid-ticket-state", "not-valid")
+                .andExpect(jsonPath("$.usedAt").doesNotExist());
     }
 
     @Test
@@ -125,8 +139,8 @@ class OrderAndTicketReasonIntegrationTest extends TicketTransferTestBase {
                 .content("{\"reason\":\"Teste\"}"));
     }
 
-    private static void expectReason(ResultActions result, int status, String slug, String reason) throws Exception {
-        result.andExpect(status().is(status))
+    private static ResultActions expectReason(ResultActions result, int status, String slug, String reason) throws Exception {
+        return result.andExpect(status().is(status))
                 .andExpect(jsonPath("$.type", endsWith("/" + slug)))
                 .andExpect(jsonPath("$.reason").value(reason));
     }

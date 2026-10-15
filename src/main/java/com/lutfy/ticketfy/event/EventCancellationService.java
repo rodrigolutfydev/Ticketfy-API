@@ -20,24 +20,33 @@ public class EventCancellationService {
     private final EventService eventService;
     private final OrderRepository orderRepository;
     private final CancelledEventOrderProcessor processor;
+    private final EventCancellationQueryRepository queries;
 
     public EventCancellationService(EventService eventService, OrderRepository orderRepository,
-                                    CancelledEventOrderProcessor processor) {
+                                    CancelledEventOrderProcessor processor,
+                                    EventCancellationQueryRepository queries) {
         this.eventService = eventService;
         this.orderRepository = orderRepository;
         this.processor = processor;
+        this.queries = queries;
+    }
+
+    public EventCancellationPreviewDTO preview(UUID eventId, User requester) {
+        eventService.checkCanManage(eventId, requester);
+        return queries.preview(eventId);
     }
 
     public EventCancellationResultDTO cancel(UUID eventId, EventCancellationDTO dto, User requester) {
         var cancelledAt = eventService.markCancelled(eventId, normalizeReason(dto), requester);
         var tally = processAll(orderRepository.findIdsByEventIdAndStatusIn(eventId, OPEN_STATUSES));
         return new EventCancellationResultDTO(eventId, cancelledAt,
-                tally.refunded, tally.cancelled, tally.failed, tally.requiresManualAction);
+                tally.refunded, tally.freeCancelled, tally.cancelled, tally.failed, tally.requiresManualAction,
+                queries.countUsedTickets(eventId));
     }
 
     public int processPendingOrders() {
         var tally = processAll(orderRepository.findIdsAwaitingEventCancellation(OPEN_STATUSES));
-        return tally.refunded + tally.cancelled;
+        return tally.refunded + tally.freeCancelled + tally.cancelled;
     }
 
     private Tally processAll(List<UUID> orderIds) {
@@ -47,6 +56,7 @@ public class EventCancellationService {
                 switch (processor.process(orderId)) {
                     case REFUNDED -> tally.refunded++;
                     case CANCELLED -> tally.cancelled++;
+                    case FREE_CANCELLED -> tally.freeCancelled++;
                     case REQUIRES_MANUAL_ACTION -> tally.requiresManualAction++;
                     case SKIPPED -> { }
                 }
@@ -66,6 +76,7 @@ public class EventCancellationService {
     private static final class Tally {
         private int refunded;
         private int cancelled;
+        private int freeCancelled;
         private int failed;
         private int requiresManualAction;
     }
