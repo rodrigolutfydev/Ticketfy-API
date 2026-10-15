@@ -119,7 +119,7 @@ Os itens abaixo não faziam parte dos requisitos originais. A situação de cada
 | ID | Sugestão | Situação |
 | --- | --- | --- |
 | SUG01 | Recuperação de senha por e-mail. | Não implementado. Depende dos e-mails transacionais com Brevo, que estão planejados. |
-| SUG02 | Envio de e-mail de confirmação após a compra. | Planejado: e-mails transacionais com Brevo. |
+| SUG02 | Envio de e-mail de confirmação após a compra. | Implementado: e-mail pela Brevo depois da confirmação do pedido (pago ou gratuito), com os ingressos, o QR Code de cada um e o `.ics` do evento em anexo. |
 | SUG03 | Reserva temporária de ingressos durante o pagamento. | Implementado: incorporada ao RF10 e à RN12, com prazo de 15 minutos. |
 | SUG04 | Relatório de vendas por evento para o organizador. | Implementado: painel do evento e do organizador (RF21). |
 

@@ -9,8 +9,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.UUID;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 @Service
 public class EventCalendarService {
@@ -31,7 +29,19 @@ public class EventCalendarService {
     public String calendar(UUID id) {
         var event = repository.findByIdAndActiveTrue(id)
                 .orElseThrow(() -> new EventNotFoundException("Event not found"));
+        return calendar(event, null);
+    }
+
+    /**
+     * Mesmo arquivo do endpoint. Com {@code defaultDuration}, evento sem
+     * término ganha DTEND = início + duração (anexo do e-mail de compra);
+     * sem ela, sai sem DTEND, como em GET /events/{id}/calendar.ics.
+     */
+    public String calendar(Event event, Duration defaultDuration) {
         var url = site.eventUrl(event.getId()).orElse(null);
+        var endsAt = event.getEndsAt() != null || defaultDuration == null
+                ? event.getEndsAt()
+                : event.getStartsAt().plus(defaultDuration);
         var writer = new IcsWriter()
                 .raw("BEGIN", "VCALENDAR")
                 .raw("VERSION", "2.0")
@@ -44,9 +54,9 @@ public class EventCalendarService {
                 .raw("SEQUENCE", String.valueOf(sequence(event)))
                 .time("LAST-MODIFIED", event.getUpdatedAt())
                 .time("DTSTART", event.getStartsAt())
-                .time("DTEND", event.getEndsAt())
+                .time("DTEND", endsAt)
                 .text("SUMMARY", event.getName())
-                .text("LOCATION", location(event))
+                .text("LOCATION", event.fullLocation())
                 .text("DESCRIPTION", description(event, url))
                 .raw("STATUS", event.isCancelled() ? "CANCELLED" : "CONFIRMED");
         if (url != null) {
@@ -62,15 +72,6 @@ public class EventCalendarService {
     static long sequence(Event event) {
         if (event.getCreatedAt() == null || event.getUpdatedAt() == null) return 0;
         return Math.max(0, Duration.between(event.getCreatedAt(), event.getUpdatedAt()).toSeconds());
-    }
-
-    private static String location(Event event) {
-        var cityAndState = Stream.of(event.getCity(), event.getState())
-                .filter(part -> part != null && !part.isBlank())
-                .collect(Collectors.joining(" - "));
-        return Stream.of(event.getVenueName(), event.getAddress(), cityAndState)
-                .filter(part -> part != null && !part.isBlank())
-                .collect(Collectors.joining(", "));
     }
 
     private static String description(Event event, String url) {

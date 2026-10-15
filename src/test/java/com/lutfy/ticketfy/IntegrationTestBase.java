@@ -2,10 +2,12 @@ package com.lutfy.ticketfy;
 
 import com.lutfy.ticketfy.auth.AuthSessionService;
 import com.lutfy.ticketfy.auth.google.FakeGoogle;
+import com.lutfy.ticketfy.infra.mail.MailTestConfig;
 import com.lutfy.ticketfy.infra.security.AuthOriginFilter;
 import com.lutfy.ticketfy.user.User;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -19,6 +21,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 @SpringBootTest
+@Import(MailTestConfig.class)
 public abstract class IntegrationTestBase {
 
     protected static final String PROXY_SECRET = "test-proxy-secret-with-at-least-32-chars";

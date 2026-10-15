@@ -1020,6 +1020,8 @@ HTTP/1.1 201 Created
 
 `GET /orders` traz, em cada pedido, `id`, `status`, `totalAmount`, `createdAt`, `eventId`, `eventName` e `eventStartsAt`.
 
+Quando o pedido fica `PAID` (pagamento aprovado ou pedido gratuito), o comprador recebe por e-mail os dados do evento, os ingressos (lote e código), o total pago e o link para `/tickets` do site, com o QR Code de cada ingresso (PNG) e o `.ics` do evento em anexo. O e-mail sai depois da confirmação, no idioma da conta, e uma falha no envio não afeta o pedido.
+
 Regras do pedido:
 
 - Todos os itens precisam ser do mesmo evento.
@@ -1107,6 +1109,8 @@ Content-Type: application/json
 ```
 
 A resposta não traz o código novo. O código antigo deixa de valer na mesma hora.
+
+Depois da transferência, quem recebe ganha um e-mail com quem transferiu, o evento, o lote e o QR Code novo em anexo; quem transferiu recebe uma confirmação de que o QR antigo deixou de valer. Cada e-mail sai no idioma da conta de quem recebe.
 
 A transferência só vale para ingresso `VALID`, de evento não cancelado que ainda não começou, até 3 vezes por ingresso. Erros possíveis:
 

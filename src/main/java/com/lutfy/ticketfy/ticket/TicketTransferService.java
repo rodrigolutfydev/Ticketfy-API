@@ -15,6 +15,8 @@ import com.lutfy.ticketfy.order.OrderRepository;
 import com.lutfy.ticketfy.user.User;
 import com.lutfy.ticketfy.user.UserLocks;
 import com.lutfy.ticketfy.user.UserRepository;
+import com.lutfy.ticketfy.notification.TicketTransferredEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,13 +37,14 @@ public class TicketTransferService {
     private final PasswordConfirmation passwordConfirmation;
     private final AuditService auditService;
     private final UserLocks userLocks;
+    private final ApplicationEventPublisher events;
 
     public TicketTransferService(TicketRepository ticketRepository, TicketTransferRepository transferRepository,
                                  EventRepository eventRepository, OrderRepository orderRepository,
                                  UserRepository userRepository, TicketService ticketService,
                                  TicketTransferPolicy policy, TransferRecipientLimiter recipientLimiter,
                                  PasswordConfirmation passwordConfirmation, AuditService auditService,
-                                 UserLocks userLocks) {
+                                 UserLocks userLocks, ApplicationEventPublisher events) {
         this.ticketRepository = ticketRepository;
         this.transferRepository = transferRepository;
         this.eventRepository = eventRepository;
@@ -53,6 +56,7 @@ public class TicketTransferService {
         this.passwordConfirmation = passwordConfirmation;
         this.auditService = auditService;
         this.userLocks = userLocks;
+        this.events = events;
     }
 
     @Transactional
@@ -110,6 +114,7 @@ public class TicketTransferService {
                 "orderId", refs.orderId(),
                 "eventId", refs.eventId(),
                 "transferNumber", ticket.getTransferCount() + 1));
+        events.publishEvent(new TicketTransferredEvent(ticketId, sender.getId(), recipient.getId()));
         return new TicketTransferResultDTO(ticketId, now);
     }
 }
