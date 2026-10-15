@@ -5,9 +5,8 @@
 
 API de venda de ingressos que trata no banco de dados os problemas de verdade: a última vaga disputada, o clique duplo, o pagamento no instante da expiração e o mesmo ingresso lido por dois porteiros.
 
-- **Site:** em breve
-- **API:** [ticketfy-api.onrender.com](https://ticketfy-api.onrender.com/actuator/health)
-- **Documentação:** veja a seção [Documentação](#documentação)
+- **Site:** [ticketfy-6fd.pages.dev](https://ticketfy-6fd.pages.dev/)
+- **Documentação:** [Documentação](#documentação)
 
 ## O que o sistema faz
 
