@@ -8,9 +8,13 @@ public record OrderSummaryDTO(
         UUID id,
         OrderStatus status,
         BigDecimal totalAmount,
-        Instant createdAt
+        Instant createdAt,
+        UUID eventId,
+        String eventName,
+        Instant eventStartsAt
 ) {
-    public OrderSummaryDTO(Order order) {
-        this(order.getId(), order.getStatus(), order.getTotalAmount(), order.getCreatedAt());
+    public OrderSummaryDTO(Order order, OrderEventRef event) {
+        this(order.getId(), order.getStatus(), order.getTotalAmount(), order.getCreatedAt(),
+                event.eventId(), event.eventName(), event.eventStartsAt());
     }
 }

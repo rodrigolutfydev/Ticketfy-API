@@ -28,6 +28,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 public class OrderService {
@@ -162,8 +164,11 @@ public class OrderService {
 
     @Transactional(readOnly = true)
     public Page<OrderSummaryDTO> listMyOrders(User authenticated, Pageable pageable) {
-        return orderRepository.findByUserId(authenticated.getId(), pageable)
-                .map(OrderSummaryDTO::new);
+        var orders = orderRepository.findByUserId(authenticated.getId(), pageable);
+        Map<UUID, OrderEventRef> events = orders.isEmpty() ? Map.of()
+                : orderRepository.findEventRefsByOrderIdIn(orders.map(Order::getId).toList()).stream()
+                        .collect(Collectors.toMap(OrderEventRef::orderId, Function.identity()));
+        return orders.map(order -> new OrderSummaryDTO(order, events.get(order.getId())));
     }
 
     @Transactional
@@ -210,6 +215,18 @@ public class OrderService {
         releaseStock(order);
         paymentService.refundApproved(order);
         ledgerService.recordRefund(order);
+    }
+
+    /**
+     * Pedido gratuito de evento cancelado: não há o que reembolsar. Os ingressos
+     * válidos são cancelados (os usados continuam usados) e o pedido fica
+     * CANCELLED. O uso do cupom fica registrado, como no reembolso.
+     */
+    @Transactional
+    public void cancelFreeOfCancelledEvent(Order order) {
+        order.cancelFreeOfCancelledEvent();
+        ticketService.cancelValid(order.getId());
+        releaseStock(order);
     }
 
     private void releaseStock(Order order) {

@@ -22,6 +22,7 @@ public enum ProblemReason {
     PAYMENT_NOT_APPROVED(ProblemType.INVALID_PAYMENT_STATE, "not-approved"),
     TICKET_EVENT_CANCELLED(ProblemType.INVALID_TICKET_STATE, "event-cancelled"),
     TICKET_NOT_VALID(ProblemType.INVALID_TICKET_STATE, "not-valid"),
+    TICKET_ALREADY_USED(ProblemType.INVALID_TICKET_STATE, "already-used"),
     TICKET_TRANSFER_UNAVAILABLE(ProblemType.INVALID_TICKET_STATE, "transfer-unavailable"),
     ACCOUNT_ALREADY_SUSPENDED(ProblemType.INVALID_SUSPENSION_STATE, "already-suspended"),
     ACCOUNT_NOT_SUSPENDED(ProblemType.INVALID_SUSPENSION_STATE, "not-suspended"),

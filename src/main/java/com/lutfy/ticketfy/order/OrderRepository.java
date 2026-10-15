@@ -29,6 +29,13 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
 
     Page<Order> findByUserId(UUID userId, Pageable pageable);
 
+    @Query("""
+        SELECT DISTINCT new com.lutfy.ticketfy.order.OrderEventRef(o.id, e.id, e.name, e.startsAt)
+          FROM Order o JOIN o.items i JOIN i.ticketType tt JOIN tt.event e
+         WHERE o.id IN :orderIds
+        """)
+    List<OrderEventRef> findEventRefsByOrderIdIn(@Param("orderIds") Collection<UUID> orderIds);
+
     List<Order> findByStatusAndExpiresAtBefore(OrderStatus status, Instant instant);
 
     @EntityGraph(attributePaths = {"items", "items.ticketType"})
@@ -48,10 +55,10 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
           FROM Order o JOIN o.items i
          WHERE i.ticketType.event.cancelledAt IS NOT NULL
            AND o.status IN :statuses
-           AND NOT EXISTS (
+           AND (o.totalAmount = 0 OR NOT EXISTS (
                SELECT 1 FROM Ticket t
                 WHERE t.order = o
-                  AND t.status = com.lutfy.ticketfy.ticket.TicketStatus.USED)
+                  AND t.status = com.lutfy.ticketfy.ticket.TicketStatus.USED))
         """)
     List<UUID> findIdsAwaitingEventCancellation(@Param("statuses") Collection<OrderStatus> statuses);
 

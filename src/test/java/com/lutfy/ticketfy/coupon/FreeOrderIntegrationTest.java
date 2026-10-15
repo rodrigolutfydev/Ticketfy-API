@@ -99,7 +99,7 @@ class FreeOrderIntegrationTest extends CouponTestBase {
     }
 
     @Test
-    void eventCancellationRefundsFreeOrders() throws Exception {
+    void eventCancellationCancelsFreeOrdersWithoutRefund() throws Exception {
         var lot = lot(eventId, "0.00", 10);
         var order = order(user("USER"), lot, 1, null);
 
@@ -108,9 +108,12 @@ class FreeOrderIntegrationTest extends CouponTestBase {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"reason\":\"Chuva\"}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.refundedOrders").value(1));
+                .andExpect(jsonPath("$.refundedOrders").value(0))
+                .andExpect(jsonPath("$.cancelledFreeOrders").value(1));
 
-        assertThat(orderStatus(order.id())).isEqualTo("REFUNDED");
+        assertThat(orderStatus(order.id())).isEqualTo("CANCELLED");
+        assertThat(count("SELECT COUNT(*) FROM tickets WHERE order_id = ? AND status = 'CANCELLED'", order.id())).isEqualTo(1);
+        assertThat(count("SELECT quantity_sold FROM ticket_types WHERE id = ?", lot)).isZero();
         assertThat(count("SELECT COUNT(*) FROM organizer_ledger_entries WHERE order_id = ?", order.id())).isZero();
     }
 

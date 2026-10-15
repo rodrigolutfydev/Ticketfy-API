@@ -15,7 +15,7 @@ public class CancelledEventOrderProcessor {
 
     private static final Logger log = LoggerFactory.getLogger(CancelledEventOrderProcessor.class);
 
-    public enum Outcome { REFUNDED, CANCELLED, REQUIRES_MANUAL_ACTION, SKIPPED }
+    public enum Outcome { REFUNDED, CANCELLED, FREE_CANCELLED, REQUIRES_MANUAL_ACTION, SKIPPED }
 
     private final OrderRepository orderRepository;
     private final OrderService orderService;
@@ -40,6 +40,10 @@ public class CancelledEventOrderProcessor {
                 yield Outcome.CANCELLED;
             }
             case PAID -> {
+                if (order.isFree()) {
+                    orderService.cancelFreeOfCancelledEvent(order);
+                    yield Outcome.FREE_CANCELLED;
+                }
                 if (ticketRepository.existsByOrderIdAndStatus(orderId, TicketStatus.USED)) {
                     log.warn("Order {} of a cancelled event has used tickets and requires manual refund", orderId);
                     yield Outcome.REQUIRES_MANUAL_ACTION;

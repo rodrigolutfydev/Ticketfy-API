@@ -7,8 +7,10 @@ public record EventCancellationResultDTO(
         UUID eventId,
         Instant cancelledAt,
         int refundedOrders,
+        int cancelledFreeOrders,
         int cancelledOrders,
         int pendingOrders,
-        int requiresManualAction
+        int requiresManualAction,
+        int usedTickets
 ) {
 }

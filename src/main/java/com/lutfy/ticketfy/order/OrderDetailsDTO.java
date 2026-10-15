@@ -18,7 +18,10 @@ public record OrderDetailsDTO(
        Instant createdAt,
        List<OrderItemDTO> items,
        List<OrderTicketDTO> tickets,
-       boolean eventCancelled
+       boolean eventCancelled,
+       UUID eventId,
+       String eventName,
+       Instant eventStartsAt
 ) {
     public OrderDetailsDTO(Order order, List<Ticket> tickets) {
         this( order.getId(),
@@ -31,7 +34,10 @@ public record OrderDetailsDTO(
                 order.getCreatedAt(),
                 order.getItems().stream().map(OrderItemDTO::new).toList(),
                 tickets.stream().map(ticket -> new OrderTicketDTO(ticket, order.getUser().getId())).toList(),
-                order.belongsToCancelledEvent()
+                order.belongsToCancelledEvent(),
+                order.event().getId(),
+                order.event().getName(),
+                order.event().getStartsAt()
         );
     }
 }

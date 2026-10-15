@@ -4,6 +4,7 @@ import com.lutfy.ticketfy.infra.exception.ProblemReason;
 import com.lutfy.ticketfy.infra.exception.EventAccessDeniedException;
 import com.lutfy.ticketfy.infra.exception.InvalidOrderStateException;
 import com.lutfy.ticketfy.infra.exception.InvalidTicketStateException;
+import com.lutfy.ticketfy.infra.exception.ProblemException;
 import com.lutfy.ticketfy.infra.exception.TicketNotFoundException;
 import com.lutfy.ticketfy.order.Order;
 import com.lutfy.ticketfy.user.Role;
@@ -17,6 +18,7 @@ import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -65,13 +67,16 @@ public class TicketService {
         }
 
         int updated = ticketRepository.checkIn(code, Instant.now(), TicketStatus.USED, TicketStatus.VALID);
+        var current = ticketRepository.findByCode(code)
+                .orElseThrow(() -> new TicketNotFoundException("Ticket not found"));
         if (updated == 0) {
+            if (current.getStatus() == TicketStatus.USED) {
+                throw new ProblemException(ProblemReason.TICKET_ALREADY_USED, "Ticket was already used",
+                        Map.of("usedAt", current.getUsedAt()));
+            }
             throw new InvalidTicketStateException(ProblemReason.TICKET_NOT_VALID, "Ticket is not valid for check-in");
         }
-
-        var usedTicket = ticketRepository.findByCode(code)
-                .orElseThrow(() -> new TicketNotFoundException("Ticket not found"));
-        return new TicketDetailsDTO(usedTicket, transferPolicy.allows(usedTicket));
+        return new TicketDetailsDTO(current, transferPolicy.allows(current));
     }
 
     @Transactional(readOnly = true)
@@ -90,6 +95,11 @@ public class TicketService {
             code.append(CODE_ALPHABET.charAt(random.nextInt(CODE_ALPHABET.length())));
         }
         return code.toString();
+    }
+
+    @Transactional
+    public void cancelValid(UUID orderId) {
+        ticketRepository.cancelValidByOrderId(orderId, Instant.now(), TicketStatus.CANCELLED, TicketStatus.VALID);
     }
 
     @Transactional

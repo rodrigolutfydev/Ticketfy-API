@@ -92,6 +92,13 @@ public class EventController {
         return ResponseEntity.ok(service.changeFeatured(id, dto.featured()));
     }
 
+    @GetMapping("/{id}/cancellation-preview")
+    @PreAuthorize("hasAnyRole('ORGANIZER', 'ADMIN')")
+    public ResponseEntity<EventCancellationPreviewDTO> cancellationPreview(@PathVariable UUID id,
+                                                                           @AuthenticationPrincipal User requester) {
+        return ResponseEntity.ok(cancellationService.preview(id, requester));
+    }
+
     @PostMapping("/{id}/cancel")
     @PreAuthorize("hasAnyRole('ORGANIZER', 'ADMIN')")
     public ResponseEntity<EventCancellationResultDTO> cancel(@PathVariable UUID id,

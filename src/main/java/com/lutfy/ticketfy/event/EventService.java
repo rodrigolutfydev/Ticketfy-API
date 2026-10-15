@@ -153,6 +153,13 @@ public class EventService {
         }
     }
 
+    @Transactional(readOnly = true)
+    public void checkCanManage(UUID id, User requester) {
+        var event = repository.findByIdAndActiveTrue(id)
+                .orElseThrow(() -> new EventNotFoundException("Event not found"));
+        checkOwnership(event, requester);
+    }
+
     private void checkOwnership(Event event, User requester) {
         if (requester.getRole() == Role.ADMIN) return;
         if (!event.getOrganizer().getId().equals(requester.getId())) {
