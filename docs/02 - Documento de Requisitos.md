@@ -411,4 +411,4 @@ As perguntas Q01 a Q04 vêm do Documento de Visão; Q05 a Q08 surgiram nesta an�
 
 ### Planejado
 
-Funcionalidades do [roadmap](ROADMAP.md) ainda não implementadas, sem requisito detalhado: e-mails transacionais com Brevo, pagamento via Pix com Asaas, publicação do frontend na Cloudflare Pages, login com Google, monitoramento de erros com Sentry, upload de foto de perfil e de capa de evento e teste de carga com k6.
+Funcionalidades do [roadmap](ROADMAP.md) ainda não implementadas, sem requisito detalhado: e-mails transacionais com Brevo, pagamento via Pix com Asaas, publicação do frontend na Cloudflare Pages, tela de login com Google no front (a API já tem `POST /auth/google`), monitoramento de erros com Sentry, upload de foto de perfil e de capa de evento e teste de carga com k6.

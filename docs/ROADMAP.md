@@ -57,7 +57,7 @@ O que já está pronto na API do Ticketfy e o que vem a seguir. Os detalhes de c
 - [ ] E-mails transacionais com Brevo
 - [ ] Pagamento via Pix com Asaas
 - [ ] Publicar o frontend na Cloudflare Pages
-- [ ] Login com Google
+- [ ] Login com Google: API pronta (`POST /auth/google`, authorization code + PKCE); falta a tela no front
 - [ ] Monitoramento de erros com Sentry
 - [ ] Upload de foto de perfil e de capa de evento
 - [ ] Teste de carga com k6

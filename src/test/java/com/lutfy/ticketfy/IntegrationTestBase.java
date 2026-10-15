@@ -1,6 +1,7 @@
 package com.lutfy.ticketfy;
 
 import com.lutfy.ticketfy.auth.AuthSessionService;
+import com.lutfy.ticketfy.auth.google.FakeGoogle;
 import com.lutfy.ticketfy.infra.security.AuthOriginFilter;
 import com.lutfy.ticketfy.user.User;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -43,6 +44,12 @@ public abstract class IntegrationTestBase {
         registry.add("ticketfy.auth.cookie-name", () -> "__Host-ticketfy_rt");
         registry.add("ticketfy.auth.cookie-secure", () -> "true");
         registry.add("ticketfy.auth.proxy-secret", () -> PROXY_SECRET);
+        var google = FakeGoogle.shared();
+        registry.add("ticketfy.google.client-id", () -> FakeGoogle.CLIENT_ID);
+        registry.add("ticketfy.google.client-secret", () -> FakeGoogle.CLIENT_SECRET);
+        registry.add("ticketfy.google.redirect-uris", () -> FakeGoogle.REDIRECT_URI + ",https://ticketfy.example/auth/google/callback");
+        registry.add("ticketfy.google.token-uri", google::tokenUri);
+        registry.add("ticketfy.google.jwk-set-uri", google::jwkSetUri);
     }
 
     @Autowired

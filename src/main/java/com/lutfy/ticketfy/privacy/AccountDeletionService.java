@@ -85,7 +85,7 @@ public class AccountDeletionService {
         if (principal.getRole() == Role.ADMIN) {
             throw new ProblemException(ProblemType.ADMIN_ACCOUNT_DELETION, "Admin accounts cannot be deleted");
         }
-        passwordConfirmation.verify(principal, dto.password());
+        confirm(principal, dto);
         var user = userRepository.findForUpdate(principal.getId())
                 .filter(found -> !found.isDeleted())
                 .orElseThrow(UserLocks::accountDeleted);
@@ -114,6 +114,23 @@ public class AccountDeletionService {
         details.put("deactivatedEvents", deactivatedEvents);
         details.put("payoutAccountRemoved", account.isPresent());
         auditService.record(AuditAction.ACCOUNT_DELETED, AuditTargetType.USER, user.getId(), details);
+    }
+
+    private void confirm(User principal, AccountDeletionRequestDTO dto) {
+        if (principal.hasPassword()) {
+            if (dto.password() == null || dto.password().isBlank()) {
+                throw ProblemException.requiredField("password");
+            }
+            passwordConfirmation.verify(principal, dto.password());
+            return;
+        }
+        if (dto.email() == null || dto.email().isBlank()) {
+            throw ProblemException.requiredField("email");
+        }
+        if (!dto.email().trim().equalsIgnoreCase(principal.getEmail())) {
+            throw new ProblemException(ProblemType.EMAIL_CONFIRMATION_MISMATCH,
+                    "Type the email of this account to confirm");
+        }
     }
 
     private void checkCanDelete(User user, Instant now) {

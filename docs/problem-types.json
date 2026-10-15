@@ -388,4 +388,44 @@
   "status" : 409,
   "title" : "Account has upcoming tickets",
   "reasons" : [ ]
+}, {
+  "slug" : "google-login-unavailable",
+  "status" : 503,
+  "title" : "Google login unavailable",
+  "reasons" : [ ]
+}, {
+  "slug" : "google-redirect-uri-not-allowed",
+  "status" : 400,
+  "title" : "Google redirect URI not allowed",
+  "reasons" : [ ]
+}, {
+  "slug" : "google-authorization-failed",
+  "status" : 401,
+  "title" : "Google authorization failed",
+  "reasons" : [ ]
+}, {
+  "slug" : "google-email-not-verified",
+  "status" : 403,
+  "title" : "Google email not verified",
+  "reasons" : [ ]
+}, {
+  "slug" : "google-account-conflict",
+  "status" : 409,
+  "title" : "Google account conflict",
+  "reasons" : [ ]
+}, {
+  "slug" : "google-unavailable",
+  "status" : 502,
+  "title" : "Google unavailable",
+  "reasons" : [ ]
+}, {
+  "slug" : "password-not-set",
+  "status" : 409,
+  "title" : "Password not set",
+  "reasons" : [ ]
+}, {
+  "slug" : "email-confirmation-mismatch",
+  "status" : 403,
+  "title" : "Email confirmation mismatch",
+  "reasons" : [ ]
 } ]
