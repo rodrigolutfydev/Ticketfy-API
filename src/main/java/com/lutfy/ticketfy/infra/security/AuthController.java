@@ -3,6 +3,8 @@ package com.lutfy.ticketfy.infra.security;
 import com.lutfy.ticketfy.auth.AuthSessionService;
 import com.lutfy.ticketfy.auth.RefreshTokenCookie;
 import com.lutfy.ticketfy.auth.RevocationReason;
+import com.lutfy.ticketfy.auth.google.GoogleLoginDTO;
+import com.lutfy.ticketfy.auth.google.GoogleLoginService;
 import com.lutfy.ticketfy.infra.exception.ProblemDetailFactory;
 import com.lutfy.ticketfy.infra.exception.ProblemException;
 import com.lutfy.ticketfy.infra.exception.ProblemType;
@@ -29,13 +31,15 @@ public class AuthController {
     private final AuthSessionService authSessions;
     private final RefreshTokenCookie cookie;
     private final ProblemDetailFactory problems;
+    private final GoogleLoginService googleLogin;
 
     public AuthController(AuthenticationManager manager, AuthSessionService authSessions,
-                          RefreshTokenCookie cookie, ProblemDetailFactory problems) {
+                          RefreshTokenCookie cookie, ProblemDetailFactory problems, GoogleLoginService googleLogin) {
         this.manager = manager;
         this.authSessions = authSessions;
         this.cookie = cookie;
         this.problems = problems;
+        this.googleLogin = googleLogin;
     }
 
     @PostMapping("/login")
@@ -43,6 +47,15 @@ public class AuthController {
         var usernamePassword = new UsernamePasswordAuthenticationToken(dto.email(), dto.password());
         var authentication = manager.authenticate(usernamePassword);
         var session = authSessions.start((User) authentication.getPrincipal());
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore())
+                .header(HttpHeaders.SET_COOKIE, cookie.issue(session))
+                .body(new LoginResponseDTO(session));
+    }
+
+    @PostMapping("/google")
+    public ResponseEntity<LoginResponseDTO> google(@RequestBody @Valid GoogleLoginDTO dto) {
+        var session = googleLogin.login(dto);
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())
                 .header(HttpHeaders.SET_COOKIE, cookie.issue(session))

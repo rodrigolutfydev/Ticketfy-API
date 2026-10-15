@@ -56,14 +56,23 @@ public class UserService {
         lockActive(user.getId()).promoteToOrganizer();
     }
 
+    // Quem tem senha troca confirmando a atual. Conta sem senha (criada pelo
+    // Google) define a primeira, sem senha atual. Nos dois casos as sessões
+    // abertas caem e uma nova é aberta.
     @Transactional
     public IssuedSession changePassword(UUID userId, PasswordChangeDTO dto) {
         var user = lockActive(userId);
-        passwordConfirmation.verify(user, dto.currentPassword());
+        boolean firstPassword = !user.hasPassword();
+        if (!firstPassword) {
+            if (dto.currentPassword() == null || dto.currentPassword().isBlank()) {
+                throw ProblemException.requiredField("currentPassword");
+            }
+            passwordConfirmation.verify(user, dto.currentPassword());
+        }
         user.changePassword(passwordEncoder.encode(dto.newPassword()));
         int revoked = authSessions.revokeAll(user.getId(), RevocationReason.PASSWORD_CHANGED);
-        auditService.record(AuditAction.PASSWORD_CHANGED, AuditTargetType.USER, user.getId(),
-                Map.of("revokedSessions", revoked));
+        auditService.record(firstPassword ? AuditAction.PASSWORD_SET : AuditAction.PASSWORD_CHANGED,
+                AuditTargetType.USER, user.getId(), Map.of("revokedSessions", revoked));
         return authSessions.start(user);
     }
 

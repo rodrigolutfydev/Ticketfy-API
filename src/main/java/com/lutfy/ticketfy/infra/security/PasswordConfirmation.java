@@ -35,6 +35,9 @@ public class PasswordConfirmation {
     }
 
     public void verify(User user, String rawPassword) {
+        if (!user.hasPassword()) {
+            throw new ProblemException(ProblemType.PASSWORD_NOT_SET, "Set a password for this account first");
+        }
         var now = clock.instant();
         var current = failures.get(user.getId());
         if (current != null && current.expired(now, window)) {

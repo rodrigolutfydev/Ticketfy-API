@@ -44,7 +44,13 @@ public class User implements UserDetails {
     private Role role;
     private String name;
     private String email;
+
+    /** Hash BCrypt da senha; nulo em conta criada pelo Google que ainda não definiu senha. */
     private String password;
+
+    /** Identificador estável do Google (claim "sub" do id_token); nulo se a conta não está ligada ao Google. */
+    @Column(name = "google_subject")
+    private String googleSubject;
 
     @Column(name = "avatar_url", length = 500)
     private String avatarUrl;
@@ -76,6 +82,32 @@ public class User implements UserDetails {
                 : Language.fromCode(data.language()).orElse(Language.DEFAULT);
     }
 
+    /** Conta nova criada pelo login com Google: papel USER e sem senha. */
+    public static User fromGoogle(String name, String email, String googleSubject) {
+        var user = new User();
+        user.role = Role.USER;
+        user.name = name;
+        user.email = email;
+        user.googleSubject = googleSubject;
+        return user;
+    }
+
+    public boolean hasPassword() {
+        return password != null;
+    }
+
+    public boolean isLinkedToGoogle() {
+        return googleSubject != null;
+    }
+
+    public void linkGoogle(String googleSubject) {
+        this.googleSubject = googleSubject;
+    }
+
+    public void removePassword() {
+        this.password = null;
+    }
+
     public void promoteToOrganizer() {
         if (this.getRole() == Role.ORGANIZER || this.getRole() == Role.ADMIN) {
             throw new InvalidRoleChangeException("This account cannot be promoted to organizer");
@@ -100,6 +132,7 @@ public class User implements UserDetails {
         this.email = "deleted-" + id + "@" + DELETED_EMAIL_DOMAIN;
         this.avatarUrl = null;
         this.password = encodedPassword;
+        this.googleSubject = null;
         this.deletedAt = now;
     }
 

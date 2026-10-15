@@ -24,7 +24,7 @@ public record DataExportDTO(
     public static final int SCHEMA_VERSION = 1;
 
     public record Profile(UUID id, String name, String email, Role role, String avatarUrl, Language language,
-                          Instant createdAt, Instant updatedAt) {}
+                          boolean googleLinked, Instant createdAt, Instant updatedAt) {}
 
     public record EventRef(UUID id, String name, Instant startsAt) {}
 

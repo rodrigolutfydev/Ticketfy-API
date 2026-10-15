@@ -357,6 +357,34 @@
         "tags" : [ "admin-user-controller" ]
       }
     },
+    "/auth/google" : {
+      "post" : {
+        "operationId" : "google",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/GoogleLoginDTO"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/LoginResponseDTO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "auth-controller" ]
+      }
+    },
     "/auth/login" : {
       "post" : {
         "operationId" : "login",
@@ -2037,13 +2065,18 @@
             "type" : "string",
             "enum" : [ "EXCLUIR", "DELETE" ]
           },
+          "email" : {
+            "type" : "string",
+            "maxLength" : 150,
+            "minLength" : 0
+          },
           "password" : {
             "type" : "string",
             "maxLength" : 100,
             "minLength" : 0
           }
         },
-        "required" : [ "confirmation", "password" ]
+        "required" : [ "confirmation" ]
       },
       "AdminPayoutDTO" : {
         "type" : "object",
@@ -2140,7 +2173,7 @@
         "properties" : {
           "action" : {
             "type" : "string",
-            "enum" : [ "PAYOUT_ACCOUNT_SAVED", "PAYOUT_REQUESTED", "PAYOUT_SENT_TO_REVIEW", "PAYOUT_APPROVED", "PAYOUT_REJECTED", "PAYOUT_CANCELLED", "PAYOUT_PAID", "PAYOUT_FAILED", "PAYOUTS_BLOCKED", "PAYOUTS_UNBLOCKED", "EVENT_FEATURED", "EVENT_UNFEATURED", "TICKET_TYPE_PRICE_CHANGED", "EVENT_CANCELLED", "PASSWORD_CHANGED", "SESSION_REUSE_DETECTED", "TICKET_TRANSFERRED", "COUPON_CREATED", "COUPON_UPDATED", "COUPON_DEACTIVATED", "COUPON_REACTIVATED", "COUPON_DELETED", "DATA_EXPORTED", "ACCOUNT_DELETED", "ACCOUNT_SUSPENDED", "ACCOUNT_REACTIVATED", "TICKET_TYPE_DEACTIVATED", "TICKET_TYPE_REACTIVATED", "PARTICIPANTS_EXPORTED" ]
+            "enum" : [ "PAYOUT_ACCOUNT_SAVED", "PAYOUT_REQUESTED", "PAYOUT_SENT_TO_REVIEW", "PAYOUT_APPROVED", "PAYOUT_REJECTED", "PAYOUT_CANCELLED", "PAYOUT_PAID", "PAYOUT_FAILED", "PAYOUTS_BLOCKED", "PAYOUTS_UNBLOCKED", "EVENT_FEATURED", "EVENT_UNFEATURED", "TICKET_TYPE_PRICE_CHANGED", "EVENT_CANCELLED", "PASSWORD_CHANGED", "SESSION_REUSE_DETECTED", "TICKET_TRANSFERRED", "COUPON_CREATED", "COUPON_UPDATED", "COUPON_DEACTIVATED", "COUPON_REACTIVATED", "COUPON_DELETED", "DATA_EXPORTED", "ACCOUNT_DELETED", "ACCOUNT_SUSPENDED", "ACCOUNT_REACTIVATED", "TICKET_TYPE_DEACTIVATED", "TICKET_TYPE_REACTIVATED", "PARTICIPANTS_EXPORTED", "GOOGLE_ACCOUNT_LINKED", "PASSWORD_SET" ]
           },
           "actorEmail" : {
             "type" : "string"
@@ -3052,6 +3085,28 @@
           }
         }
       },
+      "GoogleLoginDTO" : {
+        "type" : "object",
+        "properties" : {
+          "code" : {
+            "type" : "string",
+            "maxLength" : 2048,
+            "minLength" : 0
+          },
+          "codeVerifier" : {
+            "type" : "string",
+            "maxLength" : 128,
+            "minLength" : 43,
+            "pattern" : "[A-Za-z0-9._~-]*"
+          },
+          "redirectUri" : {
+            "type" : "string",
+            "maxLength" : 2048,
+            "minLength" : 0
+          }
+        },
+        "required" : [ "code", "codeVerifier", "redirectUri" ]
+      },
       "Item" : {
         "type" : "object",
         "properties" : {
@@ -3697,7 +3752,7 @@
             "minLength" : 8
           }
         },
-        "required" : [ "currentPassword", "newPassword" ]
+        "required" : [ "newPassword" ]
       },
       "PaymentDetailsDTO" : {
         "type" : "object",
@@ -3972,6 +4027,9 @@
           },
           "email" : {
             "type" : "string"
+          },
+          "googleLinked" : {
+            "type" : "boolean"
           },
           "id" : {
             "type" : "string",
@@ -4442,6 +4500,12 @@
           },
           "email" : {
             "type" : "string"
+          },
+          "googleLinked" : {
+            "type" : "boolean"
+          },
+          "hasPassword" : {
+            "type" : "boolean"
           },
           "id" : {
             "type" : "string",

@@ -8,9 +8,12 @@ public record UserDetailsDTO(
         String email,
         Role role,
         String avatarUrl,
-        Language language
+        Language language,
+        boolean hasPassword,
+        boolean googleLinked
 ) {
     public UserDetailsDTO(User user) {
-        this(user.getId(), user.getName(), user.getEmail(), user.getRole(), user.getAvatarUrl(), user.getLanguage());
+        this(user.getId(), user.getName(), user.getEmail(), user.getRole(), user.getAvatarUrl(), user.getLanguage(),
+                user.hasPassword(), user.isLinkedToGoogle());
     }
 }

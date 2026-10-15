@@ -84,7 +84,15 @@ public enum ProblemType {
     ACCOUNT_HAS_PAYOUT_IN_PROGRESS("account-has-payout-in-progress", "Account has payout in progress", HttpStatus.CONFLICT),
     ACCOUNT_HAS_BALANCE("account-has-balance", "Account has balance", HttpStatus.CONFLICT),
     ACCOUNT_HAS_ACTIVE_EVENTS("account-has-active-events", "Account has active events", HttpStatus.CONFLICT),
-    ACCOUNT_HAS_UPCOMING_TICKETS("account-has-upcoming-tickets", "Account has upcoming tickets", HttpStatus.CONFLICT);
+    ACCOUNT_HAS_UPCOMING_TICKETS("account-has-upcoming-tickets", "Account has upcoming tickets", HttpStatus.CONFLICT),
+    GOOGLE_LOGIN_UNAVAILABLE("google-login-unavailable", "Google login unavailable", HttpStatus.SERVICE_UNAVAILABLE),
+    GOOGLE_REDIRECT_URI_NOT_ALLOWED("google-redirect-uri-not-allowed", "Google redirect URI not allowed", HttpStatus.BAD_REQUEST),
+    GOOGLE_AUTHORIZATION_FAILED("google-authorization-failed", "Google authorization failed", HttpStatus.UNAUTHORIZED),
+    GOOGLE_EMAIL_NOT_VERIFIED("google-email-not-verified", "Google email not verified", HttpStatus.FORBIDDEN),
+    GOOGLE_ACCOUNT_CONFLICT("google-account-conflict", "Google account conflict", HttpStatus.CONFLICT),
+    GOOGLE_UNAVAILABLE("google-unavailable", "Google unavailable", HttpStatus.BAD_GATEWAY),
+    PASSWORD_NOT_SET("password-not-set", "Password not set", HttpStatus.CONFLICT),
+    EMAIL_CONFIRMATION_MISMATCH("email-confirmation-mismatch", "Email confirmation mismatch", HttpStatus.FORBIDDEN);
 
     private final String slug;
     private final String title;

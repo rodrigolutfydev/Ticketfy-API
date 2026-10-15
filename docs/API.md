@@ -52,7 +52,7 @@ Na coluna **Acesso** das tabelas de endpoints:
 
 ### Access token
 
-`POST /auth/login` devolve um access token JWT que vale **10 minutos**. Rotas protegidas exigem o header:
+`POST /auth/login` e `POST /auth/google` devolvem um access token JWT que vale **10 minutos**. Rotas protegidas exigem o header:
 
 ```http
 Authorization: Bearer <token>
@@ -67,6 +67,7 @@ O refresh token nunca aparece no corpo da resposta. Ele vai no cookie `__Host-ti
 | Rota | O que faz |
 |---|---|
 | `POST /auth/login` | Confere e-mail e senha, abre uma sessão, devolve o access token e grava o cookie; conta suspensa responde 403 `account-suspended`, só depois de a senha conferir |
+| `POST /auth/google` | Login com Google: troca o código do Google, valida a identidade e abre a mesma sessão do login com senha (ver [Login com Google](#login-com-google)) |
 | `POST /auth/refresh` | Troca o cookie por um novo e devolve outro access token; sem sessão válida, 401 `session-expired` e o cookie é apagado; conta suspensa, 403 `account-suspended` e o cookie é apagado |
 | `POST /auth/logout` | Encerra a sessão do cookie e apaga o cookie; responde 204 mesmo sem cookie |
 | `POST /auth/logout-all` | Encerra todas as sessões do usuário; exige também `Authorization` |
@@ -105,7 +106,7 @@ Set-Cookie: __Host-ticketfy_rt=<refresh token>; Path=/; Max-Age=1800; Secure; Ht
 }
 ```
 
-E-mail ou senha errados respondem 401 `invalid-credentials`. Cinco tentativas por IP em 60 segundos levam a 429 `too-many-login-attempts`.
+E-mail ou senha errados respondem 401 `invalid-credentials`; conta criada pelo Google que ainda não definiu senha também. Cinco tentativas por IP em 60 segundos, somando login com senha e com Google, levam a 429 `too-many-login-attempts`.
 
 **Renovar**
 
@@ -117,6 +118,38 @@ Cookie: __Host-ticketfy_rt=<refresh token>
 ```
 
 A resposta tem o mesmo formato do login e grava um cookie novo.
+
+### Login com Google
+
+Fluxo de código com PKCE (authorization code + PKCE). O front gera um `code_verifier` aleatório, manda o usuário ao Google com o `code_challenge` (SHA-256 do verifier) e recebe de volta um código na redirect URI. Depois chama a API, pelo mesmo proxy das outras rotas `/auth/**` (com `Origin` e `X-Ticketfy-Auth: 1`):
+
+```http
+POST /auth/google
+Origin: http://localhost:5173
+X-Ticketfy-Auth: 1
+Content-Type: application/json
+
+{
+  "code": "<código devolvido pelo Google>",
+  "codeVerifier": "<code_verifier do PKCE, 43 a 128 caracteres>",
+  "redirectUri": "http://localhost:5173/auth/google/callback"
+}
+```
+
+A resposta é a mesma do login com senha: 200 com `token` e `expiresIn`, e o cookie `__Host-ticketfy_rt`.
+
+O que a API faz:
+
+1. Confere se `redirectUri` está, exatamente, na lista de `GOOGLE_REDIRECT_URIS`; fora dela, 400 `google-redirect-uri-not-allowed`, sem chamar o Google.
+2. Troca o código no endpoint de token do Google, com client id, client secret, `code_verifier` e `redirect_uri`. Código recusado (inválido, vencido, já usado ou verifier errado) responde 401 `google-authorization-failed`; Google fora do ar ou sem resposta em 10 s, 502 `google-unavailable`.
+3. Valida o `id_token` recebido: assinatura pelas chaves públicas do Google, `iss` (`https://accounts.google.com` ou `accounts.google.com`), `aud` igual ao client id e `exp` (60 s de tolerância de relógio). Qualquer falha responde 401 `google-authorization-failed`. E-mail não verificado no Google (`email_verified` diferente de `true`) responde 403 `google-email-not-verified`.
+4. Acha o usuário:
+   - pelo identificador do Google (`sub`), se a conta já está ligada;
+   - senão, pelo e-mail (sem diferenciar maiúsculas) de uma conta ativa, e liga essa conta ao Google. Na ligação, a senha da conta é **apagada** e as sessões que ela já tinha abertas são encerradas: o cadastro com senha não confirma o e-mail, então a senha pode ter sido criada por outra pessoa antes de o dono entrar pelo Google. A partir daí a conta entra pelo Google, e o dono pode definir uma senha nova em `PATCH /users/me/password` sem a senha atual (ver [Definir a primeira senha](#usuários-e-conta)); a senha antiga responde 401 `invalid-credentials`. A ligação vai para a auditoria (`GOOGLE_ACCOUNT_LINKED`, com `revokedSessions` e `credentialRemoved`, que indica a senha apagada). Se o e-mail já estiver ligado a outra conta Google, 409 `google-account-conflict`;
+   - senão, cria um usuário `USER` com o nome e o e-mail do Google e **sem senha**.
+5. Abre a sessão como no login com senha. Conta suspensa responde 403 `account-suspended`, e nesse caso nada é ligado.
+
+Sem `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` e `GOOGLE_REDIRECT_URIS`, a rota responde 503 `google-login-unavailable` e o resto da API funciona normalmente.
 
 ### Confirmação de senha
 
@@ -130,6 +163,8 @@ Ações sensíveis pedem a senha de novo no corpo (`password` ou `currentPasswor
 - excluir a conta.
 
 Senha errada responde 403 `invalid-password`. Cinco erros em 15 minutos bloqueiam a confirmação com 429 `too-many-password-attempts` e `Retry-After`.
+
+Conta sem senha (criada pelo Google) responde 409 `password-not-set` nessas ações, com duas exceções: trocar a senha vira definir a primeira senha, sem `currentPassword` (ver [Usuários e conta](#usuários-e-conta)), e excluir a conta é confirmado com o próprio e-mail (ver [Privacidade](#privacidade-lgpd)). `GET /users/me` informa `hasPassword` e `googleLinked`.
 
 ## Erros
 
@@ -257,14 +292,18 @@ Os tipos abaixo trazem `reason`, com um dos valores da tabela. A lista também e
 | `pix-key-not-found` | 400 | Chave Pix não encontrada no provedor |
 | `pix-key-holder-mismatch` | 400 | Chave Pix de outro documento |
 | `payout-below-minimum` | 400 | Saque abaixo do mínimo; traz `minAmount` |
-| `email-not-allowed` | 400 | Cadastro com domínio reservado (`deleted.ticketfy.invalid`) |
-| `invalid-credentials` | 401 | E-mail ou senha errados no login |
+| `email-not-allowed` | 400 | Cadastro com domínio reservado (`deleted.ticketfy.invalid`), ou e-mail do Google com mais de 150 caracteres |
+| `google-redirect-uri-not-allowed` | 400 | `redirectUri` fora da lista `GOOGLE_REDIRECT_URIS` no login com Google |
+| `invalid-credentials` | 401 | E-mail ou senha errados no login, ou conta sem senha (inclusive a senha apagada ao ligar a conta ao Google) |
+| `google-authorization-failed` | 401 | Código recusado pelo Google ou `id_token` inválido (assinatura, `iss`, `aud` ou `exp`) |
 | `authentication-required` | 401 | Rota protegida sem token ou com token inválido |
 | `session-expired` | 401 | Sessão vencida, revogada ou conta excluída |
 | `access-denied` | 403 | Papel insuficiente |
 | `event-access-denied` | 403 | O evento não é do usuário |
 | `auth-request-rejected` | 403 | `POST /auth/**` sem `Origin` permitido ou sem `X-Ticketfy-Auth: 1` |
 | `invalid-password` | 403 | Senha de confirmação errada |
+| `email-confirmation-mismatch` | 403 | Exclusão de conta sem senha com e-mail diferente do da conta |
+| `google-email-not-verified` | 403 | E-mail não verificado na conta Google |
 | `user-not-found` | 404 | Usuário não encontrado |
 | `event-not-found` | 404 | Evento inexistente ou desativado |
 | `ticket-type-not-found` | 404 | Lote inexistente ou fora de venda |
@@ -308,6 +347,8 @@ Os tipos abaixo trazem `reason`, com um dos valores da tabela. A lista também e
 | `account-has-balance` | 409 | Exclusão com saldo diferente de zero; traz `pending`, `available` e `held` |
 | `account-has-active-events` | 409 | Exclusão com evento com vendas ou pedidos pendentes; traz `eventIds` |
 | `account-has-upcoming-tickets` | 409 | Exclusão com ingresso válido de evento futuro; traz `ticketCount` |
+| `password-not-set` | 409 | Ação que pede a senha numa conta sem senha (criada pelo Google) |
+| `google-account-conflict` | 409 | Login com Google cujo e-mail já está ligado a outra conta Google, ou usado por mais de uma conta |
 | `unsupported-media-type` | 415 | `Content-Type` diferente de JSON |
 | `transfer-recipient-unavailable` | 422 | Destinatário da transferência não pode receber (mensagem genérica) |
 | `invalid-coupon` | 422 | Cupom inválido, expirado, inativo, esgotado ou de outro evento (mesma mensagem para todos) |
@@ -318,6 +359,8 @@ Os tipos abaixo trazem `reason`, com um dos valores da tabela. A lista também e
 | `too-many-coupon-attempts` | 429 | Limite de cupons inválidos |
 | `too-many-data-exports` | 429 | Limite de exportações de dados |
 | `internal-error` | 500 | Erro inesperado; `detail` é sempre `"Internal server error"` e traz `requestId` |
+| `google-unavailable` | 502 | Google fora do ar ou sem resposta no login com Google |
+| `google-login-unavailable` | 503 | Login com Google não configurado (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` e `GOOGLE_REDIRECT_URIS`) |
 
 ## Formato dos CSVs
 
@@ -391,7 +434,7 @@ Os limites ficam em memória, por instância da aplicação, exceto o de exporta
 
 | O que | Limite | Resposta |
 |---|---|---|
-| Login | 5 por IP em 60 s | 429 `too-many-login-attempts` |
+| Login (senha e Google somados) | 5 por IP em 60 s | 429 `too-many-login-attempts` |
 | Senha de confirmação errada | 5 por usuário em 15 min | 429 `too-many-password-attempts` |
 | Transferência para e-mail não cadastrado | 5 por usuário em 15 min | 429 `too-many-transfer-attempts` |
 | Cupom inválido (pré-visualização e pedido somados) | 10 por usuário em 15 min | 429 `too-many-coupon-attempts` |
@@ -404,12 +447,13 @@ Os limites ficam em memória, por instância da aplicação, exceto o de exporta
 | Método | Endpoint | Descrição | Acesso |
 |---|---|---|---|
 | POST | `/users` | Cadastra um usuário com papel `USER` | Público |
-| GET | `/users/me` | Dados do usuário autenticado, com o idioma preferido | Autenticado |
+| GET | `/users/me` | Dados do usuário autenticado, com o idioma preferido, se tem senha (`hasPassword`) e se está ligado ao Google (`googleLinked`) | Autenticado |
 | PATCH | `/users/me/language` | Troca o idioma preferido (`pt-BR` ou `en`) | Autenticado |
 | PATCH | `/users/me/avatar` | Troca a foto (`avatarUrl` https); `""` ou `null` remove | Autenticado |
-| PATCH | `/users/me/password` | Troca a senha, encerra todas as sessões e abre uma nova | Autenticado |
+| PATCH | `/users/me/password` | Troca a senha (ou define a primeira, em conta sem senha), encerra todas as sessões e abre uma nova | Autenticado |
 | POST | `/users/me/organizer` | Torna o usuário organizador; responde 204 e o token atual continua valendo | Autenticado |
 | POST | `/auth/login` | Ver [Autenticação](#autenticação) | Público |
+| POST | `/auth/google` | Ver [Login com Google](#login-com-google) | Público |
 | POST | `/auth/refresh` | Ver [Autenticação](#autenticação) | Público (cookie) |
 | POST | `/auth/logout` | Ver [Autenticação](#autenticação) | Público (cookie) |
 | POST | `/auth/logout-all` | Ver [Autenticação](#autenticação) | Autenticado |
@@ -437,7 +481,9 @@ HTTP/1.1 201 Created
   "email": "ana@email.com",
   "role": "USER",
   "avatarUrl": null,
-  "language": "pt-BR"
+  "language": "pt-BR",
+  "hasPassword": true,
+  "googleLinked": false
 }
 ```
 
@@ -468,7 +514,19 @@ Content-Type: application/json
 }
 ```
 
-A resposta tem o mesmo formato do login e grava um cookie novo. As outras sessões são encerradas.
+A resposta tem o mesmo formato do login e grava um cookie novo. As outras sessões são encerradas. Sem `currentPassword` numa conta que tem senha, a resposta é 400 `validation-failed` com `code` `required`.
+
+**Definir a primeira senha (conta criada pelo Google)**
+
+```http
+PATCH /users/me/password
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{ "newPassword": "outraSenhaForte456" }
+```
+
+Vale só enquanto `hasPassword` é `false` (conta criada pelo Google, ou conta antiga cuja senha foi apagada ao ser ligada ao Google): não pede a senha atual e, como na troca, encerra as sessões e abre uma nova. Vai para a auditoria como `PASSWORD_SET` (a troca continua `PASSWORD_CHANGED`). Depois disso, a conta entra também com e-mail e senha e passa a confirmar ações com a senha.
 
 ### Privacidade (LGPD)
 
@@ -496,7 +554,7 @@ Cache-Control: no-store
 {
   "schemaVersion": 1,
   "generatedAt": "2026-10-08T17:00:00Z",
-  "profile": { "id": "…", "name": "Ana Souza", "email": "ana@email.com", "role": "ORGANIZER", "avatarUrl": null, "language": "pt-BR", "createdAt": "…", "updatedAt": "…" },
+  "profile": { "id": "…", "name": "Ana Souza", "email": "ana@email.com", "role": "ORGANIZER", "avatarUrl": null, "language": "pt-BR", "googleLinked": false, "createdAt": "…", "updatedAt": "…" },
   "orders": [ { "id": "…", "status": "PAID", "subtotalAmount": 100.00, "discountAmount": 10.00, "totalAmount": 90.00, "couponCode": "AMIGO10", "event": { "id": "…", "name": "Festival de Verão", "startsAt": "…" }, "items": [ ], "payments": [ ] } ],
   "tickets": [ ],
   "transfers": [ { "ticketId": "…", "direction": "SENT", "event": { }, "ticketTypeName": "Pista", "transferredAt": "…" } ],
@@ -526,13 +584,24 @@ Content-Type: application/json
 
 Responde 204 e apaga o cookie. Numa única transação, a exclusão:
 
-- substitui nome, e-mail, foto e senha por valores sem identificação;
+- substitui nome, e-mail, foto e senha por valores sem identificação e desfaz a ligação com o Google;
 - apaga os dados de recebimento;
 - cancela pedidos pendentes;
 - desativa os eventos do usuário;
 - revoga todas as sessões, então o token atual passa a receber 401.
 
 Pedidos, pagamentos, extrato, saques e auditoria continuam existindo, ligados à conta anonimizada, e o e-mail original pode ser usado num novo cadastro.
+
+Conta sem senha (criada pelo Google) confirma com o próprio e-mail no lugar da senha:
+
+```json
+{
+  "email": "ana@gmail.com",
+  "confirmation": "EXCLUIR"
+}
+```
+
+O e-mail é comparado sem diferenciar maiúsculas e sem os espaços das pontas; diferente do da conta, a resposta é 403 `email-confirmation-mismatch`. Quem tem senha continua confirmando com `password`. O campo exigido pela conta (`password` ou `email`) faltando responde 400 `validation-failed` com `code` `required`.
 
 `confirmation` aceita `"EXCLUIR"` ou `"DELETE"`, exatamente assim, para o cliente pedir a palavra no idioma do usuário. Outro valor, ou a falta dele, responde 400 `validation-failed`, com `code` `confirmation` e `params.allowed`. Conta suspensa responde 403 `account-suspended`. A exclusão é recusada com 409 nos casos abaixo, verificados nesta ordem:
 
