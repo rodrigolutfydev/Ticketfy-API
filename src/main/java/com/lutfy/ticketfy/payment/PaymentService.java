@@ -11,6 +11,8 @@ import com.lutfy.ticketfy.payout.ledger.LedgerService;
 import com.lutfy.ticketfy.ticket.TicketService;
 import com.lutfy.ticketfy.user.User;
 import com.lutfy.ticketfy.user.UserLocks;
+import com.lutfy.ticketfy.notification.OrderConfirmedEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,6 +29,7 @@ public class PaymentService {
     private final LedgerService ledgerService;
     private final UserLocks userLocks;
     private final Clock clock;
+    private final ApplicationEventPublisher events;
 
     public PaymentService(PaymentRepository paymentRepository,
                           OrderRepository orderRepository,
@@ -34,7 +37,8 @@ public class PaymentService {
                           PaymentGateway paymentGateway,
                           LedgerService ledgerService,
                           UserLocks userLocks,
-                          Clock clock) {
+                          Clock clock,
+                          ApplicationEventPublisher events) {
         this.paymentRepository = paymentRepository;
         this.orderRepository = orderRepository;
         this.ticketService = ticketService;
@@ -42,6 +46,7 @@ public class PaymentService {
         this.ledgerService = ledgerService;
         this.userLocks = userLocks;
         this.clock = clock;
+        this.events = events;
     }
 
     @Transactional
@@ -70,6 +75,7 @@ public class PaymentService {
         ticketService.issueForOrder(order);
 
         var saved = paymentRepository.saveAndFlush(payment);
+        events.publishEvent(new OrderConfirmedEvent(order.getId()));
         return new PaymentDetailsDTO(saved);
     }
 

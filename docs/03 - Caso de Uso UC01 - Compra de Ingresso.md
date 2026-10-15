@@ -31,7 +31,7 @@ O caso de uso escolhido é **Realizar compra de ingresso**, porque é o fluxo qu
 
 - Reembolso do pedido pago (RF15) e cancelamento do evento (RF07).
 - Transferência dos ingressos emitidos (RF20).
-- Envio de e-mail de confirmação, planejado com Brevo (SUG02).
+- Envio do e-mail de confirmação pela Brevo (SUG02), que acontece depois da confirmação e fora da transação da compra.
 
 ## 1. Identificação do Caso de Uso
 

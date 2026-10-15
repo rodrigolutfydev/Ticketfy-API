@@ -15,7 +15,9 @@ import com.lutfy.ticketfy.tickettype.TicketTypeRepository;
 import com.lutfy.ticketfy.user.Role;
 import com.lutfy.ticketfy.user.User;
 import com.lutfy.ticketfy.user.UserLocks;
+import com.lutfy.ticketfy.notification.OrderConfirmedEvent;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -47,6 +49,7 @@ public class OrderService {
     private final Clock clock;
     private final long reservationMinutes;
     private final long refundDeadlineHours;
+    private final ApplicationEventPublisher events;
 
     public OrderService(OrderRepository orderRepository,
                         TicketTypeRepository ticketTypeRepository,
@@ -60,7 +63,8 @@ public class OrderService {
                         TicketTypeBuyerCounts buyerCounts,
                         Clock clock,
                         @Value("${ticketfy.order.reservation-minutes}") long reservationMinutes,
-                        @Value("${ticketfy.refund.deadline-hours}") long refundDeadlineHours) {
+                        @Value("${ticketfy.refund.deadline-hours}") long refundDeadlineHours,
+                        ApplicationEventPublisher events) {
         this.orderRepository = orderRepository;
         this.ticketTypeRepository = ticketTypeRepository;
         this.ticketService = ticketService;
@@ -74,6 +78,7 @@ public class OrderService {
         this.clock = clock;
         this.reservationMinutes = reservationMinutes;
         this.refundDeadlineHours = refundDeadlineHours;
+        this.events = events;
     }
 
     @Transactional
@@ -141,6 +146,7 @@ public class OrderService {
         var saved = orderRepository.saveAndFlush(order);
         if (saved.getStatus() == OrderStatus.PAID) {
             ticketService.issueForOrder(saved);
+            events.publishEvent(new OrderConfirmedEvent(saved.getId()));
         }
         return details(saved);
     }

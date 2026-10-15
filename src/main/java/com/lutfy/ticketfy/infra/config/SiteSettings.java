@@ -43,6 +43,10 @@ public class SiteSettings {
         this.baseUrl = trimmed;
     }
 
+    public Optional<String> ticketsUrl() {
+        return baseUrl.isEmpty() ? Optional.empty() : Optional.of(baseUrl + "/tickets");
+    }
+
     public Optional<String> eventUrl(UUID eventId) {
         return baseUrl.isEmpty() ? Optional.empty() : Optional.of(baseUrl + "/events/" + eventId);
     }

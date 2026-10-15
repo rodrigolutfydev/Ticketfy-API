@@ -12,6 +12,8 @@ import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
 import java.util.UUID;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Entity
 @Table(name = "events")
@@ -103,6 +105,16 @@ public class Event {
 
     public boolean isCancelled() {
         return cancelledAt != null;
+    }
+
+    /** Local em uma linha: casa, endereço, cidade - UF (partes vazias ficam de fora). */
+    public String fullLocation() {
+        var cityAndState = Stream.of(city, state)
+                .filter(part -> part != null && !part.isBlank())
+                .collect(Collectors.joining(" - "));
+        return Stream.of(venueName, address, cityAndState)
+                .filter(part -> part != null && !part.isBlank())
+                .collect(Collectors.joining(", "));
     }
 
     private static String blankToNull(String value) {
