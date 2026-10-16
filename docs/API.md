@@ -33,7 +33,7 @@ O contrato gerado a partir do código fica em [`openapi.json`](openapi.json). O 
 |---|---|
 | Produção | `https://ticketfy-api.onrender.com` |
 | Local | `http://localhost:8080` |
-| Swagger UI | `/swagger-ui/index.html`, só no perfil `dev` (desligado em produção) |
+| Swagger UI | [`https://ticketfy-api.onrender.com/swagger-ui/index.html`](https://ticketfy-api.onrender.com/swagger-ui/index.html) (em produção, o "Try it out" executa só `GET`); local em `http://localhost:8080/swagger-ui/index.html` |
 | Formato | JSON em UTF-8; erros em `application/problem+json` |
 | Datas | ISO 8601 em UTC: `"2026-12-10T23:00:00Z"` é 20h em Brasília. Filtros por dia (`from`, `to`) usam `AAAA-MM-DD` no fuso `America/Sao_Paulo` |
 | Dinheiro | Número decimal com 2 casas, em reais: `80.00` |
