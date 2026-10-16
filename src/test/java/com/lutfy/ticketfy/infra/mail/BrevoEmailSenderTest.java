@@ -86,11 +86,19 @@ class BrevoEmailSenderTest {
     }
 
     @Test
-    void apiKeyWithoutSenderAddressIsRejectedAtStartup() {
-        assertThatThrownBy(() -> new MailSettings("key-123", "https://api.brevo.com/v3/smtp/email", " ",
-                "Ticketfy", 10, "America/Sao_Paulo"))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("ticketfy.mail.from-email");
+    void brevoNeedsBothKeyAndSenderOtherwiseEmailsOnlyGoToTheLog() {
+        var withoutSender = new MailSettings("key-123", "https://api.brevo.com/v3/smtp/email", " ",
+                "Ticketfy", 5, "America/Sao_Paulo");
+        var withoutKey = new MailSettings("", "https://api.brevo.com/v3/smtp/email", "noreply@ticketfy.example",
+                "Ticketfy", 5, "America/Sao_Paulo");
+        var complete = new MailSettings("key-123", "https://api.brevo.com/v3/smtp/email", "noreply@ticketfy.example",
+                "Ticketfy", 5, "America/Sao_Paulo");
+
+        assertThat(withoutSender.brevoEnabled()).isFalse();
+        assertThat(withoutKey.brevoEnabled()).isFalse();
+        assertThat(complete.brevoEnabled()).isTrue();
+        assertThat(new MailConfig().emailSender(withoutSender)).isInstanceOf(LoggingEmailSender.class);
+        assertThat(new MailConfig().emailSender(complete)).isInstanceOf(BrevoEmailSender.class);
     }
 
     private BrevoEmailSender sender(String key) {

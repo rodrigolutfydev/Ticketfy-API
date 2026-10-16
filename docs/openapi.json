@@ -435,6 +435,48 @@
         "tags" : [ "auth-controller" ]
       }
     },
+    "/auth/password-reset/confirm" : {
+      "post" : {
+        "operationId" : "confirm",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/PasswordResetConfirmDTO"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "password-reset-controller" ]
+      }
+    },
+    "/auth/password-reset/request" : {
+      "post" : {
+        "operationId" : "request",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/PasswordResetRequestDTO"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "password-reset-controller" ]
+      }
+    },
     "/auth/refresh" : {
       "post" : {
         "operationId" : "refresh",
@@ -2200,7 +2242,7 @@
         "properties" : {
           "action" : {
             "type" : "string",
-            "enum" : [ "PAYOUT_ACCOUNT_SAVED", "PAYOUT_REQUESTED", "PAYOUT_SENT_TO_REVIEW", "PAYOUT_APPROVED", "PAYOUT_REJECTED", "PAYOUT_CANCELLED", "PAYOUT_PAID", "PAYOUT_FAILED", "PAYOUTS_BLOCKED", "PAYOUTS_UNBLOCKED", "EVENT_FEATURED", "EVENT_UNFEATURED", "TICKET_TYPE_PRICE_CHANGED", "EVENT_CANCELLED", "PASSWORD_CHANGED", "SESSION_REUSE_DETECTED", "TICKET_TRANSFERRED", "COUPON_CREATED", "COUPON_UPDATED", "COUPON_DEACTIVATED", "COUPON_REACTIVATED", "COUPON_DELETED", "DATA_EXPORTED", "ACCOUNT_DELETED", "ACCOUNT_SUSPENDED", "ACCOUNT_REACTIVATED", "TICKET_TYPE_DEACTIVATED", "TICKET_TYPE_REACTIVATED", "PARTICIPANTS_EXPORTED", "GOOGLE_ACCOUNT_LINKED", "PASSWORD_SET" ]
+            "enum" : [ "PAYOUT_ACCOUNT_SAVED", "PAYOUT_REQUESTED", "PAYOUT_SENT_TO_REVIEW", "PAYOUT_APPROVED", "PAYOUT_REJECTED", "PAYOUT_CANCELLED", "PAYOUT_PAID", "PAYOUT_FAILED", "PAYOUTS_BLOCKED", "PAYOUTS_UNBLOCKED", "EVENT_FEATURED", "EVENT_UNFEATURED", "TICKET_TYPE_PRICE_CHANGED", "EVENT_CANCELLED", "PASSWORD_CHANGED", "SESSION_REUSE_DETECTED", "TICKET_TRANSFERRED", "COUPON_CREATED", "COUPON_UPDATED", "COUPON_DEACTIVATED", "COUPON_REACTIVATED", "COUPON_DELETED", "DATA_EXPORTED", "ACCOUNT_DELETED", "ACCOUNT_SUSPENDED", "ACCOUNT_REACTIVATED", "TICKET_TYPE_DEACTIVATED", "TICKET_TYPE_REACTIVATED", "PARTICIPANTS_EXPORTED", "GOOGLE_ACCOUNT_LINKED", "PASSWORD_SET", "PASSWORD_RESET_REQUESTED", "PASSWORD_RESET" ]
           },
           "actorEmail" : {
             "type" : "string"
@@ -3839,6 +3881,34 @@
           }
         },
         "required" : [ "newPassword" ]
+      },
+      "PasswordResetConfirmDTO" : {
+        "type" : "object",
+        "properties" : {
+          "newPassword" : {
+            "type" : "string",
+            "maxLength" : 72,
+            "minLength" : 8
+          },
+          "token" : {
+            "type" : "string",
+            "maxLength" : 100,
+            "minLength" : 0
+          }
+        },
+        "required" : [ "newPassword", "token" ]
+      },
+      "PasswordResetRequestDTO" : {
+        "type" : "object",
+        "properties" : {
+          "email" : {
+            "type" : "string",
+            "format" : "email",
+            "maxLength" : 150,
+            "minLength" : 0
+          }
+        },
+        "required" : [ "email" ]
       },
       "PaymentDetailsDTO" : {
         "type" : "object",

@@ -414,6 +414,26 @@
   "title" : "Google account conflict",
   "reasons" : [ ]
 }, {
+  "slug" : "password-reset-token-invalid",
+  "status" : 400,
+  "title" : "Password reset token invalid",
+  "reasons" : [ ]
+}, {
+  "slug" : "password-reset-token-expired",
+  "status" : 400,
+  "title" : "Password reset token expired",
+  "reasons" : [ ]
+}, {
+  "slug" : "password-reset-token-used",
+  "status" : 400,
+  "title" : "Password reset token used",
+  "reasons" : [ ]
+}, {
+  "slug" : "too-many-password-reset-attempts",
+  "status" : 429,
+  "title" : "Too many password reset attempts",
+  "reasons" : [ ]
+}, {
   "slug" : "google-unavailable",
   "status" : 502,
   "title" : "Google unavailable",

@@ -118,7 +118,7 @@ Os itens abaixo não faziam parte dos requisitos originais. A situação de cada
 
 | ID | Sugestão | Situação |
 | --- | --- | --- |
-| SUG01 | Recuperação de senha por e-mail. | Não implementado. Depende dos e-mails transacionais com Brevo, que estão planejados. |
+| SUG01 | Recuperação de senha por e-mail. | Implementado: `POST /auth/password-reset/request` e `/confirm`, com link de 30 minutos e uso único enviado pela Brevo; conta criada pelo Google usa o mesmo fluxo para definir a primeira senha. |
 | SUG02 | Envio de e-mail de confirmação após a compra. | Implementado: e-mail pela Brevo depois da confirmação do pedido (pago ou gratuito), com os ingressos, o QR Code de cada um e o `.ics` do evento em anexo. |
 | SUG03 | Reserva temporária de ingressos durante o pagamento. | Implementado: incorporada ao RF10 e à RN12, com prazo de 15 minutos. |
 | SUG04 | Relatório de vendas por evento para o organizador. | Implementado: painel do evento e do organizador (RF21). |
@@ -411,4 +411,4 @@ As perguntas Q01 a Q04 vêm do Documento de Visão; Q05 a Q08 surgiram nesta an�
 
 ### Planejado
 
-Funcionalidades do [roadmap](ROADMAP.md) ainda não implementadas, sem requisito detalhado: e-mails transacionais com Brevo, pagamento via Pix com Asaas, publicação do frontend na Cloudflare Pages, tela de login com Google no front (a API já tem `POST /auth/google`), monitoramento de erros com Sentry, upload de foto de perfil e de capa de evento e teste de carga com k6.
+Funcionalidades do [roadmap](ROADMAP.md) ainda não implementadas, sem requisito detalhado: pagamento via Pix com Asaas, publicação do frontend na Cloudflare Pages, tela de login com Google no front (a API já tem `POST /auth/google`), monitoramento de erros com Sentry, upload de foto de perfil e de capa de evento e teste de carga com k6.

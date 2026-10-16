@@ -1,5 +1,6 @@
 package com.lutfy.ticketfy.notification;
 
+import com.lutfy.ticketfy.auth.passwordreset.PasswordResetRequestedEvent;
 import com.lutfy.ticketfy.infra.mail.EmailDeliveryException;
 import com.lutfy.ticketfy.infra.mail.EmailMessage;
 import com.lutfy.ticketfy.infra.mail.EmailSender;
@@ -47,6 +48,12 @@ public class EmailNotificationListener {
                 () -> emails.transferReceived(event.ticketId(), event.senderId(), event.recipientId()));
         dispatch("Transfer sent", "ticket", event.ticketId(),
                 () -> emails.transferSent(event.ticketId(), event.senderId(), event.recipientId()));
+    }
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onPasswordResetRequested(PasswordResetRequestedEvent event) {
+        dispatch("Password reset", "user", event.userId(),
+                () -> emails.passwordReset(event.userId(), event.rawToken()));
     }
 
     private void dispatch(String kind, String target, UUID id, Supplier<Optional<EmailMessage>> compose) {

@@ -19,7 +19,7 @@ public class MailConfig {
         if (settings.brevoEnabled()) {
             return new BrevoEmailSender(settings);
         }
-        log.warn("Brevo API key not set: transactional emails will only be logged");
+        log.warn("Brevo is not configured (BREVO_API_KEY and MAIL_FROM_EMAIL): transactional emails will only be logged");
         return new LoggingEmailSender();
     }
 

@@ -71,6 +71,8 @@ O refresh token nunca aparece no corpo da resposta. Ele vai no cookie `__Host-ti
 | `POST /auth/refresh` | Troca o cookie por um novo e devolve outro access token; sem sessão válida, 401 `session-expired` e o cookie é apagado; conta suspensa, 403 `account-suspended` e o cookie é apagado |
 | `POST /auth/logout` | Encerra a sessão do cookie e apaga o cookie; responde 204 mesmo sem cookie |
 | `POST /auth/logout-all` | Encerra todas as sessões do usuário; exige também `Authorization` |
+| `POST /auth/password-reset/request` | Pede o link de recuperação de senha por e-mail; sempre 202 (ver [Recuperação de senha](#recuperação-de-senha)) |
+| `POST /auth/password-reset/confirm` | Troca a senha com o token do link; 204 e todas as sessões da conta encerradas |
 
 ### `Origin` e `X-Ticketfy-Auth`
 
@@ -150,6 +152,49 @@ O que a API faz:
 5. Abre a sessão como no login com senha. Conta suspensa responde 403 `account-suspended`, e nesse caso nada é ligado.
 
 Sem `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` e `GOOGLE_REDIRECT_URIS`, a rota responde 503 `google-login-unavailable` e o resto da API funciona normalmente.
+
+### Recuperação de senha
+
+**Pedir o link**
+
+```http
+POST /auth/password-reset/request
+Origin: https://ticketfy.example
+X-Ticketfy-Auth: 1
+Content-Type: application/json
+
+{ "email": "ana@example.com" }
+```
+
+Responde **202 sem corpo**, exista a conta ou não, para não revelar quem tem cadastro. Só conta ativa (não suspensa nem excluída) recebe e-mail. O pedido:
+
+1. gera um token aleatório de 256 bits (base64url, 43 caracteres) e guarda só o hash SHA-256 dele;
+2. invalida os tokens anteriores da conta que ainda não foram usados;
+3. envia, depois do commit e fora da requisição, um e-mail no idioma da conta com o link `SITE_BASE_URL/reset-password?token=<token>`, avisando que ele vale **30 minutos** e que pode ser ignorado por quem não pediu.
+
+Conta criada só pelo Google também pode pedir: o e-mail fala em definir a senha, e a confirmação cria a primeira senha da conta. Sem `SITE_BASE_URL`, o token é gerado mas o e-mail não sai (fica um aviso no log).
+
+**Trocar a senha**
+
+```http
+POST /auth/password-reset/confirm
+Origin: https://ticketfy.example
+X-Ticketfy-Auth: 1
+Content-Type: application/json
+
+{ "token": "Vx3…", "newPassword": "senha-nova-456" }
+```
+
+Responde **204**. A senha segue as regras do cadastro (8 a 72 caracteres; senão 400 `validation-failed`, e o token continua valendo). O token passa a usado, todas as sessões da conta são encerradas e nenhuma sessão nova é aberta: o front leva a pessoa ao login.
+
+| Erro | Quando |
+|---|---|
+| 400 `password-reset-token-invalid` | Token desconhecido ou malformado, invalidado por um pedido mais novo, ou de conta suspensa ou excluída |
+| 400 `password-reset-token-expired` | Mais de 30 minutos desde o pedido |
+| 400 `password-reset-token-used` | Token já usado |
+| 429 `too-many-password-reset-attempts` | Limite de pedidos ou de confirmações (ver [Limites de tentativas](#limites-de-tentativas)), com `Retry-After` |
+
+As duas rotas ficam em `/auth`, então exigem `Origin` e `X-Ticketfy-Auth` como o login e passam pelo proxy do front. A auditoria registra `PASSWORD_RESET_REQUESTED` (com `invalidatedTokens` e `hasPassword`) e `PASSWORD_RESET` (com `revokedSessions` e `firstPassword`), sem token nem senha.
 
 ### Confirmação de senha
 
@@ -295,6 +340,9 @@ Os tipos abaixo trazem `reason`, com um dos valores da tabela. A lista também e
 | `payout-below-minimum` | 400 | Saque abaixo do mínimo; traz `minAmount` |
 | `email-not-allowed` | 400 | Cadastro com domínio reservado (`deleted.ticketfy.invalid`), ou e-mail do Google com mais de 150 caracteres |
 | `google-redirect-uri-not-allowed` | 400 | `redirectUri` fora da lista `GOOGLE_REDIRECT_URIS` no login com Google |
+| `password-reset-token-invalid` | 400 | Token de recuperação desconhecido, malformado, invalidado por pedido mais novo ou de conta suspensa ou excluída |
+| `password-reset-token-expired` | 400 | Token de recuperação com mais de 30 minutos |
+| `password-reset-token-used` | 400 | Token de recuperação já usado |
 | `invalid-credentials` | 401 | E-mail ou senha errados no login, ou conta sem senha (inclusive a senha apagada ao ligar a conta ao Google) |
 | `google-authorization-failed` | 401 | Código recusado pelo Google ou `id_token` inválido (assinatura, `iss`, `aud` ou `exp`) |
 | `authentication-required` | 401 | Rota protegida sem token ou com token inválido |
@@ -355,6 +403,7 @@ Os tipos abaixo trazem `reason`, com um dos valores da tabela. A lista também e
 | `invalid-coupon` | 422 | Cupom inválido, expirado, inativo, esgotado ou de outro evento (mesma mensagem para todos) |
 | `coupon-buyer-limit-reached` | 422 | O comprador já usou o cupom o máximo de vezes permitido; traz `maxUsesPerBuyer` e não conta como tentativa inválida |
 | `too-many-login-attempts` | 429 | Limite de login por IP |
+| `too-many-password-reset-attempts` | 429 | Limite de pedidos de recuperação de senha (por IP e por e-mail) ou de confirmações (por IP) |
 | `too-many-password-attempts` | 429 | Limite de senha de confirmação errada |
 | `too-many-transfer-attempts` | 429 | Limite de destinatários inexistentes |
 | `too-many-coupon-attempts` | 429 | Limite de cupons inválidos |
@@ -436,6 +485,8 @@ Os limites ficam em memória, por instância da aplicação, exceto o de exporta
 | O que | Limite | Resposta |
 |---|---|---|
 | Login (senha e Google somados) | 5 por IP em 60 s | 429 `too-many-login-attempts` |
+| Pedido de recuperação de senha | 10 por IP e 3 por e-mail em 15 min; conta o pedido exista a conta ou não, e o recusado também conta | 429 `too-many-password-reset-attempts` |
+| Confirmação de recuperação de senha | 10 por IP em 15 min | 429 `too-many-password-reset-attempts` |
 | Senha de confirmação errada | 5 por usuário em 15 min | 429 `too-many-password-attempts` |
 | Transferência para e-mail não cadastrado | 5 por usuário em 15 min | 429 `too-many-transfer-attempts` |
 | Cupom inválido (pré-visualização e pedido somados) | 10 por usuário em 15 min | 429 `too-many-coupon-attempts` |
