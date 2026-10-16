@@ -90,6 +90,10 @@ public enum ProblemType {
     GOOGLE_AUTHORIZATION_FAILED("google-authorization-failed", "Google authorization failed", HttpStatus.UNAUTHORIZED),
     GOOGLE_EMAIL_NOT_VERIFIED("google-email-not-verified", "Google email not verified", HttpStatus.FORBIDDEN),
     GOOGLE_ACCOUNT_CONFLICT("google-account-conflict", "Google account conflict", HttpStatus.CONFLICT),
+    PASSWORD_RESET_TOKEN_INVALID("password-reset-token-invalid", "Password reset token invalid", HttpStatus.BAD_REQUEST),
+    PASSWORD_RESET_TOKEN_EXPIRED("password-reset-token-expired", "Password reset token expired", HttpStatus.BAD_REQUEST),
+    PASSWORD_RESET_TOKEN_USED("password-reset-token-used", "Password reset token used", HttpStatus.BAD_REQUEST),
+    TOO_MANY_PASSWORD_RESET_ATTEMPTS("too-many-password-reset-attempts", "Too many password reset attempts", HttpStatus.TOO_MANY_REQUESTS),
     GOOGLE_UNAVAILABLE("google-unavailable", "Google unavailable", HttpStatus.BAD_GATEWAY),
     PASSWORD_NOT_SET("password-not-set", "Password not set", HttpStatus.CONFLICT),
     EMAIL_CONFIRMATION_MISMATCH("email-confirmation-mismatch", "Email confirmation mismatch", HttpStatus.FORBIDDEN);

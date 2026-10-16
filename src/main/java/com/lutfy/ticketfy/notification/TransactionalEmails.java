@@ -1,5 +1,6 @@
 package com.lutfy.ticketfy.notification;
 
+import com.lutfy.ticketfy.auth.passwordreset.PasswordResetSettings;
 import com.lutfy.ticketfy.event.Event;
 import com.lutfy.ticketfy.event.EventCalendarService;
 import com.lutfy.ticketfy.infra.config.SiteSettings;
@@ -43,10 +44,12 @@ public class TransactionalEmails {
     private final QrCodePng qrCodes;
     private final SiteSettings site;
     private final MailSettings settings;
+    private final PasswordResetSettings resetSettings;
 
     public TransactionalEmails(OrderRepository orderRepository, TicketRepository ticketRepository,
                                UserRepository userRepository, EventCalendarService calendarService,
-                               QrCodePng qrCodes, SiteSettings site, MailSettings settings) {
+                               QrCodePng qrCodes, SiteSettings site, MailSettings settings,
+                               PasswordResetSettings resetSettings) {
         this.orderRepository = orderRepository;
         this.ticketRepository = ticketRepository;
         this.userRepository = userRepository;
@@ -54,6 +57,7 @@ public class TransactionalEmails {
         this.qrCodes = qrCodes;
         this.site = site;
         this.settings = settings;
+        this.resetSettings = resetSettings;
     }
 
     @Transactional(readOnly = true)
@@ -139,6 +143,30 @@ public class TransactionalEmails {
                 .footer(texts.footer());
         return Optional.of(new EmailMessage(sender.getEmail(), sender.getName(),
                 texts.transferSentSubject(event.getName()), content.html(), content.text(), List.of()));
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<EmailMessage> passwordReset(UUID userId, String rawToken) {
+        var user = userRepository.findById(userId).orElse(null);
+        var link = site.passwordResetUrl(rawToken);
+        if (!reachable(user) || user.isSuspended()) {
+            return Optional.empty();
+        }
+        if (link.isEmpty()) {
+            log.warn("Password reset email for user {} skipped: SITE_BASE_URL is not set", userId);
+            return Optional.empty();
+        }
+        var texts = MailTexts.of(user.getLanguage());
+        boolean firstPassword = !user.hasPassword();
+        var content = new EmailContent(texts.lang(), texts.resetHeading(firstPassword))
+                .paragraph(texts.greeting(user.getName()))
+                .paragraph(texts.resetIntro(firstPassword))
+                .button(texts.resetButton(firstPassword), link.get())
+                .paragraph(texts.resetExpiry(resetSettings.tokenTtl().toMinutes()))
+                .paragraph(texts.resetIgnore())
+                .footer(texts.footer());
+        return Optional.of(new EmailMessage(user.getEmail(), user.getName(), texts.resetSubject(firstPassword),
+                content.html(), content.text(), List.of()));
     }
 
     private List<String[]> eventRows(Event event, MailTexts texts) {

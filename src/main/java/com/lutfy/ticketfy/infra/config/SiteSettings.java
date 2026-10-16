@@ -47,6 +47,11 @@ public class SiteSettings {
         return baseUrl.isEmpty() ? Optional.empty() : Optional.of(baseUrl + "/tickets");
     }
 
+    /** O token é base64url, já seguro para ir na query sem codificação. */
+    public Optional<String> passwordResetUrl(String token) {
+        return baseUrl.isEmpty() ? Optional.empty() : Optional.of(baseUrl + "/reset-password?token=" + token);
+    }
+
     public Optional<String> eventUrl(UUID eventId) {
         return baseUrl.isEmpty() ? Optional.empty() : Optional.of(baseUrl + "/events/" + eventId);
     }

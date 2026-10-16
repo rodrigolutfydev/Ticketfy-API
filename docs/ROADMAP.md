@@ -54,7 +54,7 @@ O que já está pronto na API do Ticketfy e o que vem a seguir. Os detalhes de c
 
 ## Próximos passos
 
-- [ ] E-mails transacionais com Brevo: compra confirmada e ingresso transferido prontos; falta recuperação de senha
+- [x] E-mails transacionais com Brevo: compra confirmada, ingresso transferido e recuperação de senha
 - [ ] Pagamento via Pix com Asaas
 - [ ] Publicar o frontend na Cloudflare Pages
 - [ ] Login com Google: API pronta (`POST /auth/google`, authorization code + PKCE); falta a tela no front

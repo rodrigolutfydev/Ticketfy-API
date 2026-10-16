@@ -90,6 +90,18 @@ abstract class MailTexts {
 
     abstract String transferSentOldQr();
 
+    abstract String resetSubject(boolean firstPassword);
+
+    abstract String resetHeading(boolean firstPassword);
+
+    abstract String resetIntro(boolean firstPassword);
+
+    abstract String resetButton(boolean firstPassword);
+
+    abstract String resetExpiry(long minutes);
+
+    abstract String resetIgnore();
+
     private static final class Portuguese extends MailTexts {
         String lang() { return "pt-BR"; }
         Locale locale() { return Locale.forLanguageTag("pt-BR"); }
@@ -121,6 +133,18 @@ abstract class MailTexts {
         String transferSentHeading() { return "Transferência concluída"; }
         String transferSentIntro(String recipientName) { return "Você transferiu um ingresso para " + recipientName + "."; }
         String transferSentOldQr() { return "O QR Code antigo deste ingresso deixou de valer e não passa mais na entrada."; }
+        String resetSubject(boolean first) { return first ? "Defina a senha da sua conta Ticketfy" : "Redefina a senha da sua conta Ticketfy"; }
+        String resetHeading(boolean first) { return first ? "Defina sua senha" : "Redefina sua senha"; }
+        String resetIntro(boolean first) {
+            return first
+                    ? "Recebemos um pedido para definir uma senha na sua conta, que hoje entra pelo Google. Com ela, você também poderá entrar com e-mail e senha."
+                    : "Recebemos um pedido para redefinir a senha da sua conta.";
+        }
+        String resetButton(boolean first) { return first ? "Definir senha" : "Redefinir senha"; }
+        String resetExpiry(long minutes) {
+            return "O link vale por " + minutes + " minutos e só pode ser usado uma vez. Ao trocar a senha, todas as sessões abertas da conta são encerradas.";
+        }
+        String resetIgnore() { return "Se não foi você que pediu, pode ignorar este e-mail: sua senha continua a mesma."; }
     }
 
     private static final class English extends MailTexts {
@@ -154,5 +178,17 @@ abstract class MailTexts {
         String transferSentHeading() { return "Transfer completed"; }
         String transferSentIntro(String recipientName) { return "You transferred a ticket to " + recipientName + "."; }
         String transferSentOldQr() { return "This ticket's old QR code is no longer valid and will not be accepted at the entrance."; }
+        String resetSubject(boolean first) { return first ? "Set a password for your Ticketfy account" : "Reset your Ticketfy password"; }
+        String resetHeading(boolean first) { return first ? "Set your password" : "Reset your password"; }
+        String resetIntro(boolean first) {
+            return first
+                    ? "We received a request to set a password for your account, which currently signs in with Google. With it, you can also sign in with email and password."
+                    : "We received a request to reset your account password.";
+        }
+        String resetButton(boolean first) { return first ? "Set password" : "Reset password"; }
+        String resetExpiry(long minutes) {
+            return "The link is valid for " + minutes + " minutes and can be used only once. Changing the password signs out every open session of the account.";
+        }
+        String resetIgnore() { return "If you didn't ask for this, you can ignore this email: your password stays the same."; }
     }
 }

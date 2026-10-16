@@ -59,7 +59,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/events", "/events/*").permitAll()
                         .requestMatchers(HttpMethod.GET, "/events/*/calendar.ics").permitAll()
                         .requestMatchers(HttpMethod.GET, "/events/*/ticket-types").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/auth/login", "/auth/google", "/auth/refresh", "/auth/logout").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/auth/login", "/auth/google", "/auth/refresh", "/auth/logout",
+                                "/auth/password-reset/request", "/auth/password-reset/confirm").permitAll()
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
                         .requestMatchers(HttpMethod.GET, "/actuator/health").permitAll()
                         .anyRequest().authenticated()

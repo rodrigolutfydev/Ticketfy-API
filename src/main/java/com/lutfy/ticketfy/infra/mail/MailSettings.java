@@ -21,7 +21,7 @@ public class MailSettings {
                         @Value("${ticketfy.mail.brevo.api-uri:https://api.brevo.com/v3/smtp/email}") String brevoApiUri,
                         @Value("${ticketfy.mail.from-email:}") String fromEmail,
                         @Value("${ticketfy.mail.from-name:Ticketfy}") String fromName,
-                        @Value("${ticketfy.mail.timeout-seconds:10}") long timeoutSeconds,
+                        @Value("${ticketfy.mail.timeout-seconds:5}") long timeoutSeconds,
                         @Value("${ticketfy.mail.time-zone:America/Sao_Paulo}") String timeZone) {
         this.brevoApiKey = brevoApiKey == null ? "" : brevoApiKey.trim();
         this.brevoApiUri = URI.create(brevoApiUri);
@@ -29,13 +29,11 @@ public class MailSettings {
         this.fromName = fromName == null || fromName.isBlank() ? "Ticketfy" : fromName.trim();
         this.timeout = Duration.ofSeconds(timeoutSeconds);
         this.timeZone = ZoneId.of(timeZone);
-        if (!this.brevoApiKey.isEmpty() && this.fromEmail.isEmpty()) {
-            throw new IllegalStateException("ticketfy.mail.from-email is required when the Brevo API key is set");
-        }
     }
 
+    /** Brevo só entra com chave e remetente; faltando um dos dois, os e-mails vão só para o log. */
     public boolean brevoEnabled() {
-        return !brevoApiKey.isEmpty();
+        return !brevoApiKey.isEmpty() && !fromEmail.isEmpty();
     }
 
     public String brevoApiKey() {

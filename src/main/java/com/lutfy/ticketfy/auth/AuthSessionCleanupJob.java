@@ -1,5 +1,6 @@
 package com.lutfy.ticketfy.auth;
 
+import com.lutfy.ticketfy.auth.passwordreset.PasswordResetService;
 import com.lutfy.ticketfy.infra.logging.JobRun;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,11 +19,13 @@ public class AuthSessionCleanupJob {
     private static final int BATCH_SIZE = 500;
 
     private final AuthSessionService service;
+    private final PasswordResetService passwordResets;
     private final Duration retention;
 
-    public AuthSessionCleanupJob(AuthSessionService service,
+    public AuthSessionCleanupJob(AuthSessionService service, PasswordResetService passwordResets,
                                  @Value("${ticketfy.auth.cleanup.retention-days}") long retentionDays) {
         this.service = service;
+        this.passwordResets = passwordResets;
         this.retention = Duration.ofDays(retentionDays);
     }
 
@@ -40,6 +43,14 @@ public class AuthSessionCleanupJob {
         } while (deleted == BATCH_SIZE);
         if (total > 0) {
             log.info("Deleted {} finished sessions", total);
+        }
+        int resets = 0;
+        do {
+            deleted = passwordResets.deleteExpired(retention, BATCH_SIZE);
+            resets += deleted;
+        } while (deleted == BATCH_SIZE);
+        if (resets > 0) {
+            log.info("Deleted {} expired password reset tokens", resets);
         }
         return total;
     }

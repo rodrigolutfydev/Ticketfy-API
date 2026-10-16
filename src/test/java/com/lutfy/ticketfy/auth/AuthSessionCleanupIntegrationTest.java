@@ -1,7 +1,9 @@
 package com.lutfy.ticketfy.auth;
 
 import com.lutfy.ticketfy.IntegrationTestBase;
+import com.lutfy.ticketfy.auth.passwordreset.PasswordResetService;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.List;
 import java.util.UUID;
@@ -9,6 +11,9 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class AuthSessionCleanupIntegrationTest extends IntegrationTestBase {
+
+    @Autowired
+    private PasswordResetService passwordResets;
 
     @Test
     void deletesSessionsFinishedBeforeTheRetentionWindow() {
@@ -23,7 +28,7 @@ class AuthSessionCleanupIntegrationTest extends IntegrationTestBase {
         insertRefreshToken(expiredLongAgo);
         insertRefreshToken(active);
 
-        int deleted = new AuthSessionCleanupJob(authSessions, 7).deleteAll();
+        int deleted = new AuthSessionCleanupJob(authSessions, passwordResets, 7).deleteAll();
 
         assertThat(deleted).isGreaterThanOrEqualTo(2);
         assertThat(jdbc.queryForList("SELECT id FROM auth_sessions WHERE user_id = ?", UUID.class, userId))
@@ -31,6 +36,28 @@ class AuthSessionCleanupIntegrationTest extends IntegrationTestBase {
                 .doesNotContain(expiredLongAgo, revokedLongAgo);
         assertThat(jdbc.queryForList("SELECT session_id FROM refresh_tokens WHERE session_id IN (?, ?)", UUID.class,
                 active, expiredLongAgo)).isEqualTo(List.of(active));
+    }
+
+    @Test
+    void deletesPasswordResetTokensExpiredBeforeTheRetentionWindow() {
+        var userId = insertUser("USER");
+        var old = insertResetToken(userId, "NOW() - INTERVAL '9 days'", "NOW() - INTERVAL '9 days' + INTERVAL '30 minutes'");
+        var recent = insertResetToken(userId, "NOW() - INTERVAL '2 days'", "NOW() - INTERVAL '2 days' + INTERVAL '30 minutes'");
+        var open = insertResetToken(userId, "NOW()", "NOW() + INTERVAL '30 minutes'");
+
+        new AuthSessionCleanupJob(authSessions, passwordResets, 7).deleteAll();
+
+        assertThat(jdbc.queryForList("SELECT id FROM password_reset_tokens WHERE user_id = ?", UUID.class, userId))
+                .containsExactlyInAnyOrder(recent, open)
+                .doesNotContain(old);
+    }
+
+    private UUID insertResetToken(UUID userId, String createdAt, String expiresAt) {
+        var id = UUID.randomUUID();
+        jdbc.update("INSERT INTO password_reset_tokens (id, user_id, token_hash, created_at, expires_at) "
+                        + "VALUES (?, ?, ?, " + createdAt + ", " + expiresAt + ")",
+                id, userId, (Object) AuthSessionService.hash(UUID.randomUUID().toString()));
+        return id;
     }
 
     private UUID insertSession(UUID userId, String createdAt, String expiresAt, String revokedAt) {
