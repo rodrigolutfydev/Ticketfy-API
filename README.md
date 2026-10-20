@@ -216,6 +216,6 @@ Arquivos gerados a partir do código a cada build e conferidos no CI:
 
 ## 9. Autoria
 
-Desenvolvido por Rodrigo Lutfy com auxílio de IA (Claude Code); as decisões, revisões e testes foram conduzidos pelo autor.
+Desenvolvido por Rodrigo Lutfy para um projeto academico.
 
 Contato: [rodrigolutfy.dev@gmail.com](mailto:rodrigolutfy.dev@gmail.com) · GitHub: [rodrigolutfydev](https://github.com/rodrigolutfydev)
