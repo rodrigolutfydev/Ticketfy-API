@@ -1,0 +1,321 @@
+
+========== payment/PaymentService.java ==========
+package com.lutfy.ticketfy.payment;
+
+import com.lutfy.ticketfy.infra.exception.ProblemReason;
+import com.lutfy.ticketfy.infra.exception.InvalidEventStateException;
+import com.lutfy.ticketfy.infra.exception.InvalidOrderStateException;
+import com.lutfy.ticketfy.infra.exception.InvalidPaymentStateException;
+import com.lutfy.ticketfy.infra.exception.OrderNotFoundException;
+import com.lutfy.ticketfy.order.Order;
+import com.lutfy.ticketfy.order.OrderRepository;
+import com.lutfy.ticketfy.payout.ledger.LedgerService;
+import com.lutfy.ticketfy.ticket.TicketService;
+import com.lutfy.ticketfy.user.User;
+import com.lutfy.ticketfy.user.UserLocks;
+import com.lutfy.ticketfy.notification.OrderConfirmedEvent;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Clock;
+import java.util.UUID;
+
+@Service
+public class PaymentService {
+
+    private final PaymentRepository paymentRepository;
+    private final OrderRepository orderRepository;
+    private final TicketService ticketService;
+    private final PaymentGateway paymentGateway;
+    private final LedgerService ledgerService;
+    private final UserLocks userLocks;
+    private final Clock clock;
+    private final ApplicationEventPublisher events;
+
+    public PaymentService(PaymentRepository paymentRepository,
+                          OrderRepository orderRepository,
+                          TicketService ticketService,
+                          PaymentGateway paymentGateway,
+                          LedgerService ledgerService,
+                          UserLocks userLocks,
+                          Clock clock,
+                          ApplicationEventPublisher events) {
+        this.paymentRepository = paymentRepository;
+        this.orderRepository = orderRepository;
+        this.ticketService = ticketService;
+        this.paymentGateway = paymentGateway;
+        this.ledgerService = ledgerService;
+        this.userLocks = userLocks;
+        this.clock = clock;
+        this.events = events;
+    }
+
+    @Transactional
+    public PaymentDetailsDTO paySimulated(UUID orderId, User authenticated) {
+        userLocks.requireActive(authenticated.getId());
+        var order = orderRepository.findForUpdateById(orderId)
+                .orElseThrow(() -> new OrderNotFoundException("Order not found"));
+
+        if (!order.getUser().equals(authenticated)) {
+            throw new OrderNotFoundException("Order not found");
+        }
+        if (order.belongsToCancelledEvent()) {
+            throw new InvalidEventStateException(ProblemReason.EVENT_CANCELLED, "The event for this order was cancelled");
+        }
+        if (paymentRepository.existsByOrderIdAndStatus(orderId, PaymentStatus.APPROVED)) {
+            throw new InvalidPaymentStateException(ProblemReason.PAYMENT_ALREADY_PAID, "This order has already been paid");
+        }
+        if (order.isExpired(clock.instant())) {
+            throw new InvalidOrderStateException(ProblemReason.ORDER_EXPIRED, "This order has expired");
+        }
+
+        var payment = new Payment(order, PaymentMethod.SIMULATED);
+        payment.approve();
+        order.markAsPaid();
+        ledgerService.recordSale(order);
+        ticketService.issueForOrder(order);
+
+        var saved = paymentRepository.saveAndFlush(payment);
+        events.publishEvent(new OrderConfirmedEvent(order.getId()));
+        return new PaymentDetailsDTO(saved);
+    }
+
+    @Transactional
+    public void refundApproved(Order order) {
+        var payment = paymentRepository.findByOrderIdAndStatus(order.getId(), PaymentStatus.APPROVED);
+        if (payment.isEmpty()) {
+            return;
+        }
+        var approved = payment.get();
+        var result = paymentGateway.refund(new PaymentGateway.RefundRequest(
+                approved.getId(), approved.getProviderReference(), approved.getAmount(), approved.getId().toString()));
+        approved.refund(result.reference());
+    }
+}
+
+========== payment/PaymentGateway.java ==========
+package com.lutfy.ticketfy.payment;
+
+import java.math.BigDecimal;
+import java.util.UUID;
+
+public interface PaymentGateway {
+
+    RefundResult refund(RefundRequest request);
+
+    record RefundRequest(UUID paymentId, String providerReference, BigDecimal amount, String idempotencyKey) {
+    }
+
+    record RefundResult(String reference) {
+    }
+}
+
+========== payment/PaymentController.java ==========
+package com.lutfy.ticketfy.payment;
+
+import com.lutfy.ticketfy.infra.exception.ProblemType;
+import com.lutfy.ticketfy.infra.openapi.ApiTags;
+import com.lutfy.ticketfy.infra.openapi.ProblemResponses;
+import com.lutfy.ticketfy.user.User;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.UUID;
+
+@RestController
+@RequestMapping("/orders/{orderId}/payment")
+@Tag(name = ApiTags.ORDERS)
+public class PaymentController {
+
+    private final PaymentService service;
+
+    public PaymentController(PaymentService service) {
+        this.service = service;
+    }
+
+    @PostMapping
+    @Operation(summary = "Pagar pedido",
+            description = "Pagamento simulado: aprova na hora, marca o pedido como `PAID` e emite os ingressos.")
+    @ApiResponse(responseCode = "201", description = "Pagamento aprovado.")
+    @ProblemResponses({ProblemType.SESSION_EXPIRED, ProblemType.ORDER_NOT_FOUND, ProblemType.INVALID_EVENT_STATE,
+            ProblemType.INVALID_ORDER_STATE, ProblemType.INVALID_PAYMENT_STATE})
+    public ResponseEntity<PaymentDetailsDTO> pay(
+            @PathVariable UUID orderId,
+            @AuthenticationPrincipal User authenticated) {
+        var payment = service.paySimulated(orderId, authenticated);
+        return ResponseEntity.status(HttpStatus.CREATED).body(payment);
+    }
+}
+========== payment/Payment.java ==========
+package com.lutfy.ticketfy.payment;
+
+import com.lutfy.ticketfy.infra.exception.ProblemReason;
+import com.lutfy.ticketfy.infra.exception.InvalidPaymentStateException;
+import com.lutfy.ticketfy.order.Order;
+import jakarta.persistence.*;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.UUID;
+
+@Entity
+@Table(name = "payments")
+@Getter
+@NoArgsConstructor
+@EqualsAndHashCode(of = "id")
+public class Payment {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "order_id")
+    private Order order;
+    @Enumerated(EnumType.STRING)
+    private PaymentStatus status;
+    @Enumerated(EnumType.STRING)
+    private PaymentMethod method;
+    private BigDecimal amount;
+    private String providerReference;
+    private Instant approvedAt;
+    private Instant refundedAt;
+    private String refundReference;
+    @CreationTimestamp
+    private Instant createdAt;
+    @UpdateTimestamp
+    private Instant updatedAt;
+
+    public Payment(Order order, PaymentMethod method) {
+        this.order = order;
+        this.method = method;
+        this.amount = order.getTotalAmount();
+        this.status = PaymentStatus.PENDING;
+    }
+
+    public void approve() {
+        if (status != PaymentStatus.PENDING) {
+            throw new InvalidPaymentStateException(ProblemReason.PAYMENT_NOT_PENDING, "Only pending payments can be approved");
+        }
+        this.status = PaymentStatus.APPROVED;
+        this.approvedAt = Instant.now();
+    }
+
+    public void refund(String reference) {
+        if (status != PaymentStatus.APPROVED) {
+            throw new InvalidPaymentStateException(ProblemReason.PAYMENT_NOT_APPROVED, "Only approved payments can be refunded");
+        }
+        this.status = PaymentStatus.REFUNDED;
+        this.refundedAt = Instant.now();
+        this.refundReference = reference;
+    }
+
+    public void reject() {
+        if (status != PaymentStatus.PENDING) {
+            throw new InvalidPaymentStateException(ProblemReason.PAYMENT_NOT_PENDING, "Only pending payments can be rejected");
+        }
+        this.status = PaymentStatus.REJECTED;
+    }
+}
+========== payment/PaymentMethod.java ==========
+package com.lutfy.ticketfy.payment;
+
+public enum PaymentMethod {
+    SIMULATED,
+    PIX,
+    CREDIT_CARD
+}
+
+========== payment/SimulatedPaymentGateway.java ==========
+package com.lutfy.ticketfy.payment;
+
+import org.springframework.stereotype.Component;
+
+@Component
+public class SimulatedPaymentGateway implements PaymentGateway {
+
+    @Override
+    public RefundResult refund(RefundRequest request) {
+        return new RefundResult("SIM-REFUND-" + request.idempotencyKey());
+    }
+}
+
+========== order/OrderRepository.java ==========
+package com.lutfy.ticketfy.order;
+
+import jakarta.persistence.LockModeType;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+import java.time.Instant;
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+public interface OrderRepository extends JpaRepository<Order, UUID> {
+
+    @Query(value = """
+        SELECT id FROM orders
+         WHERE user_id = :userId AND status = 'PENDING'
+         ORDER BY id
+           FOR UPDATE
+        """, nativeQuery = true)
+    List<UUID> lockPendingIdsByUserId(@Param("userId") UUID userId);
+
+    Optional<Order> findByIdempotencyKey(String idempotencyKey);
+
+    Page<Order> findByUserId(UUID userId, Pageable pageable);
+
+    @Query("""
+        SELECT DISTINCT new com.lutfy.ticketfy.order.OrderEventRef(o.id, e.id, e.name, e.startsAt)
+          FROM Order o JOIN o.items i JOIN i.ticketType tt JOIN tt.event e
+         WHERE o.id IN :orderIds
+        """)
+    List<OrderEventRef> findEventRefsByOrderIdIn(@Param("orderIds") Collection<UUID> orderIds);
+
+    List<Order> findByStatusAndExpiresAtBefore(OrderStatus status, Instant instant);
+
+    @EntityGraph(attributePaths = {"items", "items.ticketType"})
+    Optional<Order> findWithItemsById(UUID id);
+
+    @Query("""
+        SELECT DISTINCT o.id
+          FROM Order o JOIN o.items i
+         WHERE i.ticketType.event.id = :eventId
+           AND o.status IN :statuses
+        """)
+    List<UUID> findIdsByEventIdAndStatusIn(@Param("eventId") UUID eventId,
+                                           @Param("statuses") Collection<OrderStatus> statuses);
+
+    @Query("""
+        SELECT DISTINCT o.id
+          FROM Order o JOIN o.items i
+         WHERE i.ticketType.event.cancelledAt IS NOT NULL
+           AND o.status IN :statuses
+           AND (o.totalAmount = 0 OR NOT EXISTS (
+               SELECT 1 FROM Ticket t
+                WHERE t.order = o
+                  AND t.status = com.lutfy.ticketfy.ticket.TicketStatus.USED))
+        """)
+    List<UUID> findIdsAwaitingEventCancellation(@Param("statuses") Collection<OrderStatus> statuses);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT o FROM Order o WHERE o.id = :id")
+    Optional<Order> findForUpdateById(@Param("id") UUID id);
+}
