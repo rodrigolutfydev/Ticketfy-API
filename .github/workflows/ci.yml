@@ -3,6 +3,7 @@ name: CI
 on:
   push:
     branches: [main]
+
   pull_request:
     branches: [main]
 
@@ -18,13 +19,38 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
 
+    env:
+      # Configurações exclusivas do ambiente de testes
+      SPRING_PROFILES_ACTIVE: dev
+
+      # Integração Java -> Go
+      PAYMENTS_INTERNAL_TOKEN: ci-test-token-not-for-production
+      PAYMENTS_GO_URL: http://127.0.0.1:8081
+
     steps:
+      # ==========================================
+      # CHECKOUT
+      # ==========================================
+
       - name: Baixar o código
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      # ==========================================
+      # JAVA
+      # ==========================================
+
       - name: Ler a versão do Java do pom.xml
         id: java
-        run: echo "version=$(sed -n 's:.*<java.version>\(.*\)</java.version>.*:\1:p' pom.xml)" >> "$GITHUB_OUTPUT"
+        shell: bash
+        run: |
+          version=$(sed -n 's:.*<java.version>\(.*\)</java.version>.*:\1:p' pom.xml | head -n 1)
+
+          if [ -z "$version" ]; then
+            echo "::error::Não foi possível identificar java.version no pom.xml"
+            exit 1
+          fi
+
+          echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - name: Instalar o Java
         uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
@@ -33,21 +59,51 @@ jobs:
           java-version: ${{ steps.java.outputs.version }}
           cache: maven
 
+      # ==========================================
+      # DOCKER / TESTCONTAINERS
+      # ==========================================
+
+      - name: Verificar disponibilidade do Docker
+        run: |
+          docker version
+          docker info
+
+      # ==========================================
+      # MAVEN / TESTES / COBERTURA
+      # ==========================================
+
+      - name: Preparar Maven Wrapper
+        run: chmod +x ./mvnw
+
       - name: Rodar testes e cobertura
         run: ./mvnw -B verify
+
+      # ==========================================
+      # VALIDAR DOCUMENTAÇÃO GERADA
+      # ==========================================
 
       - name: Conferir se os arquivos gerados em docs/ estão atualizados
         run: |
           generated="docs/openapi.json docs/problem-types.json docs/event-categories.json"
+
           if [ -n "$(git status --porcelain -- $generated)" ]; then
+
             for file in $generated; do
+
               if [ -n "$(git status --porcelain -- "$file")" ]; then
                 echo "::error file=$file::$file desatualizado: rode ./mvnw verify e commite o arquivo."
               fi
+
             done
+
             git --no-pager diff --stat -- $generated
+
             exit 1
           fi
+
+      # ==========================================
+      # RELATÓRIOS
+      # ==========================================
 
       - name: Publicar relatórios como artefato
         if: ${{ !cancelled() }}
@@ -60,28 +116,77 @@ jobs:
           retention-days: 14
           if-no-files-found: warn
 
+      # ==========================================
+      # GERAR SELO DE COBERTURA
+      # ==========================================
+
       - name: Gerar selo de cobertura
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        shell: bash
         run: |
-          pct=$(awk -F, 'NR>1 { m += $8; c += $9 } END { printf "%d", (100 * c / (m + c)) }' target/site/jacoco/jacoco.csv)
-          if [ "$pct" -ge 90 ]; then color="#4c1"
-          elif [ "$pct" -ge 80 ]; then color="#97ca00"
-          elif [ "$pct" -ge 70 ]; then color="#dfb317"
-          else color="#e05d44"; fi
+          if [ ! -f target/site/jacoco/jacoco.csv ]; then
+            echo "::error::Relatório JaCoCo não encontrado."
+            exit 1
+          fi
+
+          pct=$(awk -F, '
+            NR > 1 {
+              missed += $8
+              covered += $9
+            }
+            END {
+              total = missed + covered
+              if (total > 0) {
+                printf "%d", (100 * covered / total)
+              } else {
+                printf "0"
+              }
+            }
+          ' target/site/jacoco/jacoco.csv)
+
+          echo "Cobertura total: ${pct}%"
+
+          if [ "$pct" -ge 90 ]; then
+            color="#4c1"
+          elif [ "$pct" -ge 80 ]; then
+            color="#97ca00"
+          elif [ "$pct" -ge 70 ]; then
+            color="#dfb317"
+          else
+            color="#e05d44"
+          fi
+
           mkdir -p _site/badges
+
           cp -r target/site/jacoco _site/jacoco
+
           cat > _site/badges/coverage.svg <<EOF
           <svg xmlns="http://www.w3.org/2000/svg" width="104" height="20" role="img" aria-label="coverage: ${pct}%">
             <title>coverage: ${pct}%</title>
-            <linearGradient id="s" x2="0" y2="100%"><stop offset="0" stop-color="#bbb" stop-opacity=".1"/><stop offset="1" stop-opacity=".1"/></linearGradient>
-            <clipPath id="r"><rect width="104" height="20" rx="3" fill="#fff"/></clipPath>
-            <g clip-path="url(#r)"><rect width="63" height="20" fill="#555"/><rect x="63" width="41" height="20" fill="${color}"/><rect width="104" height="20" fill="url(#s)"/></g>
+            <linearGradient id="s" x2="0" y2="100%">
+              <stop offset="0" stop-color="#bbb" stop-opacity=".1"/>
+              <stop offset="1" stop-opacity=".1"/>
+            </linearGradient>
+            <clipPath id="r">
+              <rect width="104" height="20" rx="3" fill="#fff"/>
+            </clipPath>
+            <g clip-path="url(#r)">
+              <rect width="63" height="20" fill="#555"/>
+              <rect x="63" width="41" height="20" fill="${color}"/>
+              <rect width="104" height="20" fill="url(#s)"/>
+            </g>
             <g fill="#fff" text-anchor="middle" font-family="Verdana,Geneva,DejaVu Sans,sans-serif" font-size="11">
-              <text x="31.5" y="15" fill="#010101" fill-opacity=".3">coverage</text><text x="31.5" y="14">coverage</text>
-              <text x="83.5" y="15" fill="#010101" fill-opacity=".3">${pct}%</text><text x="83.5" y="14">${pct}%</text>
+              <text x="31.5" y="15" fill="#010101" fill-opacity=".3">coverage</text>
+              <text x="31.5" y="14">coverage</text>
+              <text x="83.5" y="15" fill="#010101" fill-opacity=".3">${pct}%</text>
+              <text x="83.5" y="14">${pct}%</text>
             </g>
           </svg>
           EOF
+
+      # ==========================================
+      # PREPARAR GITHUB PAGES
+      # ==========================================
 
       - name: Preparar publicação no Pages
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -89,17 +194,27 @@ jobs:
         with:
           path: _site/
 
+  # ==========================================
+  # PUBLICAÇÃO DO RELATÓRIO
+  # ==========================================
+
   coverage-badge:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
     needs: test
+
     runs-on: ubuntu-24.04
+
     timeout-minutes: 15
+
     permissions:
       pages: write
       id-token: write
+
     concurrency:
       group: pages
       cancel-in-progress: false
+
     environment:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
