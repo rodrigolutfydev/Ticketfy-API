@@ -2470,7 +2470,7 @@
     "/auth/password-reset/confirm" : {
       "post" : {
         "description" : "Usa o token do link para trocar a senha. Todas as sessões abertas são encerradas; a pessoa entra de novo pelo login. Limite: 10 tentativas por IP a cada 15 minutos.",
-        "operationId" : "confirm",
+        "operationId" : "confirm_1",
         "parameters" : [ {
           "description" : "Origem do site, igual a uma das origens liberadas no CORS. O navegador envia sozinho; por isso estas rotas não funcionam pelo \"Try it out\" do Swagger UI.",
           "in" : "header",
@@ -3062,7 +3062,7 @@
       },
       "post" : {
         "description" : "**Papel exigido:** `ORGANIZER` ou `ADMIN`.\n\nCria o evento sem lotes; a venda começa quando houver um lote ativo (`POST /events/{eventId}/ticket-types`). `startsAt` e `endsAt` precisam estar no futuro.",
-        "operationId" : "create_1",
+        "operationId" : "create_2",
         "requestBody" : {
           "content" : {
             "application/json" : {
@@ -3570,7 +3570,7 @@
       },
       "post" : {
         "description" : "**Papel exigido:** `ORGANIZER` ou `ADMIN`.\n\nDesconto percentual ou em valor fixo, com limites opcionais de usos, de usos por comprador e de período. O código é único no evento e não muda depois. Só o dono do evento ou um ADMIN.",
-        "operationId" : "create_3",
+        "operationId" : "create_4",
         "parameters" : [ {
           "in" : "path",
           "name" : "eventId",
@@ -4847,7 +4847,7 @@
       },
       "post" : {
         "description" : "**Papel exigido:** `ORGANIZER` ou `ADMIN`.\n\nO nome é único dentro do evento. Só o dono do evento ou um ADMIN.",
-        "operationId" : "create_2",
+        "operationId" : "create_3",
         "parameters" : [ {
           "in" : "path",
           "name" : "eventId",
@@ -7251,6 +7251,116 @@
         "tags" : [ "Organizador e financeiro" ]
       }
     },
+    "/internal/payments/confirm" : {
+      "post" : {
+        "operationId" : "confirm",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/PixConfirmationRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PixConfirmationResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "examples" : {
+                  "malformed-request-body" : {
+                    "summary" : "malformed-request-body",
+                    "value" : {
+                      "detail" : "Malformed request body",
+                      "status" : 400,
+                      "title" : "Malformed request body",
+                      "type" : "https://ticketfy-api.onrender.com/problems/malformed-request-body"
+                    }
+                  },
+                  "validation-failed" : {
+                    "summary" : "validation-failed",
+                    "value" : {
+                      "detail" : "Validation failed",
+                      "errors" : [ {
+                        "code" : "required",
+                        "field" : "email",
+                        "message" : "must not be blank",
+                        "params" : { }
+                      } ],
+                      "status" : 400,
+                      "title" : "Validation failed",
+                      "type" : "https://ticketfy-api.onrender.com/problems/validation-failed"
+                    }
+                  }
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Requisição inválida. Tipos possíveis:\n\n- `malformed-request-body`: Malformed request body\n- `validation-failed`: Validation failed"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "examples" : {
+                  "authentication-required" : {
+                    "summary" : "authentication-required",
+                    "value" : {
+                      "detail" : "Authentication required",
+                      "status" : 401,
+                      "title" : "Authentication required",
+                      "type" : "https://ticketfy-api.onrender.com/problems/authentication-required"
+                    }
+                  }
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Não autenticado. Tipos possíveis:\n\n- `authentication-required`: Authentication required"
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "examples" : {
+                  "internal-error" : {
+                    "summary" : "internal-error",
+                    "value" : {
+                      "detail" : "Internal server error",
+                      "requestId" : "0f8e5a2c-3b1d-4c7e-9a6f-2d4b8c1e7f90",
+                      "status" : 500,
+                      "title" : "Internal server error",
+                      "type" : "https://ticketfy-api.onrender.com/problems/internal-error"
+                    }
+                  }
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Erro interno. Tipos possíveis:\n\n- `internal-error`: Internal server error"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "tags" : [ "pix-confirmation-controller" ]
+      }
+    },
     "/orders" : {
       "get" : {
         "operationId" : "listMyOrders",
@@ -8108,8 +8218,64 @@
     },
     "/orders/{orderId}/payment" : {
       "post" : {
-        "description" : "Pagamento simulado: aprova na hora, marca o pedido como `PAID` e emite os ingressos.",
         "operationId" : "pay",
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "examples" : {
+                  "authentication-required" : {
+                    "summary" : "authentication-required",
+                    "value" : {
+                      "detail" : "Authentication required",
+                      "status" : 401,
+                      "title" : "Authentication required",
+                      "type" : "https://ticketfy-api.onrender.com/problems/authentication-required"
+                    }
+                  }
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Não autenticado. Tipos possíveis:\n\n- `authentication-required`: Authentication required"
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "examples" : {
+                  "internal-error" : {
+                    "summary" : "internal-error",
+                    "value" : {
+                      "detail" : "Internal server error",
+                      "requestId" : "0f8e5a2c-3b1d-4c7e-9a6f-2d4b8c1e7f90",
+                      "status" : 500,
+                      "title" : "Internal server error",
+                      "type" : "https://ticketfy-api.onrender.com/problems/internal-error"
+                    }
+                  }
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Erro interno. Tipos possíveis:\n\n- `internal-error`: Internal server error"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "tags" : [ "payment-controller" ]
+      }
+    },
+    "/orders/{orderId}/payment/pix" : {
+      "post" : {
+        "operationId" : "create_1",
         "parameters" : [ {
           "in" : "path",
           "name" : "orderId",
@@ -8120,15 +8286,15 @@
           }
         } ],
         "responses" : {
-          "201" : {
+          "200" : {
             "content" : {
               "application/json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/PaymentDetailsDTO"
+                  "$ref" : "#/components/schemas/PixPaymentResponse"
                 }
               }
             },
-            "description" : "Pagamento aprovado."
+            "description" : "OK"
           },
           "400" : {
             "content" : {
@@ -8163,15 +8329,6 @@
                       "title" : "Authentication required",
                       "type" : "https://ticketfy-api.onrender.com/problems/authentication-required"
                     }
-                  },
-                  "session-expired" : {
-                    "summary" : "session-expired",
-                    "value" : {
-                      "detail" : "Session expired",
-                      "status" : 401,
-                      "title" : "Session expired",
-                      "type" : "https://ticketfy-api.onrender.com/problems/session-expired"
-                    }
                   }
                 },
                 "schema" : {
@@ -8179,67 +8336,7 @@
                 }
               }
             },
-            "description" : "Não autenticado. Tipos possíveis:\n\n- `authentication-required`: Authentication required\n- `session-expired`: Session expired"
-          },
-          "404" : {
-            "content" : {
-              "application/problem+json" : {
-                "examples" : {
-                  "order-not-found" : {
-                    "summary" : "order-not-found",
-                    "value" : {
-                      "detail" : "Order not found",
-                      "status" : 404,
-                      "title" : "Order not found",
-                      "type" : "https://ticketfy-api.onrender.com/problems/order-not-found"
-                    }
-                  }
-                },
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Não encontrado. Tipos possíveis:\n\n- `order-not-found`: Order not found"
-          },
-          "409" : {
-            "content" : {
-              "application/problem+json" : {
-                "examples" : {
-                  "invalid-event-state" : {
-                    "summary" : "invalid-event-state",
-                    "value" : {
-                      "detail" : "Invalid event state",
-                      "status" : 409,
-                      "title" : "Invalid event state",
-                      "type" : "https://ticketfy-api.onrender.com/problems/invalid-event-state"
-                    }
-                  },
-                  "invalid-order-state" : {
-                    "summary" : "invalid-order-state",
-                    "value" : {
-                      "detail" : "Invalid order state",
-                      "status" : 409,
-                      "title" : "Invalid order state",
-                      "type" : "https://ticketfy-api.onrender.com/problems/invalid-order-state"
-                    }
-                  },
-                  "invalid-payment-state" : {
-                    "summary" : "invalid-payment-state",
-                    "value" : {
-                      "detail" : "Invalid payment state",
-                      "status" : 409,
-                      "title" : "Invalid payment state",
-                      "type" : "https://ticketfy-api.onrender.com/problems/invalid-payment-state"
-                    }
-                  }
-                },
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Conflito com o estado atual. Tipos possíveis:\n\n- `invalid-event-state`: Invalid event state\n- `invalid-order-state`: Invalid order state\n- `invalid-payment-state`: Invalid payment state"
+            "description" : "Não autenticado. Tipos possíveis:\n\n- `authentication-required`: Authentication required"
           },
           "500" : {
             "content" : {
@@ -8267,8 +8364,7 @@
         "security" : [ {
           "bearerAuth" : [ ]
         } ],
-        "summary" : "Pagar pedido",
-        "tags" : [ "Pedidos e pagamento" ]
+        "tags" : [ "pix-payment-controller" ]
       }
     },
     "/organizer/balance" : {
@@ -11697,7 +11793,7 @@
           },
           "discountValue" : {
             "type" : "number",
-            "minimum" : 0
+            "exclusiveMinimum" : 0
           },
           "endsAt" : {
             "type" : "string",
@@ -11706,12 +11802,12 @@
           "maxUses" : {
             "type" : "integer",
             "format" : "int32",
-            "minimum" : 0
+            "exclusiveMinimum" : 0
           },
           "maxUsesPerBuyer" : {
             "type" : "integer",
             "format" : "int32",
-            "minimum" : 0
+            "exclusiveMinimum" : 0
           },
           "startsAt" : {
             "type" : "string",
@@ -11867,7 +11963,7 @@
           },
           "discountValue" : {
             "type" : "number",
-            "minimum" : 0
+            "exclusiveMinimum" : 0
           },
           "endsAt" : {
             "type" : "string",
@@ -11876,12 +11972,12 @@
           "maxUses" : {
             "type" : "integer",
             "format" : "int32",
-            "minimum" : 0
+            "exclusiveMinimum" : 0
           },
           "maxUsesPerBuyer" : {
             "type" : "integer",
             "format" : "int32",
-            "minimum" : 0
+            "exclusiveMinimum" : 0
           },
           "startsAt" : {
             "type" : "string",
@@ -12100,8 +12196,7 @@
           "imageUrl" : {
             "type" : "string",
             "maxLength" : 500,
-            "minLength" : 0,
-            "pattern" : ""
+            "minLength" : 0
           },
           "name" : {
             "type" : "string",
@@ -12498,8 +12593,7 @@
           "imageUrl" : {
             "type" : "string",
             "maxLength" : 500,
-            "minLength" : 0,
-            "pattern" : ""
+            "minLength" : 0
           },
           "name" : {
             "type" : "string",
@@ -12804,7 +12898,7 @@
           "quantity" : {
             "type" : "integer",
             "format" : "int32",
-            "minimum" : 0
+            "exclusiveMinimum" : 0
           },
           "ticketTypeId" : {
             "type" : "string",
@@ -12899,7 +12993,7 @@
         "type" : "object",
         "properties" : {
           "events" : {
-            "$ref" : "#/components/schemas/PageObject"
+            "$ref" : "#/components/schemas/PagedModelEventSales"
           },
           "totals" : {
             "$ref" : "#/components/schemas/Totals"
@@ -12959,79 +13053,8 @@
             "format" : "int64",
             "description" : "Total de páginas."
           }
-        }
-      },
-      "PageObject" : {
-        "type" : "object",
-        "properties" : {
-          "content" : {
-            "type" : "array",
-            "items" : {
-              "$ref" : "#/components/schemas/EventSales"
-            }
-          },
-          "empty" : {
-            "type" : "boolean"
-          },
-          "first" : {
-            "type" : "boolean"
-          },
-          "last" : {
-            "type" : "boolean"
-          },
-          "number" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "numberOfElements" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "pageable" : {
-            "$ref" : "#/components/schemas/PageableObject"
-          },
-          "size" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "sort" : {
-            "$ref" : "#/components/schemas/SortObject"
-          },
-          "totalElements" : {
-            "type" : "integer",
-            "format" : "int64"
-          },
-          "totalPages" : {
-            "type" : "integer",
-            "format" : "int32"
-          }
-        }
-      },
-      "PageableObject" : {
-        "type" : "object",
-        "properties" : {
-          "offset" : {
-            "type" : "integer",
-            "format" : "int64"
-          },
-          "pageNumber" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "pageSize" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "paged" : {
-            "type" : "boolean"
-          },
-          "sort" : {
-            "$ref" : "#/components/schemas/SortObject"
-          },
-          "unpaged" : {
-            "type" : "boolean"
-          }
-        }
+        },
+        "required" : [ "number", "size", "totalElements", "totalPages" ]
       },
       "PagedModelAdminPayoutDTO" : {
         "type" : "object",
@@ -13045,7 +13068,8 @@
           "page" : {
             "$ref" : "#/components/schemas/PageMetadata"
           }
-        }
+        },
+        "required" : [ "content", "page" ]
       },
       "PagedModelAuditEntryDTO" : {
         "type" : "object",
@@ -13059,7 +13083,8 @@
           "page" : {
             "$ref" : "#/components/schemas/PageMetadata"
           }
-        }
+        },
+        "required" : [ "content", "page" ]
       },
       "PagedModelEventOrderDTO" : {
         "type" : "object",
@@ -13073,7 +13098,23 @@
           "page" : {
             "$ref" : "#/components/schemas/PageMetadata"
           }
-        }
+        },
+        "required" : [ "content", "page" ]
+      },
+      "PagedModelEventSales" : {
+        "type" : "object",
+        "properties" : {
+          "content" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/EventSales"
+            }
+          },
+          "page" : {
+            "$ref" : "#/components/schemas/PageMetadata"
+          }
+        },
+        "required" : [ "content", "page" ]
       },
       "PagedModelEventSummaryDTO" : {
         "type" : "object",
@@ -13087,7 +13128,8 @@
           "page" : {
             "$ref" : "#/components/schemas/PageMetadata"
           }
-        }
+        },
+        "required" : [ "content", "page" ]
       },
       "PagedModelLedgerEntryDTO" : {
         "type" : "object",
@@ -13101,7 +13143,8 @@
           "page" : {
             "$ref" : "#/components/schemas/PageMetadata"
           }
-        }
+        },
+        "required" : [ "content", "page" ]
       },
       "PagedModelOrderSummaryDTO" : {
         "type" : "object",
@@ -13115,7 +13158,8 @@
           "page" : {
             "$ref" : "#/components/schemas/PageMetadata"
           }
-        }
+        },
+        "required" : [ "content", "page" ]
       },
       "PagedModelParticipantDTO" : {
         "type" : "object",
@@ -13129,7 +13173,8 @@
           "page" : {
             "$ref" : "#/components/schemas/PageMetadata"
           }
-        }
+        },
+        "required" : [ "content", "page" ]
       },
       "PagedModelPayoutDTO" : {
         "type" : "object",
@@ -13143,7 +13188,8 @@
           "page" : {
             "$ref" : "#/components/schemas/PageMetadata"
           }
-        }
+        },
+        "required" : [ "content", "page" ]
       },
       "PagedModelTicketDetailsDTO" : {
         "type" : "object",
@@ -13157,7 +13203,8 @@
           "page" : {
             "$ref" : "#/components/schemas/PageMetadata"
           }
-        }
+        },
+        "required" : [ "content", "page" ]
       },
       "ParticipantDTO" : {
         "type" : "object",
@@ -13235,42 +13282,6 @@
           }
         },
         "required" : [ "email" ]
-      },
-      "PaymentDetailsDTO" : {
-        "type" : "object",
-        "properties" : {
-          "amount" : {
-            "type" : "number"
-          },
-          "approvedAt" : {
-            "type" : "string",
-            "format" : "date-time"
-          },
-          "createdAt" : {
-            "type" : "string",
-            "format" : "date-time"
-          },
-          "id" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "method" : {
-            "type" : "string",
-            "enum" : [ "SIMULATED", "PIX", "CREDIT_CARD" ]
-          },
-          "orderId" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "refundedAt" : {
-            "type" : "string",
-            "format" : "date-time"
-          },
-          "status" : {
-            "type" : "string",
-            "enum" : [ "PENDING", "APPROVED", "REJECTED", "REFUNDED" ]
-          }
-        }
       },
       "PaymentEntry" : {
         "type" : "object",
@@ -13487,7 +13498,7 @@
         "properties" : {
           "amount" : {
             "type" : "number",
-            "minimum" : 0
+            "exclusiveMinimum" : 0
           },
           "password" : {
             "type" : "string",
@@ -13496,6 +13507,66 @@
           }
         },
         "required" : [ "amount", "password" ]
+      },
+      "PixConfirmationRequest" : {
+        "type" : "object",
+        "properties" : {
+          "amountCents" : {
+            "type" : "integer",
+            "format" : "int64",
+            "exclusiveMinimum" : 0
+          },
+          "orderId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "paymentId" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        },
+        "required" : [ "orderId", "paymentId" ]
+      },
+      "PixConfirmationResponse" : {
+        "type" : "object",
+        "properties" : {
+          "alreadyProcessed" : {
+            "type" : "boolean"
+          },
+          "orderId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "paymentId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "status" : {
+            "type" : "string"
+          }
+        }
+      },
+      "PixPaymentResponse" : {
+        "type" : "object",
+        "properties" : {
+          "orderId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "paymentId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "pixCopyPaste" : {
+            "type" : "string"
+          },
+          "pixQrCode" : {
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "string"
+          }
+        }
       },
       "ProblemDetail" : {
         "type" : "object",
@@ -13605,20 +13676,6 @@
           "paidOrders" : {
             "type" : "integer",
             "format" : "int64"
-          }
-        }
-      },
-      "SortObject" : {
-        "type" : "object",
-        "properties" : {
-          "empty" : {
-            "type" : "boolean"
-          },
-          "sorted" : {
-            "type" : "boolean"
-          },
-          "unsorted" : {
-            "type" : "boolean"
           }
         }
       },
@@ -13765,12 +13822,12 @@
           "maxPerBuyer" : {
             "type" : "integer",
             "format" : "int32",
-            "minimum" : 0
+            "exclusiveMinimum" : 0
           },
           "maxPerOrder" : {
             "type" : "integer",
             "format" : "int32",
-            "minimum" : 0
+            "exclusiveMinimum" : 0
           },
           "name" : {
             "type" : "string",
@@ -13784,7 +13841,7 @@
           "quantityTotal" : {
             "type" : "integer",
             "format" : "int32",
-            "minimum" : 0
+            "exclusiveMinimum" : 0
           }
         },
         "required" : [ "name", "price", "quantityTotal" ]
@@ -13949,7 +14006,7 @@
           "maxPerOrder" : {
             "type" : "integer",
             "format" : "int32",
-            "minimum" : 0
+            "exclusiveMinimum" : 0
           },
           "name" : {
             "type" : "string",
@@ -13963,7 +14020,7 @@
           "quantityTotal" : {
             "type" : "integer",
             "format" : "int32",
-            "minimum" : 0
+            "exclusiveMinimum" : 0
           }
         }
       },
@@ -14020,8 +14077,7 @@
           "avatarUrl" : {
             "type" : "string",
             "maxLength" : 500,
-            "minLength" : 0,
-            "pattern" : ""
+            "minLength" : 0
           }
         }
       },
