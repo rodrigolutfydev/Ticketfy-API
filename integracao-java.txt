@@ -1,0 +1,479 @@
+
+========== src/main/java/com/lutfy/ticketfy/order/Order.java ==========
+package com.lutfy.ticketfy.order;
+
+import com.lutfy.ticketfy.infra.exception.ProblemReason;
+import com.lutfy.ticketfy.event.Event;
+import com.lutfy.ticketfy.infra.exception.InvalidOrderStateException;
+import com.lutfy.ticketfy.user.User;
+import jakarta.persistence.*;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+
+
+@Entity
+@Table(name = "orders")
+@Getter
+@NoArgsConstructor
+@EqualsAndHashCode(of = "id")
+public class Order {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id")
+    private User user;
+    @Enumerated(EnumType.STRING)
+    private OrderStatus status;
+    private BigDecimal subtotalAmount;
+    private BigDecimal discountAmount;
+    private BigDecimal totalAmount;
+    private UUID couponId;
+    private String couponCode;
+    private BigDecimal platformFeePercent;
+    private BigDecimal platformFee;
+    private BigDecimal netAmount;
+    private Instant expiresAt;
+    private String idempotencyKey;
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<OrderItem> items;
+    @CreationTimestamp
+    private Instant createdAt;
+    @UpdateTimestamp
+    private Instant updatedAt;
+    @Version
+    private Long version;
+
+    public Order(User user, Instant expiresAt, String idempotencyKey) {
+        this.user = user;
+        this.expiresAt = expiresAt;
+        this.idempotencyKey = idempotencyKey;
+        this.status = OrderStatus.PENDING;
+        this.items = new ArrayList<>();
+        this.subtotalAmount = BigDecimal.ZERO;
+        this.discountAmount = BigDecimal.ZERO;
+        this.totalAmount = BigDecimal.ZERO;
+        this.platformFeePercent = BigDecimal.ZERO;
+        this.platformFee = BigDecimal.ZERO;
+        this.netAmount = BigDecimal.ZERO;
+    }
+
+    public void applyCoupon(UUID couponId, String couponCode, BigDecimal discount) {
+        this.couponId = couponId;
+        this.couponCode = couponCode;
+        this.discountAmount = discount;
+        this.totalAmount = subtotalAmount.subtract(discount);
+    }
+
+    public boolean isFree() {
+        return totalAmount.signum() == 0;
+    }
+
+    public void applyPlatformFee(BigDecimal percent) {
+        this.platformFeePercent = percent;
+        this.platformFee = totalAmount.multiply(percent)
+                .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+        this.netAmount = totalAmount.subtract(platformFee);
+    }
+
+    public Event event() {
+        return items.get(0).getTicketType().getEvent();
+    }
+
+    public void markAsPaid() {
+        if (status != OrderStatus.PENDING) {
+            throw new InvalidOrderStateException(ProblemReason.ORDER_NOT_PENDING, "Only pending orders can be paid");
+        }
+        this.status = OrderStatus.PAID;
+    }
+
+    public void confirmWithoutPayment() {
+        if (status != OrderStatus.PENDING || !isFree()) {
+            throw new InvalidOrderStateException(ProblemReason.ORDER_NOT_PENDING, "Only pending orders with a zero total can be confirmed without payment");
+        }
+        this.status = OrderStatus.PAID;
+    }
+
+    public void expire(Instant now) {
+        if (status != OrderStatus.PENDING) {
+            throw new InvalidOrderStateException(ProblemReason.ORDER_NOT_PENDING, "Only pending orders can expire");
+        }
+        if (!isExpired(now)) {
+            throw new InvalidOrderStateException("Order has not reached its expiration time");
+        }
+        this.status = OrderStatus.EXPIRED;
+    }
+
+    public void cancel() {
+        if (status != OrderStatus.PENDING) {
+            throw new InvalidOrderStateException(ProblemReason.ORDER_NOT_PENDING, "Only pending orders can be cancelled");
+        }
+        this.status = OrderStatus.CANCELLED;
+    }
+
+    public void cancelFreeOfCancelledEvent() {
+        if (status != OrderStatus.PAID || !isFree()) {
+            throw new InvalidOrderStateException(ProblemReason.ORDER_NOT_PAID, "Only paid orders with a zero total can be cancelled with their event");
+        }
+        this.status = OrderStatus.CANCELLED;
+    }
+
+    public void refund() {
+        if (status != OrderStatus.PAID) {
+            throw new InvalidOrderStateException(ProblemReason.ORDER_NOT_PAID, "Only paid orders can be refunded");
+        }
+        this.status = OrderStatus.REFUNDED;
+    }
+
+    public boolean belongsToCancelledEvent() {
+        return items.stream().anyMatch(item -> item.getTicketType().getEvent().isCancelled());
+    }
+
+    public boolean isExpired(Instant now) {
+        return expiresAt.isBefore(now);
+    }
+
+    public void addItem(OrderItem item) {
+        this.items.add(item);
+        this.subtotalAmount = this.subtotalAmount.add(item.subtotal());
+        this.totalAmount = this.subtotalAmount.subtract(this.discountAmount);
+    }
+
+}
+
+========== src/main/java/com/lutfy/ticketfy/payment/PaymentService.java ==========
+package com.lutfy.ticketfy.payment;
+
+import com.lutfy.ticketfy.infra.exception.ProblemReason;
+import com.lutfy.ticketfy.infra.exception.InvalidEventStateException;
+import com.lutfy.ticketfy.infra.exception.InvalidOrderStateException;
+import com.lutfy.ticketfy.infra.exception.InvalidPaymentStateException;
+import com.lutfy.ticketfy.infra.exception.OrderNotFoundException;
+import com.lutfy.ticketfy.order.Order;
+import com.lutfy.ticketfy.order.OrderRepository;
+import com.lutfy.ticketfy.payout.ledger.LedgerService;
+import com.lutfy.ticketfy.ticket.TicketService;
+import com.lutfy.ticketfy.user.User;
+import com.lutfy.ticketfy.user.UserLocks;
+import com.lutfy.ticketfy.notification.OrderConfirmedEvent;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Clock;
+import java.util.UUID;
+
+@Service
+public class PaymentService {
+
+    private final PaymentRepository paymentRepository;
+    private final OrderRepository orderRepository;
+    private final TicketService ticketService;
+    private final PaymentGateway paymentGateway;
+    private final LedgerService ledgerService;
+    private final UserLocks userLocks;
+    private final Clock clock;
+    private final ApplicationEventPublisher events;
+
+    public PaymentService(PaymentRepository paymentRepository,
+                          OrderRepository orderRepository,
+                          TicketService ticketService,
+                          PaymentGateway paymentGateway,
+                          LedgerService ledgerService,
+                          UserLocks userLocks,
+                          Clock clock,
+                          ApplicationEventPublisher events) {
+        this.paymentRepository = paymentRepository;
+        this.orderRepository = orderRepository;
+        this.ticketService = ticketService;
+        this.paymentGateway = paymentGateway;
+        this.ledgerService = ledgerService;
+        this.userLocks = userLocks;
+        this.clock = clock;
+        this.events = events;
+    }
+
+    @Transactional
+    public PaymentDetailsDTO paySimulated(UUID orderId, User authenticated) {
+        userLocks.requireActive(authenticated.getId());
+        var order = orderRepository.findForUpdateById(orderId)
+                .orElseThrow(() -> new OrderNotFoundException("Order not found"));
+
+        if (!order.getUser().equals(authenticated)) {
+            throw new OrderNotFoundException("Order not found");
+        }
+        if (order.belongsToCancelledEvent()) {
+            throw new InvalidEventStateException(ProblemReason.EVENT_CANCELLED, "The event for this order was cancelled");
+        }
+        if (paymentRepository.existsByOrderIdAndStatus(orderId, PaymentStatus.APPROVED)) {
+            throw new InvalidPaymentStateException(ProblemReason.PAYMENT_ALREADY_PAID, "This order has already been paid");
+        }
+        if (order.isExpired(clock.instant())) {
+            throw new InvalidOrderStateException(ProblemReason.ORDER_EXPIRED, "This order has expired");
+        }
+
+        var payment = new Payment(order, PaymentMethod.SIMULATED);
+        payment.approve();
+        order.markAsPaid();
+        ledgerService.recordSale(order);
+        ticketService.issueForOrder(order);
+
+        var saved = paymentRepository.saveAndFlush(payment);
+        events.publishEvent(new OrderConfirmedEvent(order.getId()));
+        return new PaymentDetailsDTO(saved);
+    }
+
+    @Transactional
+    public void refundApproved(Order order) {
+        var payment = paymentRepository.findByOrderIdAndStatus(order.getId(), PaymentStatus.APPROVED);
+        if (payment.isEmpty()) {
+            return;
+        }
+        var approved = payment.get();
+        var result = paymentGateway.refund(new PaymentGateway.RefundRequest(
+                approved.getId(), approved.getProviderReference(), approved.getAmount(), approved.getId().toString()));
+        approved.refund(result.reference());
+    }
+}
+
+========== src/main/java/com/lutfy/ticketfy/payment/PaymentRepository.java ==========
+package com.lutfy.ticketfy.payment;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+public interface PaymentRepository extends JpaRepository<Payment, UUID> {
+
+    boolean existsByOrderIdAndStatus(UUID orderId, PaymentStatus status);
+
+    List<Payment> findByOrderIdOrderByCreatedAtDesc(UUID orderId);
+
+    Optional<Payment> findByOrderIdAndStatus(UUID orderId, PaymentStatus status);
+}
+========== src/main/java/com/lutfy/ticketfy/payment/PaymentController.java ==========
+package com.lutfy.ticketfy.payment;
+
+import com.lutfy.ticketfy.infra.exception.ProblemType;
+import com.lutfy.ticketfy.infra.openapi.ApiTags;
+import com.lutfy.ticketfy.infra.openapi.ProblemResponses;
+import com.lutfy.ticketfy.user.User;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.UUID;
+
+@RestController
+@RequestMapping("/orders/{orderId}/payment")
+@Tag(name = ApiTags.ORDERS)
+public class PaymentController {
+
+    private final PaymentService service;
+
+    public PaymentController(PaymentService service) {
+        this.service = service;
+    }
+
+    @PostMapping
+    @Operation(summary = "Pagar pedido",
+            description = "Pagamento simulado: aprova na hora, marca o pedido como `PAID` e emite os ingressos.")
+    @ApiResponse(responseCode = "201", description = "Pagamento aprovado.")
+    @ProblemResponses({ProblemType.SESSION_EXPIRED, ProblemType.ORDER_NOT_FOUND, ProblemType.INVALID_EVENT_STATE,
+            ProblemType.INVALID_ORDER_STATE, ProblemType.INVALID_PAYMENT_STATE})
+    public ResponseEntity<PaymentDetailsDTO> pay(
+            @PathVariable UUID orderId,
+            @AuthenticationPrincipal User authenticated) {
+        var payment = service.paySimulated(orderId, authenticated);
+        return ResponseEntity.status(HttpStatus.CREATED).body(payment);
+    }
+}
+========== src/main/java/com/lutfy/ticketfy/payment/Payment.java ==========
+package com.lutfy.ticketfy.payment;
+
+import com.lutfy.ticketfy.infra.exception.ProblemReason;
+import com.lutfy.ticketfy.infra.exception.InvalidPaymentStateException;
+import com.lutfy.ticketfy.order.Order;
+import jakarta.persistence.*;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.UUID;
+
+@Entity
+@Table(name = "payments")
+@Getter
+@NoArgsConstructor
+@EqualsAndHashCode(of = "id")
+public class Payment {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "order_id")
+    private Order order;
+    @Enumerated(EnumType.STRING)
+    private PaymentStatus status;
+    @Enumerated(EnumType.STRING)
+    private PaymentMethod method;
+    private BigDecimal amount;
+    private String providerReference;
+    private Instant approvedAt;
+    private Instant refundedAt;
+    private String refundReference;
+    @CreationTimestamp
+    private Instant createdAt;
+    @UpdateTimestamp
+    private Instant updatedAt;
+
+    public Payment(Order order, PaymentMethod method) {
+        this.order = order;
+        this.method = method;
+        this.amount = order.getTotalAmount();
+        this.status = PaymentStatus.PENDING;
+    }
+
+    public void approve() {
+        if (status != PaymentStatus.PENDING) {
+            throw new InvalidPaymentStateException(ProblemReason.PAYMENT_NOT_PENDING, "Only pending payments can be approved");
+        }
+        this.status = PaymentStatus.APPROVED;
+        this.approvedAt = Instant.now();
+    }
+
+    public void refund(String reference) {
+        if (status != PaymentStatus.APPROVED) {
+            throw new InvalidPaymentStateException(ProblemReason.PAYMENT_NOT_APPROVED, "Only approved payments can be refunded");
+        }
+        this.status = PaymentStatus.REFUNDED;
+        this.refundedAt = Instant.now();
+        this.refundReference = reference;
+    }
+
+    public void reject() {
+        if (status != PaymentStatus.PENDING) {
+            throw new InvalidPaymentStateException(ProblemReason.PAYMENT_NOT_PENDING, "Only pending payments can be rejected");
+        }
+        this.status = PaymentStatus.REJECTED;
+    }
+}
+========== src/main/java/com/lutfy/ticketfy/infra/config/SecurityConfig.java ==========
+package com.lutfy.ticketfy.infra.config;
+
+import com.lutfy.ticketfy.infra.logging.RequestIdFilter;
+import com.lutfy.ticketfy.infra.security.AuthOriginFilter;
+import com.lutfy.ticketfy.infra.security.JsonAccessDeniedHandler;
+import com.lutfy.ticketfy.infra.security.JsonAuthenticationEntryPoint;
+import com.lutfy.ticketfy.infra.security.SecurityFilter;
+import jakarta.servlet.DispatcherType;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.config.Customizer;
+import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import java.util.List;
+
+@Configuration
+@EnableMethodSecurity
+public class SecurityConfig {
+
+    private final SecurityFilter securityFilter;
+    private final JsonAuthenticationEntryPoint authenticationEntryPoint;
+    private final JsonAccessDeniedHandler accessDeniedHandler;
+
+    public SecurityConfig(SecurityFilter securityFilter,
+                          JsonAuthenticationEntryPoint authenticationEntryPoint,
+                          JsonAccessDeniedHandler accessDeniedHandler) {
+        this.securityFilter = securityFilter;
+        this.authenticationEntryPoint = authenticationEntryPoint;
+        this.accessDeniedHandler = accessDeniedHandler;
+    }
+
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        return http
+                .csrf(csrf -> csrf.disable())
+                .cors(Customizer.withDefaults())
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint(authenticationEntryPoint)
+                        .accessDeniedHandler(accessDeniedHandler))
+                .authorizeHttpRequests(auth -> auth
+                        .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
+                        .requestMatchers(HttpMethod.POST, "/users").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/events/mine").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/events", "/events/*").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/events/*/calendar.ics").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/events/*/ticket-types").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/auth/login", "/auth/google", "/auth/refresh", "/auth/logout",
+                                "/auth/password-reset/request", "/auth/password-reset/confirm").permitAll()
+                        .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/actuator/health").permitAll()
+                        .anyRequest().authenticated()
+                )
+                .addFilterBefore(securityFilter, UsernamePasswordAuthenticationFilter.class)
+                .build();
+    }
+
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource(
+            @Value("${ticketfy.cors.allowed-origins}") List<String> allowedOrigins) {
+        var config = new CorsConfiguration();
+        config.setAllowedOrigins(allowedOrigins);
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+        config.setAllowedHeaders(List.of("Authorization", "Content-Type", "Idempotency-Key", AuthOriginFilter.HEADER));
+        config.setExposedHeaders(List.of("Retry-After", RequestIdFilter.HEADER, HttpHeaders.CONTENT_DISPOSITION));
+        config.setMaxAge(3600L);
+
+        var source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", config);
+        return source;
+    }
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+
+    @Bean
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration authConfig) throws Exception {
+        return authConfig.getAuthenticationManager();
+    }
+}

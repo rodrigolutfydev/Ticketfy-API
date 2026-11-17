@@ -1,0 +1,31 @@
+                             Table "public.ticket_types"
+     Column     |           Type           | Collation | Nullable |      Default      
+----------------+--------------------------+-----------+----------+-------------------
+ id             | uuid                     |           | not null | gen_random_uuid()
+ event_id       | uuid                     |           | not null | 
+ name           | character varying(150)   |           | not null | 
+ description    | character varying(500)   |           |          | 
+ price          | numeric(10,2)            |           | not null | 
+ quantity_total | integer                  |           | not null | 
+ quantity_sold  | integer                  |           | not null | 0
+ max_per_order  | integer                  |           |          | 
+ active         | boolean                  |           | not null | true
+ created_at     | timestamp with time zone |           | not null | now()
+ updated_at     | timestamp with time zone |           |          | 
+ max_per_buyer  | integer                  |           |          | 
+Indexes:
+    "ticket_types_pkey" PRIMARY KEY, btree (id)
+    "idx_ticket_types_event" btree (event_id)
+    "uq_ticket_types_event_name" UNIQUE CONSTRAINT, btree (event_id, name)
+Check constraints:
+    "ck_ticket_types_capacity" CHECK (quantity_sold <= quantity_total)
+    "ck_ticket_types_max_per_buyer" CHECK (max_per_buyer IS NULL OR max_per_buyer > 0)
+    "ck_ticket_types_price" CHECK (price >= 0::numeric)
+    "ck_ticket_types_sold" CHECK (quantity_sold >= 0)
+Foreign-key constraints:
+    "fk_ticket_types_event" FOREIGN KEY (event_id) REFERENCES events(id)
+Referenced by:
+    TABLE "order_items" CONSTRAINT "fk_order_items_ticket_type" FOREIGN KEY (ticket_type_id) REFERENCES ticket_types(id)
+    TABLE "ticket_type_buyer_counts" CONSTRAINT "fk_ticket_type_buyer_counts_ticket_type" FOREIGN KEY (ticket_type_id) REFERENCES ticket_types(id) ON DELETE CASCADE
+    TABLE "tickets" CONSTRAINT "fk_tickets_ticket_type" FOREIGN KEY (ticket_type_id) REFERENCES ticket_types(id)
+
