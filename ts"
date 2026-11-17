@@ -1,0 +1,228 @@
+[1mdiff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml[m
+[1mindex 7f66329..984f5d1 100644[m
+[1m--- a/.github/workflows/ci.yml[m
+[1m+++ b/.github/workflows/ci.yml[m
+[36m@@ -3,6 +3,7 @@[m [mname: CI[m
+ on:[m
+   push:[m
+     branches: [main][m
+[32m+[m
+   pull_request:[m
+     branches: [main][m
+ [m
+[36m@@ -18,13 +19,38 @@[m [mjobs:[m
+     runs-on: ubuntu-24.04[m
+     timeout-minutes: 20[m
+ [m
+[32m+[m[32m    env:[m
+[32m+[m[32m      # Configurações exclusivas do ambiente de testes[m
+[32m+[m[32m      SPRING_PROFILES_ACTIVE: dev[m
+[32m+[m
+[32m+[m[32m      # Integração Java -> Go[m
+[32m+[m[32m      PAYMENTS_INTERNAL_TOKEN: ci-test-token-not-for-production[m
+[32m+[m[32m      PAYMENTS_GO_URL: http://127.0.0.1:8081[m
+[32m+[m
+     steps:[m
+[32m+[m[32m      # ==========================================[m
+[32m+[m[32m      # CHECKOUT[m
+[32m+[m[32m      # ==========================================[m
+[32m+[m
+       - name: Baixar o código[m
+         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1[m
+ [m
+[32m+[m[32m      # ==========================================[m
+[32m+[m[32m      # JAVA[m
+[32m+[m[32m      # ==========================================[m
+[32m+[m
+       - name: Ler a versão do Java do pom.xml[m
+         id: java[m
+[31m-        run: echo "version=$(sed -n 's:.*<java.version>\(.*\)</java.version>.*:\1:p' pom.xml)" >> "$GITHUB_OUTPUT"[m
+[32m+[m[32m        shell: bash[m
+[32m+[m[32m        run: |[m
+[32m+[m[32m          version=$(sed -n 's:.*<java.version>\(.*\)</java.version>.*:\1:p' pom.xml | head -n 1)[m
+[32m+[m
+[32m+[m[32m          if [ -z "$version" ]; then[m
+[32m+[m[32m            echo "::error::Não foi possível identificar java.version no pom.xml"[m
+[32m+[m[32m            exit 1[m
+[32m+[m[32m          fi[m
+[32m+[m
+[32m+[m[32m          echo "version=$version" >> "$GITHUB_OUTPUT"[m
+ [m
+       - name: Instalar o Java[m
+         uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0[m
+[36m@@ -33,22 +59,52 @@[m [mjobs:[m
+           java-version: ${{ steps.java.outputs.version }}[m
+           cache: maven[m
+ [m
+[32m+[m[32m      # ==========================================[m
+[32m+[m[32m      # DOCKER / TESTCONTAINERS[m
+[32m+[m[32m      # ==========================================[m
+[32m+[m
+[32m+[m[32m      - name: Verificar disponibilidade do Docker[m
+[32m+[m[32m        run: |[m
+[32m+[m[32m          docker version[m
+[32m+[m[32m          docker info[m
+[32m+[m
+[32m+[m[32m      # ==========================================[m
+[32m+[m[32m      # MAVEN / TESTES / COBERTURA[m
+[32m+[m[32m      # ==========================================[m
+[32m+[m
+[32m+[m[32m      - name: Preparar Maven Wrapper[m
+[32m+[m[32m        run: chmod +x ./mvnw[m
+[32m+[m
+       - name: Rodar testes e cobertura[m
+         run: ./mvnw -B verify[m
+ [m
+[32m+[m[32m      # ==========================================[m
+[32m+[m[32m      # VALIDAR DOCUMENTAÇÃO GERADA[m
+[32m+[m[32m      # ==========================================[m
+[32m+[m
+       - name: Conferir se os arquivos gerados em docs/ estão atualizados[m
+         run: |[m
+           generated="docs/openapi.json docs/problem-types.json docs/event-categories.json"[m
+[32m+[m
+           if [ -n "$(git status --porcelain -- $generated)" ]; then[m
+[32m+[m
+             for file in $generated; do[m
+[32m+[m
+               if [ -n "$(git status --porcelain -- "$file")" ]; then[m
+                 echo "::error file=$file::$file desatualizado: rode ./mvnw verify e commite o arquivo."[m
+               fi[m
+[32m+[m
+             done[m
+[32m+[m
+             git --no-pager diff --stat -- $generated[m
+[32m+[m
+             exit 1[m
+           fi[m
+ [m
+[32m+[m[32m      # ==========================================[m
+[32m+[m[32m      # RELATÓRIOS[m
+[32m+[m[32m      # ==========================================[m
+[32m+[m
+       - name: Publicar relatórios como artefato[m
+         if: ${{ !cancelled() }}[m
+         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2[m
+[36m@@ -60,46 +116,105 @@[m [mjobs:[m
+           retention-days: 14[m
+           if-no-files-found: warn[m
+ [m
+[32m+[m[32m      # ==========================================[m
+[32m+[m[32m      # GERAR SELO DE COBERTURA[m
+[32m+[m[32m      # ==========================================[m
+[32m+[m
+       - name: Gerar selo de cobertura[m
+         if: github.event_name == 'push' && github.ref == 'refs/heads/main'[m
+[32m+[m[32m        shell: bash[m
+         run: |[m
+[31m-          pct=$(awk -F, 'NR>1 { m += $8; c += $9 } END { printf "%d", (100 * c / (m + c)) }' target/site/jacoco/jacoco.csv)[m
+[31m-          if [ "$pct" -ge 90 ]; then color="#4c1"[m
+[31m-          elif [ "$pct" -ge 80 ]; then color="#97ca00"[m
+[31m-          elif [ "$pct" -ge 70 ]; then color="#dfb317"[m
+[31m-          else color="#e05d44"; fi[m
+[32m+[m[32m          if [ ! -f target/site/jacoco/jacoco.csv ]; then[m
+[32m+[m[32m            echo "::error::Relatório JaCoCo não encontrado."[m
+[32m+[m[32m            exit 1[m
+[32m+[m[32m          fi[m
+[32m+[m
+[32m+[m[32m          pct=$(awk -F, '[m
+[32m+[m[32m            NR > 1 {[m
+[32m+[m[32m              missed += $8[m
+[32m+[m[32m              covered += $9[m
+[32m+[m[32m            }[m
+[32m+[m[32m            END {[m
+[32m+[m[32m              total = missed + covered[m
+[32m+[m[32m              if (total > 0) {[m
+[32m+[m[32m                printf "%d", (100 * covered / total)[m
+[32m+[m[32m              } else {[m
+[32m+[m[32m                printf "0"[m
+[32m+[m[32m              }[m
+[32m+[m[32m            }[m
+[32m+[m[32m          ' target/site/jacoco/jacoco.csv)[m
+[32m+[m
+[32m+[m[32m          echo "Cobertura total: ${pct}%"[m
+[32m+[m
+[32m+[m[32m          if [ "$pct" -ge 90 ]; then[m
+[32m+[m[32m            color="#4c1"[m
+[32m+[m[32m          elif [ "$pct" -ge 80 ]; then[m
+[32m+[m[32m            color="#97ca00"[m
+[32m+[m[32m          elif [ "$pct" -ge 70 ]; then[m
+[32m+[m[32m            color="#dfb317"[m
+[32m+[m[32m          else[m
+[32m+[m[32m            color="#e05d44"[m
+[32m+[m[32m          fi[m
+[32m+[m
+           mkdir -p _site/badges[m
+[32m+[m
+           cp -r target/site/jacoco _site/jacoco[m
+[32m+[m
+           cat > _site/badges/coverage.svg <<EOF[m
+           <svg xmlns="http://www.w3.org/2000/svg" width="104" height="20" role="img" aria-label="coverage: ${pct}%">[m
+             <title>coverage: ${pct}%</title>[m
+[31m-            <linearGradient id="s" x2="0" y2="100%"><stop offset="0" stop-color="#bbb" stop-opacity=".1"/><stop offset="1" stop-opacity=".1"/></linearGradient>[m
+[31m-            <clipPath id="r"><rect width="104" height="20" rx="3" fill="#fff"/></clipPath>[m
+[31m-            <g clip-path="url(#r)"><rect width="63" height="20" fill="#555"/><rect x="63" width="41" height="20" fill="${color}"/><rect width="104" height="20" fill="url(#s)"/></g>[m
+[32m+[m[32m            <linearGradient id="s" x2="0" y2="100%">[m
+[32m+[m[32m              <stop offset="0" stop-color="#bbb" stop-opacity=".1"/>[m
+[32m+[m[32m              <stop offset="1" stop-opacity=".1"/>[m
+[32m+[m[32m            </linearGradient>[m
+[32m+[m[32m            <clipPath id="r">[m
+[32m+[m[32m              <rect width="104" height="20" rx="3" fill="#fff"/>[m
+[32m+[m[32m            </clipPath>[m
+[32m+[m[32m            <g clip-path="url(#r)">[m
+[32m+[m[32m              <rect width="63" height="20" fill="#555"/>[m
+[32m+[m[32m              <rect x="63" width="41" height="20" fill="${color}"/>[m
+[32m+[m[32m              <rect width="104" height="20" fill="url(#s)"/>[m
+[32m+[m[32m            </g>[m
+             <g fill="#fff" text-anchor="middle" font-family="Verdana,Geneva,DejaVu Sans,sans-serif" font-size="11">[m
+[31m-              <text x="31.5" y="15" fill="#010101" fill-opacity=".3">coverage</text><text x="31.5" y="14">coverage</text>[m
+[31m-              <text x="83.5" y="15" fill="#010101" fill-opacity=".3">${pct}%</text><text x="83.5" y="14">${pct}%</text>[m
+[32m+[m[32m              <text x="31.5" y="15" fill="#010101" fill-opacity=".3">coverage</text>[m
+[32m+[m[32m              <text x="31.5" y="14">coverage</text>[m
+[32m+[m[32m              <text x="83.5" y="15" fill="#010101" fill-opacity=".3">${pct}%</text>[m
+[32m+[m[32m              <text x="83.5" y="14">${pct}%</text>[m
+             </g>[m
+           </svg>[m
+           EOF[m
+ [m
+[32m+[m[32m      # ==========================================[m
+[32m+[m[32m      # PREPARAR GITHUB PAGES[m
+[32m+[m[32m      # ==========================================[m
+[32m+[m
+       - name: Preparar publicação no Pages[m
+         if: github.event_name == 'push' && github.ref == 'refs/heads/main'[m
+         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0[m
+         with:[m
+           path: _site/[m
+ [m
+[32m+[m[32m  # ==========================================[m
+[32m+[m[32m  # PUBLICAÇÃO DO RELATÓRIO[m
+[32m+[m[32m  # ==========================================[m
+[32m+[m
+   coverage-badge:[m
+     if: github.event_name == 'push' && github.ref == 'refs/heads/main'[m
+[32m+[m
+     needs: test[m
+[32m+[m
+     runs-on: ubuntu-24.04[m
+[32m+[m
+     timeout-minutes: 15[m
+[32m+[m
+     permissions:[m
+       pages: write[m
+       id-token: write[m
+[32m+[m
+     concurrency:[m
+       group: pages[m
+       cancel-in-progress: false[m
+[32m+[m
+     environment:[m
+       name: github-pages[m
+       url: ${{ steps.deploy.outputs.page_url }}[m
+[36m@@ -107,4 +222,4 @@[m [mjobs:[m
+     steps:[m
+       - name: Publicar selo e relatório no Pages[m
+         id: deploy[m
+[31m-        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1[m
+[32m+[m[32m        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1[m
+\ No newline at end of file[m
