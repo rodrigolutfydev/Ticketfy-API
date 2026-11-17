@@ -8,6 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.core.PropertyReferenceException;
 import org.springframework.http.HttpMethod;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
@@ -96,6 +97,40 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(BadCredentialsException.class)
     public ResponseEntity<ProblemDetail> handleBadCredentials(BadCredentialsException ex) {
         return problems.response(ProblemType.INVALID_CREDENTIALS, "Invalid credentials");
+    }
+
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<ProblemDetail> handleResponseStatusException(ResponseStatusException ex) {
+        var status = ex.getStatusCode();
+        var reason = ex.getReason();
+        var detail = reason == null || reason.isBlank()
+                ? "Request could not be completed"
+                : reason;
+
+        if (status.value() == 409) {
+            return problems.response(ProblemType.INVALID_ORDER_STATE, detail);
+        }
+        if (status.value() == 404) {
+            return problems.response(ProblemType.ORDER_NOT_FOUND, "Pedido não encontrado");
+        }
+        if (status.value() == 401) {
+            return problems.response(ProblemType.AUTHENTICATION_REQUIRED, "Authentication required");
+        }
+        if (status.value() == 403) {
+            return problems.response(ProblemType.ACCESS_DENIED, "Access denied");
+        }
+        if (status.value() == 400) {
+            return problems.response(ProblemType.BAD_REQUEST, detail);
+        }
+
+        var problem = ProblemDetail.forStatusAndDetail(
+                status,
+                status.is5xxServerError() ? "Upstream service error" : detail
+        );
+        problem.setTitle(status.toString());
+        return ResponseEntity.status(status)
+                .contentType(MediaType.APPLICATION_PROBLEM_JSON)
+                .body(problem);
     }
 
     @ExceptionHandler(Exception.class)

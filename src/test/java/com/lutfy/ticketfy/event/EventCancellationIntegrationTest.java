@@ -167,9 +167,10 @@ class EventCancellationIntegrationTest extends IntegrationTestBase {
         var orderId = pendingOrder(buyer, 1);
         eventService.markCancelled(eventId, null, organizer);
 
-        mockMvc.perform(post("/orders/{id}/payment", orderId).header("Authorization", bearer(buyer)))
+        mockMvc.perform(post("/orders/{id}/payment/pix", orderId).header("Authorization", bearer(buyer)))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.detail").value("The event for this order was cancelled"));
+                .andExpect(jsonPath("$.detail")
+        .value("Não é possível pagar um pedido de evento cancelado"));
 
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM payments WHERE order_id = ?", Long.class, orderId)).isZero();
         assertThat(ticketStatuses(orderId)).isEmpty();

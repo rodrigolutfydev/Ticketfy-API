@@ -2,10 +2,12 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
 
   pull_request:
-    branches: [main]
+    branches:
+      - main
 
 permissions:
   contents: read
@@ -16,16 +18,36 @@ concurrency:
 
 jobs:
   test:
+    name: Testes, integração e cobertura
+
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+
+    timeout-minutes: 30
 
     env:
-      # Configurações exclusivas do ambiente de testes
+      # ==========================================
+      # SPRING BOOT — AMBIENTE DE TESTES
+      # ==========================================
+
       SPRING_PROFILES_ACTIVE: dev
 
-      # Integração Java -> Go
+      # ==========================================
+      # MICROSSERVIÇO GO — AMBIENTE DE TESTES
+      # ==========================================
+
+      # Token fictício exclusivo para CI.
+      # Nunca utilizar credenciais reais neste arquivo.
       PAYMENTS_INTERNAL_TOKEN: ci-test-token-not-for-production
+
+      # Os testes devem utilizar mocks ou serviços
+      # locais, sem depender do Render.
       PAYMENTS_GO_URL: http://127.0.0.1:8081
+
+      # ==========================================
+      # JAVA / MAVEN
+      # ==========================================
+
+      MAVEN_OPTS: -Xmx1024m
 
     steps:
       # ==========================================
@@ -50,6 +72,8 @@ jobs:
             exit 1
           fi
 
+          echo "Versão do Java: $version"
+
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - name: Instalar o Java
@@ -64,26 +88,85 @@ jobs:
       # ==========================================
 
       - name: Verificar disponibilidade do Docker
+        shell: bash
         run: |
+          echo "=========================================="
+          echo "VERIFICANDO DOCKER"
+          echo "=========================================="
+
           docker version
+
           docker info
 
+          echo ""
+          echo "Docker disponível."
+
       # ==========================================
-      # MAVEN / TESTES / COBERTURA
+      # MAVEN
       # ==========================================
 
       - name: Preparar Maven Wrapper
-        run: chmod +x ./mvnw
+        shell: bash
+        run: |
+          chmod +x ./mvnw
+
+          ./mvnw --version
+
+      # ==========================================
+      # VALIDAR CONFIGURAÇÕES
+      # ==========================================
+
+      - name: Validar variáveis obrigatórias
+        shell: bash
+        run: |
+          echo "=========================================="
+          echo "VALIDANDO AMBIENTE DE TESTES"
+          echo "=========================================="
+
+          required_vars=(
+            SPRING_PROFILES_ACTIVE
+            PAYMENTS_INTERNAL_TOKEN
+            PAYMENTS_GO_URL
+          )
+
+          for var in "${required_vars[@]}"; do
+
+            if [ -z "${!var:-}" ]; then
+              echo "::error::$var não está configurada."
+              exit 1
+            fi
+
+            echo "$var configurada."
+
+          done
+
+          echo ""
+          echo "Configurações obrigatórias disponíveis."
+
+      # ==========================================
+      # TESTES / INTEGRAÇÃO / COBERTURA
+      # ==========================================
 
       - name: Rodar testes e cobertura
-        run: ./mvnw -B verify
+        shell: bash
+        run: |
+          echo "=========================================="
+          echo "EXECUTANDO TESTES DA TICKETFY"
+          echo "=========================================="
+
+          ./mvnw -B clean verify
 
       # ==========================================
       # VALIDAR DOCUMENTAÇÃO GERADA
       # ==========================================
 
-      - name: Conferir se os arquivos gerados em docs/ estão atualizados
+      - name: Conferir documentação gerada
+        shell: bash
         run: |
+          echo "=========================================="
+          echo "VALIDANDO DOCUMENTAÇÃO"
+          echo "=========================================="
+
           generated="docs/openapi.json docs/problem-types.json docs/event-categories.json"
 
           if [ -n "$(git status --porcelain -- $generated)" ]; then
@@ -91,7 +174,9 @@ jobs:
             for file in $generated; do
 
               if [ -n "$(git status --porcelain -- "$file")" ]; then
-                echo "::error file=$file::$file desatualizado: rode ./mvnw verify e commite o arquivo."
+
+                echo "::error file=$file::$file desatualizado. Execute ./mvnw verify e faça commit do arquivo."
+
               fi
 
             done
@@ -99,21 +184,27 @@ jobs:
             git --no-pager diff --stat -- $generated
 
             exit 1
+
           fi
+
+          echo "Documentação atualizada."
 
       # ==========================================
       # RELATÓRIOS
       # ==========================================
 
-      - name: Publicar relatórios como artefato
+      - name: Publicar relatórios de testes e cobertura
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: relatorios-testes-cobertura
+
           path: |
             target/surefire-reports/
             target/site/jacoco/
+
           retention-days: 14
+
           if-no-files-found: warn
 
       # ==========================================
@@ -124,6 +215,10 @@ jobs:
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         shell: bash
         run: |
+          echo "=========================================="
+          echo "GERANDO SELO DE COBERTURA"
+          echo "=========================================="
+
           if [ ! -f target/site/jacoco/jacoco.csv ]; then
             echo "::error::Relatório JaCoCo não encontrado."
             exit 1
@@ -136,6 +231,7 @@ jobs:
             }
             END {
               total = missed + covered
+
               if (total > 0) {
                 printf "%d", (100 * covered / total)
               } else {
@@ -184,11 +280,13 @@ jobs:
           </svg>
           EOF
 
+          echo "Selo de cobertura gerado."
+
       # ==========================================
       # PREPARAR GITHUB PAGES
       # ==========================================
 
-      - name: Preparar publicação no Pages
+      - name: Preparar publicação no GitHub Pages
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
@@ -199,6 +297,8 @@ jobs:
   # ==========================================
 
   coverage-badge:
+    name: Publicar cobertura no GitHub Pages
+
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     needs: test

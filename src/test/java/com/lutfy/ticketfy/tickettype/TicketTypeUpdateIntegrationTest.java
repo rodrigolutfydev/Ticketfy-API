@@ -1,6 +1,7 @@
 package com.lutfy.ticketfy.tickettype;
 
 import com.lutfy.ticketfy.IntegrationTestBase;
+import com.lutfy.ticketfy.payment.PaymentService;
 import com.lutfy.ticketfy.user.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -34,6 +35,9 @@ class TicketTypeUpdateIntegrationTest extends IntegrationTestBase {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private PaymentService paymentService;
 
 
     @Autowired
@@ -218,8 +222,13 @@ class TicketTypeUpdateIntegrationTest extends IntegrationTestBase {
     void priceChangeDoesNotAffectExistingOrders() throws Exception {
         var buyer = insertUser("USER");
         var orderId = createOrder(buyer, 2);
-        mockMvc.perform(post("/orders/{id}/payment", orderId).header("Authorization", tokenFor(buyer)))
-                .andExpect(status().is2xxSuccessful());
+        // Prepara um pedido pago sem usar o endpoint legado (HTTP 410).
+        // A rota Pix real não confirma pagamentos nem emite ingressos antecipadamente.
+        paymentService.paySimulated(orderId, userRepository.findById(buyer).orElseThrow());
+
+        assertThat(jdbc.queryForObject(
+                "SELECT status FROM orders WHERE id = ?", String.class, orderId
+        )).isEqualTo("PAID");
 
         update(organizerId, "{\"price\":120.00}").andExpect(status().isOk());
 

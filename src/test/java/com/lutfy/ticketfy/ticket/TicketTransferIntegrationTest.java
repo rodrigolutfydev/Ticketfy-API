@@ -185,7 +185,7 @@ class TicketTransferIntegrationTest extends TicketTransferTestBase {
 
         expectProblem(mockMvc.perform(get("/orders/{id}", orderId).header("Authorization", bearer(stranger))),
                 404, "order-not-found");
-        expectProblem(mockMvc.perform(post("/orders/{id}/payment", orderId).header("Authorization", bearer(stranger))),
+        expectProblem(mockMvc.perform(post("/orders/{id}/payment/pix", orderId).header("Authorization", bearer(stranger))),
                 404, "order-not-found");
         expectProblem(transfer(stranger, transferred, buyer.getEmail(), PASSWORD), 404, "ticket-not-found");
         expectProblem(transfer(buyer, transferred, stranger.getEmail(), PASSWORD), 404, "ticket-not-found");

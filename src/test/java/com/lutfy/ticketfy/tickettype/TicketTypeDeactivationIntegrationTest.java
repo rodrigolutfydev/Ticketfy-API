@@ -76,8 +76,16 @@ class TicketTypeDeactivationIntegrationTest extends PayoutTestBase {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.type").value(PROBLEMS + "ticket-type-not-found"));
 
-        mockMvc.perform(post("/orders/{id}/payment", pending).header("Authorization", bearer(buyer)))
-                .andExpect(status().isCreated());
+        // A reserva foi criada antes da desativação do lote e continua válida.
+        // Esta fixture confirma o pagamento sem utilizar o endpoint legado (HTTP 410).
+        paymentService.paySimulated(pending, buyer);
+
+        assertThat(jdbc.queryForObject(
+                "SELECT status FROM orders WHERE id = ?", String.class, pending
+        )).isEqualTo("PAID");
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM tickets WHERE order_id = ?", Integer.class, pending
+        )).isEqualTo(2);
         var code = jdbc.queryForObject("SELECT code FROM tickets WHERE order_id = ? LIMIT 1", String.class, paid);
         mockMvc.perform(post("/tickets/{code}/check-in", code).header("Authorization", bearer(organizer)))
                 .andExpect(status().isOk());

@@ -3,6 +3,7 @@ package com.lutfy.ticketfy.infra.openapi;
 import com.lutfy.ticketfy.IntegrationTestBase;
 import com.lutfy.ticketfy.infra.security.AuthOriginFilter;
 import com.lutfy.ticketfy.infra.security.ClientAddressResolver;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -10,6 +11,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -27,10 +29,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * Confere o contrato OpenAPI contra o comportamento real da API: o cadeado aparece só nas rotas que
- * o SecurityConfig fecha, e toda rota documenta as respostas de erro em ProblemDetail.
- */
 @AutoConfigureMockMvc
 class OpenApiContractTest extends IntegrationTestBase {
 
@@ -47,9 +45,21 @@ class OpenApiContractTest extends IntegrationTestBase {
             "POST /auth/refresh",
             "POST /auth/logout",
             "POST /auth/password-reset/request",
-            "POST /auth/password-reset/confirm");
+            "POST /auth/password-reset/confirm"
+    );
 
-    private static final String PROBLEM_SCHEMA = "#/components/schemas/ProblemDetail";
+    /**
+     * Rotas protegidas por autenticação entre serviços.
+     *
+     * Não exigem login de usuário, mas precisam continuar
+     * protegidas e documentadas com cadeado no OpenAPI.
+     */
+    private static final Set<String> INTERNAL_ROUTES = Set.of(
+            "POST /internal/payments/confirm"
+    );
+
+    private static final String PROBLEM_SCHEMA =
+            "#/components/schemas/ProblemDetail";
 
     @Autowired
     private MockMvc mockMvc;
@@ -58,97 +68,260 @@ class OpenApiContractTest extends IntegrationTestBase {
 
     @BeforeEach
     void loadDocument() throws Exception {
+
+        routes.clear();
+
         var body = mockMvc.perform(get("/v3/api-docs"))
                 .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
-        var paths = JsonMapper.builder().build().readTree(body).get("paths");
-        paths.properties().forEach(path -> path.getValue().properties().forEach(operation ->
-                routes.add(new Route(operation.getKey().toUpperCase(Locale.ROOT), path.getKey(), operation.getValue()))));
+                .andReturn()
+                .getResponse()
+                .getContentAsString(StandardCharsets.UTF_8);
+
+        var paths = JsonMapper.builder()
+                .build()
+                .readTree(body)
+                .get("paths");
+
+        paths.properties().forEach(path ->
+                path.getValue().properties().forEach(operation ->
+                        routes.add(
+                                new Route(
+                                        operation.getKey().toUpperCase(Locale.ROOT),
+                                        path.getKey(),
+                                        operation.getValue()
+                                )
+                        )
+                )
+        );
+
         assertThat(routes).hasSizeGreaterThan(50);
     }
 
     @Test
-    void lockAppearsOnlyOnRoutesThatRequireLogin() throws Exception {
+    void lockAppearsOnlyOnProtectedRoutes() throws Exception {
+
         var wrong = new TreeSet<String>();
         var open = new TreeSet<String>();
+
+        var documentedRoutes = new TreeSet<String>();
+
         for (var route : routes) {
-            boolean requiresLogin = requiresLogin(route);
-            if (!requiresLogin) {
+
+            documentedRoutes.add(route.name());
+
+            boolean internal = INTERNAL_ROUTES.contains(route.name());
+
+            boolean requiresAuthentication = requiresLogin(route);
+
+            if (internal) {
+
+                // Uma rota interna não é pública.
+                // Precisa aparecer protegida no OpenAPI.
+                if (!route.locked()) {
+                    wrong.add(
+                            route.name()
+                                    + " é interna e está sem cadeado"
+                    );
+                }
+
+                continue;
+            }
+
+            if (!requiresAuthentication) {
                 open.add(route.name());
             }
-            if (route.locked() != requiresLogin) {
-                wrong.add(route.name() + (requiresLogin ? " exige login e está sem cadeado"
-                        : " é pública e aparece com cadeado"));
+
+            if (route.locked() != requiresAuthentication) {
+
+                wrong.add(
+                        route.name()
+                                + (
+                                    requiresAuthentication
+                                            ? " exige login e está sem cadeado"
+                                            : " é pública e aparece com cadeado"
+                                )
+                );
             }
         }
+
+        // Garante que as rotas internas configuradas
+        // realmente existem na documentação.
+        assertThat(documentedRoutes)
+                .containsAll(INTERNAL_ROUTES);
+
         assertThat(wrong).isEmpty();
-        assertThat(open).containsExactlyInAnyOrderElementsOf(PUBLIC_ROUTES);
+
+        assertThat(open)
+                .containsExactlyInAnyOrderElementsOf(PUBLIC_ROUTES);
     }
 
     @Test
     void everyRouteDocumentsItsErrorsAsProblemDetail() {
+
         var wrong = new TreeSet<String>();
+
         for (var route : routes) {
+
             var errors = new ArrayList<String>();
-            route.operation().get("responses").properties().forEach(response -> {
-                if (Integer.parseInt(response.getKey()) >= 400) {
-                    errors.add(response.getKey());
-                    if (!route.path().startsWith("/actuator/") && !isProblemDetail(response.getValue())) {
-                        wrong.add(route.name() + " " + response.getKey() + " não usa ProblemDetail");
-                    }
-                }
-            });
+
+            route.operation()
+                    .get("responses")
+                    .properties()
+                    .forEach(response -> {
+
+                        if (Integer.parseInt(response.getKey()) >= 400) {
+
+                            errors.add(response.getKey());
+
+                            if (
+                                    !route.path().startsWith("/actuator/")
+                                            && !isProblemDetail(
+                                                    response.getValue()
+                                            )
+                            ) {
+
+                                wrong.add(
+                                        route.name()
+                                                + " "
+                                                + response.getKey()
+                                                + " não usa ProblemDetail"
+                                );
+                            }
+                        }
+                    });
+
             if (errors.isEmpty()) {
-                wrong.add(route.name() + " não documenta respostas de erro");
+
+                wrong.add(
+                        route.name()
+                                + " não documenta respostas de erro"
+                );
             }
-            if (route.locked() && !hasExample(route.operation(), "401", "authentication-required")) {
-                wrong.add(route.name() + " não documenta 401 authentication-required");
+
+            if (
+                    route.locked()
+                            && !hasExample(
+                                    route.operation(),
+                                    "401",
+                                    "authentication-required"
+                            )
+            ) {
+
+                wrong.add(
+                        route.name()
+                                + " não documenta 401 authentication-required"
+                );
             }
         }
+
         assertThat(wrong).isEmpty();
     }
 
-    // Sem token, a rota fechada pelo SecurityConfig responde 401 authentication-required antes de
-    // chegar ao controller; a pública chega ao controller e responde outra coisa.
+    /**
+     * Verifica se a rota exige autenticação de usuário.
+     *
+     * Rotas internas são tratadas separadamente,
+     * pois utilizam autenticação entre serviços.
+     */
     private boolean requiresLogin(Route route) throws Exception {
-        var uri = route.path().replaceAll("\\{[^}]+}", UUID.randomUUID().toString());
-        var builder = request(HttpMethod.valueOf(route.method()), uri)
+
+        var uri = route.path()
+                .replaceAll(
+                        "\\{[^}]+}",
+                        UUID.randomUUID().toString()
+                );
+
+        var builder = request(
+                HttpMethod.valueOf(route.method()),
+                uri
+        )
                 .header("Origin", FRONTEND_ORIGIN)
                 .header(AuthOriginFilter.HEADER, "1")
-                .header(ClientAddressResolver.PROXY_SECRET_HEADER, PROXY_SECRET)
-                .header(ClientAddressResolver.CLIENT_IP_HEADER, randomIp());
-        if (Set.of("POST", "PUT", "PATCH").contains(route.method())) {
-            builder.contentType(MediaType.APPLICATION_JSON).content("{}");
+                .header(
+                        ClientAddressResolver.PROXY_SECRET_HEADER,
+                        PROXY_SECRET
+                )
+                .header(
+                        ClientAddressResolver.CLIENT_IP_HEADER,
+                        randomIp()
+                );
+
+        if (
+                Set.of("POST", "PUT", "PATCH")
+                        .contains(route.method())
+        ) {
+
+            builder
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{}");
         }
-        var response = mockMvc.perform(builder).andReturn().getResponse();
+
+        var response = mockMvc.perform(builder)
+                .andReturn()
+                .getResponse();
+
         return response.getStatus() == 401
-                && response.getContentAsString(StandardCharsets.UTF_8).contains("/authentication-required\"");
+                && response.getContentAsString(
+                        StandardCharsets.UTF_8
+                ).contains("/authentication-required\"");
     }
 
     private static boolean isProblemDetail(JsonNode response) {
-        var schema = response.path("content").path("application/problem+json").path("schema").path("$ref");
-        return PROBLEM_SCHEMA.equals(schema.asString(""));
+
+        var schema = response
+                .path("content")
+                .path("application/problem+json")
+                .path("schema")
+                .path("$ref");
+
+        return PROBLEM_SCHEMA.equals(
+                schema.asString("")
+        );
     }
 
-    private static boolean hasExample(JsonNode operation, String status, String slug) {
-        return operation.path("responses").path(status).path("content").path("application/problem+json")
-                .path("examples").has(slug);
+    private static boolean hasExample(
+            JsonNode operation,
+            String status,
+            String slug
+    ) {
+
+        return operation
+                .path("responses")
+                .path(status)
+                .path("content")
+                .path("application/problem+json")
+                .path("examples")
+                .has(slug);
     }
 
     private static String randomIp() {
+
         var random = ThreadLocalRandom.current();
-        return "10." + random.nextInt(256) + "." + random.nextInt(256) + "." + random.nextInt(1, 255);
+
+        return "10."
+                + random.nextInt(256)
+                + "."
+                + random.nextInt(256)
+                + "."
+                + random.nextInt(1, 255);
     }
 
-    private record Route(String method, String path, JsonNode operation) {
+    private record Route(
+            String method,
+            String path,
+            JsonNode operation
+    ) {
 
         String name() {
             return method + " " + path;
         }
 
         boolean locked() {
+
             var security = operation.path("security");
-            return security.isArray() && !security.isEmpty();
+
+            return security.isArray()
+                    && !security.isEmpty();
         }
     }
 }
