@@ -1,4 +1,4 @@
 ticketfy:
   payments:
-    go-url: ${PAYMENTS_GO_URL:${TICKETFY_PAYMENTS_GO_URL:http://127.0.0.1:8081}}
+    go-url: ${PAYMENTS_GO_URL:${TICKETFY_PAYMENTS_GQ_URL:http://127.0.0.1:8081}}
     internal-token: ${PAYMENTS_INTERNAL_TOKEN}
