@@ -224,7 +224,7 @@ Contato: [rodrigolutfy.dev@gmail.com](mailto:rodrigolutfy.dev@gmail.com) · GitH
 Contato: [cainbretas@gmail.com](mailto:cainbretas@gmail.com) · GitHub: [caio-bretas](https://github.com/caio-bretas)      
 Contato: [odiegodev10@gmail.com](mailto:odiegodev10@gmail.com)  · GitHub: [Odiegodev1](https://github.com/Odiegodev1)    
 Contato: [jvv.math@gmail.com](mailto:jvv.math@gmail.com) · GitHub: [JoãoVictor_V7](https://github.com/joaovictorv7)      
-Contato: [brennosantos590@gmail.com](emailto:brennosantos590@gmail.com) · GitHub: [bnx021](https://github.com/bnx021)    
+Contato: [brennosantos590@gmail.com](mailto:brennosantos590@gmail.com) · GitHub: [bnx021](https://github.com/bnx021)    
 Contato: [lunamaximiano5@gmail.com](mailto:lunamaximiano5@gmail.com)  · GitHub: [lunamaximiano5-web](https://github.com/lunamaximiano5-web)
 
 
