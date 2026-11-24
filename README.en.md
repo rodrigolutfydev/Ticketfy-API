@@ -37,6 +37,9 @@ REST API for selling event tickets, built in Java with Spring Boot.
 
 Ticketfy covers the full ticket sales cycle: event publishing, checkout, ticket issuing with QR Code, check-in and payouts to the organizer. Concurrency cases (two buyers competing for the last ticket, a double click on payment, the same ticket scanned at two gates) are handled in the database, with transactions and locks.
 
+The first version of the project was built with Next.js. Today the API is written in Java (Spring Boot), and payments are handled by a Go microservice and processed by CajuPay.
+
+
 ## 2. Features
 
 | Role | Capabilities |
