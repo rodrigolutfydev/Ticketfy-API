@@ -37,6 +37,8 @@ API REST de venda de ingressos para eventos, desenvolvida em Java com Spring Boo
 
 O Ticketfy cobre o ciclo completo da venda de ingressos: publicação do evento, compra, emissão do ingresso com QR Code, check-in e repasse ao organizador. Os casos de concorrência (disputa pelo último ingresso, clique duplo no pagamento, leitura do mesmo ingresso em duas entradas) são tratados no banco de dados, com transações e travas.
 
+A primeira versão do projeto foi feita em Next.js. Hoje a API é escrita em Java (Spring Boot), e os pagamentos são feitos por um microsserviço em Go e processados pela CajuPay.
+
 ## 2. Funcionalidades
 
 | Perfil | Recursos |
