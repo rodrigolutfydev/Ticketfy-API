@@ -224,19 +224,19 @@ Contato: [rodrigolutfy.dev@gmail.com](mailto:rodrigolutfy.dev@gmail.com) · GitH
 Contato: [cainbretas@gmail.com](mailto:cainbretas@gmail.com) · GitHub: [caio-bretas](https://github.com/caio-bretas)      
 Contato: [odiegodev10@gmail.com](mailto:odiegodev10@gmail.com)  · GitHub: [Odiegodev1](https://github.com/Odiegodev1)    
 Contato: [jvv.math@gmail.com](mailto:jvv.math@gmail.com) · GitHub: [JoãoVictor_V7](https://github.com/joaovictorv7)      
-Contato:  · GitHub: [bnx021](https://github.com/bnx021)    
+Contato: [brennosantos590@gmail.com](emailto:brennosantos590@gmail.com) · GitHub: [bnx021](https://github.com/bnx021)    
 Contato: [lunamaximiano5@gmail.com](mailto:lunamaximiano5@gmail.com)  · GitHub: [lunamaximiano5-web](https://github.com/lunamaximiano5-web)
 
 
 ## 10. Papel	O que fez no Ticketfy
 1	Rodrigo:	Arquiteto e back-end base =	Estrutura Spring Boot em camadas (controller, service, repository). Segurança com Spring Security, JWT de 10 min, refresh token rotativo em cookie e login com Google (PKCE). Regra de concorrência da venda do último ingresso.      
 
-2	Diego:	Back-end de negócio =	Pedidos com reserva de 15 min, cupons, lotes, reembolso, transferência de ingresso e saques do organizador. Integração de pagamento com o microsserviço em Go. E-mails (Brevo) com QR Code (ZXing) e arquivo .ics.   
+2	Diego :	 Back-end de negócio =	Pedidos com reserva de 15 min, cupons, lotes, reembolso, transferência de ingresso e saques do organizador. Integração de pagamento com o microsserviço em Go. E-mails (Brevo) com QR Code (ZXing) e arquivo .ics.   
 
-3 Joâo :	Banco de dados e infraestrutura =	Modelagem do PostgreSQL, migrations com Flyway, transações e travas. Banco no Neon, Docker (imagem multi-stage), deploy da API no Render e o script seed-demo.sh.     
+3 Joâo :	 Banco de dados e infraestrutura =	Modelagem do PostgreSQL, migrations com Flyway, transações e travas. Banco no Neon, Docker (imagem multi-stage), deploy da API no Render e o script seed-demo.sh.     
 
-4	Caio: 	Front-end =	React, React Router, TanStack Query e Tailwind. Telas de home, evento e escolha de lotes, checkout, ingresso com QR Code, painel do organizador e versão mobile. Deploy na Cloudflare Pages e proxy de sessão.     
+4	Caio : 	Front-end =	React, React Router, TanStack Query e Tailwind. Telas de home, evento e escolha de lotes, checkout, ingresso com QR Code, painel do organizador e versão mobile. Deploy na Cloudflare Pages e proxy de sessão.     
 
-5	Luna: Testes e qualidade =	JUnit, Testcontainers (PostgreSQL real), JaCoCo com cobertura mínima, Vitest no front. CI no GitHub Actions, CodeQL e Dependabot.     
+5	Luna :   Testes e qualidade =	JUnit, Testcontainers (PostgreSQL real), JaCoCo com cobertura mínima, Vitest no front. CI no GitHub Actions, CodeQL e Dependabot.     
 
-6	Brenno :	Requisitos e documentação =	Documento de Visão, Requisitos, Caso de Uso UC01 e Diagrama de Classes. README em português e inglês, referência da API (API.md), Swagger/OpenAPI e Roadmap.
+6	Brenno :	 Requisitos e documentação =	Documento de Visão, Requisitos, Caso de Uso UC01 e Diagrama de Classes. README em português e inglês, referência da API (API.md), Swagger/OpenAPI e Roadmap.
