@@ -220,9 +220,9 @@ Arquivos gerados a partir do código a cada build e conferidos no CI:
 
 Desenvolvido por Rodrigo Lutfy, Diego Santos, Brenno César, Caio Bretas, João Victor e Luna Vasconcelos para um projeto academico.
 
-Contato: [rodrigolutfy.dev@gmail.com](mailto:rodrigolutfy.dev@gmail.com) · GitHub: [rodrigolutfydev](https://github.com/rodrigolutfydev)
-Contato: [cainbretas@gmail.com](mailto:cainbretas@gmail.com) · GitHub: [caio-bretas](https://github.com/caio-bretas)
-Contato: [odiegodev10@gmail.com](mailto:odiegodev10@gmail.com)  · GitHub: [Odiegodev1](https://github.com/Odiegodev1)
-Contato:  · GitHub: [JoãoVictor_V7](https://github.com/joaovictorv7)
-Contato:  · GitHub: [bnx021](https://github.com/bnx021)
+Contato: [rodrigolutfy.dev@gmail.com](mailto:rodrigolutfy.dev@gmail.com) · GitHub: [rodrigolutfydev](https://github.com/rodrigolutfydev)          
+Contato: [cainbretas@gmail.com](mailto:cainbretas@gmail.com) · GitHub: [caio-bretas](https://github.com/caio-bretas)      
+Contato: [odiegodev10@gmail.com](mailto:odiegodev10@gmail.com)  · GitHub: [Odiegodev1](https://github.com/Odiegodev1)    
+Contato:  · GitHub: [JoãoVictor_V7](https://github.com/joaovictorv7)      
+Contato:  · GitHub: [bnx021](https://github.com/bnx021)    
 Contato:  · GitHub:
